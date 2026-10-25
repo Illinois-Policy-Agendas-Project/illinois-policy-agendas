@@ -5,8 +5,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&family=Figtree:wght@400;500;600;700&family=Literata:opsz,wght@7..72,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: masthead + tabs (home, three datasets, topics, sponsors, search). Light-only by design ("Lakefront"). */
-:root{ /* subtopic segments in stacked topic bars: the nth subtopic of every major topic gets the nth color */
-  --sc0:#5b86b8;--sc1:#f39a45;--sc2:#69ad5f;--sc3:#e46b6c;--sc4:#86c0bb;--sc5:#eccf5c;--sc6:#b986ab;--sc7:#f7a9b2;--sc8:#a8846f;--sc9:#9bd48d}
 :root{
   color-scheme:light;
   --bg:#ffffff; --band:#eef5fc; --sunk:#f4f7fb; --surface:#ffffff;
@@ -480,7 +478,7 @@ function hbars(el, items, {color='--accent', valFmt=fmt, labelW=200, rowH=24, ma
   items.forEach((d,i)=>{ const y=i*rowH+1, w=Math.max(d.value>0?2:0,iw*d.value/mx), lab=d.label.length>cpx?d.label.slice(0,Math.floor(cpx)-1)+'…':d.label, fill=`var(${d.color||color})`;
     let bar = `<path d="${rRight(m.l,y+5,w,rowH-10,3)}" style="fill:${fill}"/>`;
     if (d.segs?.length > 1 || d.segs?.[0]?.color){ let x = m.l; bar = '';
-      d.segs.forEach((g,j)=>{ const sw = iw*g.value/mx, last = j===d.segs.length-1, op = g.color ? 1 : j%2 ? .58 : 1, f = g.color ? `var(${g.color})` : fill;
+      d.segs.forEach((g,j)=>{ const sw = iw*g.value/mx, last = j===d.segs.length-1, op = g.color ? 1 : j%2 ? .58 : 1, f = g.color ? cssColor(g.color) : fill;
         bar += last ? `<path class="seg" data-j="${j}" d="${rRight(x,y+5,Math.max(sw,.5),rowH-10,3)}" style="fill:${f};fill-opacity:${op}"/>`
                     : `<rect class="seg" data-j="${j}" x="${x}" y="${y+5}" width="${Math.max(sw,.5)}" height="${rowH-10}" style="fill:${f};fill-opacity:${op};stroke:var(--surface);stroke-width:.75"/>`;
         x += sw; }); }
@@ -492,16 +490,21 @@ function hbars(el, items, {color='--accent', valFmt=fmt, labelW=200, rowH=24, ma
   const head = d => `<div class="t">${d.code!=null?`<span class="mono">${d.code}</span> `:''}${esc(d.label)}</div>`;
   $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i];
     g.addEventListener('pointermove', e=>{ const sg = e.target.closest('.seg'), p = sg && d.segs[+sg.dataset.j];
-      showTip(e, p ? `<div class="muted" style="font-size:11.5px">${d.code!=null?d.code+' · ':''}${esc(d.label)}</div><div class="seg-t">${p.color?`<i class="dot" style="background:var(${p.color});border-radius:2px"></i> `:''}<span class="mono">${p.code}</span> ${esc(p.label)}</div>${p.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(p.value)}</b></div>`}<div class="muted">${pct(p.value/Math.max(d.value,1e-9),0)} of this topic${d.onSeg?' · click to select':''}</div>`
+      showTip(e, p ? `<div class="muted" style="font-size:11.5px">${d.code!=null?d.code+' · ':''}${esc(d.label)}</div><div class="seg-t">${p.color?`<i class="dot" style="background:${cssColor(p.color)};border-radius:2px"></i> `:''}<span class="mono">${p.code}</span> ${esc(p.label)}</div>${p.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(p.value)}</b></div>`}<div class="muted">${pct(p.value/Math.max(d.value,1e-9),0)} of this topic${d.onSeg?' · click to select':''}</div>`
                      : head(d) + (d.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(d.value)}</b></div>`) + (d.segs?.length ? '<div class="muted">Hover a segment for its subtopic</div>' : '')); });
     g.addEventListener('pointerleave', hideTip);
     if (d.onclick || d.onSeg) g.addEventListener('click', e=>{ const sg = e.target.closest('.seg'); if (sg && d.onSeg) d.onSeg(d.segs[+sg.dataset.j]); else d.onclick?.(); }); });
 }
 /* subtopic pieces of one major topic's bar: rows already limited to the bar's records; value = count × scale */
-const subColor = c => { const i = subsOf(Math.floor(c/100)).indexOf(c); return '--sc' + ((i<0?0:i) % 10); };
+/* each major topic is one color family; its subtopics run from dark (largest piece) to light */
+const FAMILY = {1:[210,55],2:[265,45],3:[355,60],4:[85,45],5:[28,75],6:[310,45],7:[135,45],8:[46,80],9:[240,55],10:[192,60],12:[22,35],
+  13:[335,55],14:[60,30],15:[175,42],16:[150,22],17:[285,25],18:[38,35],19:[185,22],20:[220,6],21:[112,35],23:[330,25]};
+const family = m => FAMILY[m] || [Math.round((m * 47) % 360), 40];
+const shade = (m, j, n) => { const [h,sat] = family(m); return `hsl(${h} ${sat}% ${n>1 ? 40 + 44*j/(n-1) : 50}%)`; };
+const cssColor = c => c.startsWith('--') ? `var(${c})` : c;
 function subSegs(rows, major, scale=1, tip){
   return [...count(rows.filter(r=>r.major===major && r.sub!=null), r=>r.sub)].sort((a,b)=>b[1]-a[1])
-    .map(([c,n])=>({code:c, label:CB.subs[c]||('Subtopic '+c), value:n*scale, n, color:subColor(c), tip:tip?.(c,n)}));
+    .map(([c,n],j,a)=>({code:c, label:CB.subs[c]||('Subtopic '+c), value:n*scale, n, color:shade(major, j, a.length), tip:tip?.(c,n)}));
 }
 /* line chart, shares; series [{label, cls, color, pts:[[x,share,n,total]]}] */
 function lines(el, xs, series, {height=220, bands=true}={}){
