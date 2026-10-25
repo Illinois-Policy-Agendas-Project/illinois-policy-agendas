@@ -12,6 +12,7 @@ DATA = Path(os.environ.get('IL_AGENDAS_DATA') or ROOT).expanduser().resolve()
 PORT = int(os.environ.get('IL_AGENDAS_PORT', 8777))
 CFG = tomllib.loads((ROOT / 'config.toml').read_text(encoding='utf-8'))
 OUT = ROOT / CFG['build']['output']
+VERSION = subprocess.run(['git', 'log', '-1', '--format=%h, %cd', '--date=format:%b %d %Y %H:%M'], cwd=ROOT, capture_output=True, text=True).stdout.strip() or 'unknown'
 JOB = {'name': None, 'running': False, 'log': [], 'code': None}
 LOCK = threading.Lock()
 
@@ -38,7 +39,7 @@ def status():
     s = json.loads(st.read_text()) if st.exists() else None
     pub = DATA / 'state' / 'publish_log.csv'
     last_pub = pub.read_text().strip().splitlines()[-1].split(',')[0] if pub.exists() and len(pub.read_text().strip().splitlines()) > 1 else None
-    return {'build': s, 'published': last_pub, 'method': CFG['publish'].get('method'), 'sessions': [int(x['ga']) for x in CFG['bills']['sessions']],
+    return {'version': VERSION, 'build': s, 'published': last_pub, 'method': CFG['publish'].get('method'), 'sessions': [int(x['ga']) for x in CFG['bills']['sessions']],
             'job': {k: JOB[k] for k in ('name', 'running', 'code')}, 'log': JOB['log'][-400:]}
 
 
@@ -64,6 +65,7 @@ pre{background:#0f1720;color:#dbe4ee;border-radius:8px;padding:12px;font:12.5px/
 <h1>Update the Illinois Policy Agendas website</h1>
 <p class="muted">Coders save into the <code>inputs</code> folder in Dropbox. Then check, look, and publish. The site's code updates itself from GitHub each time this panel opens.</p>
 <div class="status" id="status">Loading…</div>
+<p class="muted" id="version" style="font-size:12.5px;margin:-12px 0 16px"></p>
 <div class="steps">
   <div class="step"><span class="n">1</span><div><h2>Check data</h2><p>Reads every input file, checks the codes, and rebuilds the site on this computer. Takes about a minute.</p></div>
     <div class="act"><button class="primary" id="build">Check data</button></div></div>
@@ -87,6 +89,7 @@ async function poll(){
   $('#status').className = 'status ' + (b ? (b.ok ? 'ok' : 'bad') : '');
   $('#status').innerHTML = b ? `<b>${b.ok ? 'Last check passed: ready to publish' : `Last check found ${b.errors} error${b.errors>1?'s':''}: open the report`}</b>Checked ${b.built}. ${s.published ? 'Last published '+s.published+'.' : 'Not published from this computer yet.'}` : '<b>Not checked yet</b>Start with step 1.';
   if (busy) $('#status').innerHTML = `<b>Working: ${s.job.name}…</b>This page updates by itself.`;
+  $('#version').textContent = 'Site code version ' + s.version + ' (updates from GitHub each time you open Update website)';
   $('#pubdesc').textContent = desc[s.method] || '';
   $('#pw').hidden = s.method !== 'sftp';
   for (const id of ['build','sheet','logos']) $('#'+id).disabled = busy;
@@ -163,8 +166,16 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    srv = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)  # this computer only
-    url = f'http://127.0.0.1:{PORT}/'
+    # an older control panel may still be running in another window; take the next free port instead of failing
+    for port in range(PORT, PORT + 20):
+        try:
+            srv = ThreadingHTTPServer(('127.0.0.1', port), Handler)  # this computer only
+            break
+        except OSError:
+            print(f'Port {port} is in use (probably an older control panel still open in another window); trying {port + 1}.')
+    else:
+        raise SystemExit('Could not start the control panel: close the other "Update website" windows and try again.')
+    url = f'http://127.0.0.1:{port}/'
     print(f'Control panel: {url}\nLeave this window open while you work; close it when you are done.')
     if not os.environ.get('IL_AGENDAS_NO_BROWSER'):
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
