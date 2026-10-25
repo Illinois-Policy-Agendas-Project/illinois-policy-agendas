@@ -95,11 +95,16 @@ def _with_intermediates(host, port, timeout):
             break
         with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'}), timeout=timeout) as r:
             data = r.read()
-        pem = _as_pem(data)
+        try:
+            pem = _as_pem(data)
+            next_der = ssl.PEM_cert_to_DER_cert(pem)
+            ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT).load_verify_locations(cadata=pem)  # is it really a certificate?
+        except (ValueError, ssl.SSLError):  # not a single certificate (some issuers link a .p7c bundle): stop here
+            break
         if pem in pems:
             break
         pems.append(pem)
-        der = ssl.PEM_cert_to_DER_cert(pem)
+        der = next_der
     if not pems:
         return []
     out = []

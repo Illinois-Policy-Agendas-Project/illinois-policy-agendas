@@ -1280,10 +1280,10 @@ function buildSponsors(people){
   SPONKEY = new Map(SPON.map(p=>[p.slug,p]));
 }
 /* party, district and photo from legislators.json (pipeline/fetch_legislators.py), matched by chamber and name:
-   first and last name (or nickname and last name), ignoring middle initials, suffixes and accents; last name alone when that is unique */
+   first and last name (or nickname and last name), ignoring middle initials, suffixes, accents and the second half of a hyphenated surname; last name alone when that is unique */
 const nameParts = n => { const a = n.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/,?\s+(jr|sr|ii|iii|iv)\.?$/,'');
   const nick = (a.match(/"([^"]+)"/)||[])[1]; const w = a.replace(/"[^"]*"/g,' ').replace(/\b[a-z]\.(?=\s)/g,' ').replace(/[^a-z' -]/g,' ').split(/\s+/).filter(Boolean);
-  return {first:w[0]||'', last:w[w.length-1]||'', nick:nick?nick.trim().split(/\s+/)[0]:null}; };
+  return {first:w[0]||'', last:(w[w.length-1]||'').split('-')[0], nick:nick?nick.trim().split(/\s+/)[0]:null}; };
 let LEGS = [];
 function attachLegislators(list){
   LEGS = list; if (!list.length) return;

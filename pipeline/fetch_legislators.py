@@ -42,7 +42,9 @@ def first_last(name):
     """ILGA sometimes writes "Last, First M." -- turn it into "First M. Last"."""
     name = clean(name)
     m = re.match(r'^([^,]+),\s*(.+?)(,\s*(Jr\.?|Sr\.?|II|III|IV))?$', name)
-    return f'{m.group(2)} {m.group(1)}{m.group(3) or ""}' if m and not re.search(r'\b(Jr|Sr|II|III|IV)\.?$', m.group(1)) else name
+    if m and re.fullmatch(r'(Jr|Sr|II|III|IV)\.?', m.group(2)):  # "Jaime M. Andrade, Jr." is already First Last
+        return name
+    return f'{m.group(2)} {m.group(1)}{m.group(3) or ""}' if m else name
 
 
 def party_of(text):
@@ -114,10 +116,39 @@ class Page(HTMLParser):
             self._h.append(data)
 
 
-def read_list(chamber, log):
-    """Members from the chamber's list page: [{name, url, party, district}]."""
+CARD = re.compile(r'''(<div class="member-card(?: [^"]*)?"[^>]*>).*?<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>\s*\(([^)]*)\)\s*</h2>(.*?)</div>\s*</div>''', re.S | re.I)
+CARD_PHOTO = re.compile(r'''url\(\s*['"]?([^'")\s]+)''')
+
+
+def read_cards(text, final):
+    """Members on ilga.gov's card layout. The page lists each member twice (desktop and mobile layouts), then repeats the
+    cards of members who have left under a "Former Members" heading. Returns (current, former)."""
+    cut = text.find('Former Members')
+    out = []
+    for part in (text[:cut] if cut >= 0 else text, text[cut:] if cut >= 0 else ''):
+        seen, rows = set(), []
+        for m in CARD.finditer(part):
+            opening, href, name, party, rest = m.groups()
+            photo = (CARD_PHOTO.search(opening) or [None, ''])[1]
+            url = urljoin(final, href)
+            if url in seen:
+                continue
+            seen.add(url)
+            dm = re.search(r'(\d{1,3})(?:st|nd|rd|th)\s+District', clean(re.sub(r'<[^>]+>', ' ', rest)))
+            rows.append({'name': first_last(re.sub(r'<[^>]+>', '', name)), 'url': url, 'party': party_of(party),
+                         'district': dm.group(1) if dm else '', 'photo_url': urljoin(final, photo) if photo else ''})
+        out.append(rows)
+    return out[0], out[1]
+
+
+def read_list(chamber, log, former=False):
+    """Members from the chamber's list page: [{name, url, party, district, photo_url}]."""
     page, _, final = get(LISTS[chamber])
     text = page.decode('utf-8', 'replace')
+    cur, old = read_cards(text, final)
+    if cur:
+        log(f'{chamber}: {len(cur)} current members and {len(old)} former members on {LISTS[chamber]}')
+        return old if former else cur
     p = Rows()
     p.feed(text)
     out, seen = [], set()
@@ -214,6 +245,7 @@ def main(argv=None, log=print):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--force', action='store_true', help='download every photo again')
     ap.add_argument('--chamber', choices=['House', 'Senate'], help='just one chamber')
+    ap.add_argument('--former', action='store_true', help='also add members listed as "Former Members" who are not already in the file, as manual rows')
     a = ap.parse_args(argv)
     cfg = tomllib.loads((ROOT / 'config.toml').read_text(encoding='utf-8'))
     csv_path = ROOT / cfg.get('legislators', {}).get('file', 'content/legislators/members.csv')
@@ -232,14 +264,24 @@ def main(argv=None, log=print):
             problems.append(f'{chamber} list: {e}')
             log(f'Could not read the {chamber} list: {e}')
             continue
+        if a.former:
+            try:
+                have = {r['name'] for r in rows if r['chamber'] == chamber} | {n for c, n in old if c == chamber}
+                members += [dict(m, source='manual') for m in read_list(chamber, log, former=True) if m['name'] not in have]
+            except Exception as e:  # noqa: BLE001
+                problems.append(f'{chamber} former members: {e}')
         for i, m in enumerate(members, 1):
             prev = old.get((chamber, m['name']))
             if prev and prev.get('source') == 'manual':
                 rows.append(prev)
                 continue
-            row = {'chamber': chamber, 'district': m['district'], 'name': m['name'], 'party': m['party'], 'url': m['url'], 'photo': (prev or {}).get('photo', ''), 'source': 'ilga.gov'}
+            row = {'chamber': chamber, 'district': m['district'], 'name': m['name'], 'party': m['party'], 'url': m['url'], 'photo': (prev or {}).get('photo', ''), 'source': m.get('source', 'ilga.gov')}
             try:
-                photo_url = read_member(m, log)
+                photo_url = m.get('photo_url')
+                if not (photo_url and m['party'] and m['district']):  # the list shows all three; the member's own page is the fallback
+                    photo_url = photo_url or read_member(m, log)
+                    if not (m['party'] and m['district']):
+                        read_member(m, log)
                 row['party'], row['district'] = m['party'], m['district']
                 have = row['photo'] and (photo_dir / row['photo']).exists()
                 if photo_url and (a.force or not have):
@@ -254,7 +296,9 @@ def main(argv=None, log=print):
     if not rows:
         log('Nothing collected. Check the internet connection, or whether ilga.gov changed its member pages.')
         return 1
-    kept = [r for k, r in old.items() if k[0] not in {x['chamber'] for x in rows}]  # chambers not fetched this time
+    have = {(x['chamber'], x['name']) for x in rows}
+    # chambers not fetched this time, and hand-edited rows for people who are no longer on the current list
+    kept = [r for k, r in old.items() if k not in have and (k[0] not in {x['chamber'] for x in rows} or r.get('source') == 'manual')]
     rows = sorted(rows + kept, key=lambda r: (r['chamber'], int(r['district'] or 999), r['name']))
     with open(csv_path, 'w', newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=COLS, extrasaction='ignore')
