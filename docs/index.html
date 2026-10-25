@@ -21,6 +21,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15p
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--band)}
 a{color:var(--accent)}
 button,input,select{font:inherit;color:inherit}
+select{max-width:100%;min-width:0;text-overflow:ellipsis} .phead > div{min-width:0}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .mono{font-family:var(--f-mono);font-size:.86em} .muted{color:var(--muted)} .ink2{color:var(--ink-2)} .num{font-variant-numeric:tabular-nums}
@@ -306,6 +307,17 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 @media (max-width:560px){ .leg-photo{width:64px;height:80px} }
 .pfun{width:100%;border-collapse:collapse;font-size:13.5px} .pfun th{text-align:left;font-weight:600;color:var(--ink-2);font-size:12px;padding:6px 8px} .pfun tbody th{font-size:13.5px;color:var(--ink);white-space:nowrap}
 .pfun td{padding:8px;position:relative;vertical-align:top;border-top:1px solid var(--line)} .pfun .pbar{display:block;height:5px;border-radius:3px;margin-top:5px;opacity:.85}
+@media (max-width:560px){ .pfun{font-size:12.5px} .pfun td,.pfun th{padding:6px 4px} .pfun tbody th{font-size:12.5px} .pfun td .muted{display:block} }
+/* phones: data tables become one card per row; each value is labeled with its column (labels added by labelTables) */
+@media (max-width:560px){
+  table.dt{min-width:0!important} table.dt thead{display:none} table.dt,table.dt tbody{display:block}
+  table.dt tr{display:block;padding:10px 4px 9px;border-bottom:1px solid var(--line)} table.dt tr:hover td{background:none!important}
+  table.dt td{display:block;border:0;padding:2px 6px;text-align:left!important;width:auto!important;min-width:0!important}
+  table.dt td[data-l]:not([data-l=""])::before{content:attr(data-l);display:inline-block;min-width:118px;font-size:11.5px;color:var(--muted);font-weight:500}
+  table.dt td:first-child{font-weight:600} table.dt td:first-child::before{display:none!important}
+  table.dt td:has(div,a.rl)::before{display:block!important;margin-bottom:1px}
+  .tscroll{overflow:visible}
+}
 .orglist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
 .orgcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .orgcard:hover{border-color:var(--s-tt)}
@@ -485,20 +497,24 @@ function columns(el, labels, series, {height=190, tipTitle=l=>l, every}={}){
 /* horizontal bars: items [{label, code, value, color, tip, onclick, on, segs}]
    segs (optional): the bar split into stacked pieces [{code, label, value, tip}], largest first; hover a piece for its own tooltip */
 function hbars(el, items, {color='--accent', valFmt=fmt, labelW=200, rowH=24, max}={}){
-  const W=cw(el); labelW=Math.min(labelW, W*.45); const m={l:labelW,r:58}, H=items.length*rowH+2;
-  const mx = max ?? niceMax(Math.max(1,...items.map(d=>d.value))); const cpx = labelW/6.4, iw = W-m.l-m.r;
+  // on narrow screens each label sits on its own line above a full-width bar, instead of taking half the width
+  const W=cw(el), nar = W < 480; labelW = nar ? 0 : Math.min(labelW, W*.45);
+  const RH = nar ? rowH+14 : rowH, bh = rowH-10, m={l:labelW,r:nar?44:58}, H=items.length*RH+2;
+  const mx = max ?? niceMax(Math.max(...items.map(d=>d.value), 0) || 1); const cpx = nar ? W/6.6 : labelW/6.4, iw = W-m.l-m.r;   // scale to the data (shares too)
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart">`;
-  items.forEach((d,i)=>{ const y=i*rowH+1, w=Math.max(d.value>0?2:0,iw*d.value/mx), lab=d.label.length>cpx?d.label.slice(0,Math.floor(cpx)-1)+'…':d.label, fill=`var(${d.color||color})`;
-    let bar = `<path d="${rRight(m.l,y+5,w,rowH-10,3)}" style="fill:${fill}"/>`;
+  items.forEach((d,i)=>{ const y=i*RH+1, by = y + (nar ? 16 : 5), w=Math.max(d.value>0?2:0,iw*d.value/mx), lab=d.label.length>cpx?d.label.slice(0,Math.floor(cpx)-1)+'…':d.label, fill=`var(${d.color||color})`;
+    let bar = `<path d="${rRight(m.l,by,w,bh,3)}" style="fill:${fill}"/>`;
     if (d.segs?.length > 1 || d.segs?.[0]?.color){ let x = m.l; bar = '';
       d.segs.forEach((g,j)=>{ const sw = iw*g.value/mx, last = j===d.segs.length-1, op = g.color ? 1 : j%2 ? .58 : 1, f = g.color ? cssColor(g.color) : fill;
-        bar += last ? `<path class="seg" data-j="${j}" d="${rRight(x,y+5,Math.max(sw,.5),rowH-10,3)}" style="fill:${f};fill-opacity:${op}"/>`
-                    : `<rect class="seg" data-j="${j}" x="${x}" y="${y+5}" width="${Math.max(sw,.5)}" height="${rowH-10}" style="fill:${f};fill-opacity:${op};stroke:var(--surface);stroke-width:.75"/>`;
+        bar += last ? `<path class="seg" data-j="${j}" d="${rRight(x,by,Math.max(sw,.5),bh,3)}" style="fill:${f};fill-opacity:${op}"/>`
+                    : `<rect class="seg" data-j="${j}" x="${x}" y="${by}" width="${Math.max(sw,.5)}" height="${bh}" style="fill:${f};fill-opacity:${op};stroke:var(--surface);stroke-width:.75"/>`;
         x += sw; }); }
-    s += `<g class="hb" data-i="${i}" style="cursor:${d.onclick?'pointer':'default'}"><rect x="0" y="${y}" width="${W}" height="${rowH}" style="fill:${d.on?'var(--sel)':'transparent'}" rx="4"/>`+
-      `<text x="${m.l-8}" y="${y+rowH/2+4}" text-anchor="end" style="fill:var(--ink-2);font-size:12px;${d.on?'font-weight:700':''}">${esc(lab)}</text>`+
-      `${bar}<text x="${m.l+w+6}" y="${y+rowH/2+4}" style="fill:var(--ink-2)">${valFmt(d.value)}</text></g>`; });
-  s += `<line class="base" x1="${m.l}" x2="${m.l}" y1="0" y2="${H}"/></svg>`;
+    s += `<g class="hb" data-i="${i}" style="cursor:${d.onclick?'pointer':'default'}"><rect x="0" y="${y}" width="${W}" height="${RH}" style="fill:${d.on?'var(--sel)':'transparent'}" rx="4"/>`+
+      (nar ? `<text x="2" y="${y+12}" style="fill:var(--ink-2);font-size:12px;${d.on?'font-weight:700':''}">${esc(lab)}</text>`
+           : `<text x="${m.l-8}" y="${y+rowH/2+4}" text-anchor="end" style="fill:var(--ink-2);font-size:12px;${d.on?'font-weight:700':''}">${esc(lab)}</text>`)+
+      `${bar}<text x="${m.l+w+6}" y="${by+bh/2+4}" style="fill:var(--ink-2)">${valFmt(d.value)}</text></g>`; });
+  if (!nar) s += `<line class="base" x1="${m.l}" x2="${m.l}" y1="0" y2="${H}"/>`;
+  s += `</svg>`;
   el.innerHTML = s; el.classList.add('chart');
   const head = d => `<div class="t">${d.code!=null?`<span class="mono">${d.code}</span> `:''}${esc(d.label)}</div>`;
   $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i];
@@ -1713,7 +1729,7 @@ function renderParties(){
   <div class="grid2">${PARTIES.map(pt=>`<div class="panel"><div class="chead"><h3>${PNOUN[pt]} who draw the most cross-party sponsors</h3><span class="muted" style="font-size:12px">Share of their bills as primary sponsor; at least 10 bills</span></div><div id="pt-x-${pt[0]}"></div></div>`).join('')}</div>`;
 
   // bipartisan share by party
-  hbars($('#pt-bi'), PARTIES.map(pt=>({label:PNOUN[pt], value:st[pt].bi/Math.max(1,st[pt].n), color:PCSS[pt], tip:`<div class="r"><span>Bipartisan bills</span><b class="num">${fmt(st[pt].bi)} of ${fmt(st[pt].n)}</b></div>`})), {labelW:110, rowH:30, valFmt:v=>pct(v,0), max:1});
+  hbars($('#pt-bi'), PARTIES.map(pt=>({label:PNOUN[pt], value:st[pt].bi/Math.max(1,st[pt].n), color:PCSS[pt], tip:`<div class="r"><span>Bipartisan bills</span><b class="num">${fmt(st[pt].bi)} of ${fmt(st[pt].n)}</b></div>`})), {labelW:110, rowH:30, valFmt:v=>pct(v,0)});
   // agenda: paired bars per topic
   const pool = pt => (PT.agenda==='law' ? by(pt).filter(r=>r.x.stage>=5) : by(pt)).filter(isPol);
   const P = Object.fromEntries(PARTIES.map(pt=>[pt, pool(pt)])), C = Object.fromEntries(PARTIES.map(pt=>[pt, count(P[pt], r=>r.major)]));
@@ -1727,12 +1743,15 @@ function renderParties(){
   divBars($('#pt-df'), majors.map(m=>({label:CB.majors[m], code:m, value:share('Democratic',m)-share('Republican',m)})).sort((a,b)=>b.value-a.value), ['--pr','--pd'], ['More Republican','More Democratic']);
   // bipartisan by topic
   const bt = [...count(B.filter(isPol), r=>r.major)].filter(([,n])=>n>=20).map(([m,n])=>[m, B.filter(r=>r.major===m && isBipartisan(r)).length, n]).sort((a,b)=>b[1]/b[2]-a[1]/a[2]);
-  hbars($('#pt-bt'), bt.map(([m,k,n])=>({label:CB.majors[m], code:m, value:k/n, color:'--h3', tip:`<div class="r"><span>Bipartisan</span><b class="num">${fmt(k)} of ${fmt(n)}</b></div>`})), {labelW:200, rowH:21, valFmt:v=>pct(v,0), max:1});
-  // legislators who draw cross-party sponsors
+  hbars($('#pt-bt'), bt.map(([m,k,n])=>({label:CB.majors[m], code:m, value:k/n, color:'--h3', tip:`<div class="r"><span>Bipartisan</span><b class="num">${fmt(k)} of ${fmt(n)}</b></div>`})), {labelW:200, rowH:21, valFmt:v=>pct(v,0)});
+  // legislators who draw cross-party sponsors (both charts on one scale)
+  const xrows = {};
   for (const pt of PARTIES){
-    const rows = SPON.filter(p=>p.party===pt && (PT.ch==='all'||p.ch===PT.ch)).map(p=>{ const mine = p.bills.filter(b=>b.role==='C' && b.r.x.ga===ga && isBillT(b.r)).map(b=>b.r); return [p, mine.length, mine.filter(isBipartisan).length]; })
-      .filter(([,n])=>n>=10).sort((a,b)=>b[2]/b[1]-a[2]/a[1] || b[2]-a[2]).slice(0,10);
-    hbars($('#pt-x-'+pt[0]), rows.map(([p,n,k])=>({label:p.title, value:k/n, color:PCSS[pt], tip:`<div class="r"><span>Bipartisan bills</span><b class="num">${fmt(k)} of ${fmt(n)}</b></div><div class="muted">Click for their page</div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:190, rowH:22, valFmt:v=>pct(v,0), max:1});
+    xrows[pt] = SPON.filter(p=>p.party===pt && (PT.ch==='all'||p.ch===PT.ch)).map(p=>{ const mine = p.bills.filter(b=>b.role==='C' && b.r.x.ga===ga && isBillT(b.r)).map(b=>b.r); return [p, mine.length, mine.filter(isBipartisan).length]; })
+      .filter(([,n])=>n>=10).sort((a,b)=>b[2]/b[1]-a[2]/a[1] || b[2]-a[2]).slice(0,10); }
+  const xmax = niceMax(Math.max(0.01, ...PARTIES.flatMap(pt=>xrows[pt].map(([,n,k])=>k/n))));
+  for (const pt of PARTIES){
+    hbars($('#pt-x-'+pt[0]), xrows[pt].map(([p,n,k])=>({label:p.title, value:k/n, color:PCSS[pt], tip:`<div class="r"><span>Bipartisan bills</span><b class="num">${fmt(k)} of ${fmt(n)}</b></div><div class="muted">Click for their page</div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:190, rowH:22, valFmt:v=>pct(v,0), max:xmax});
   }
   $$('[data-pc]').forEach(b=>b.addEventListener('click', ()=>{ PT.ch=b.dataset.pc; renderParties(); }));
   $$('[data-pa]').forEach(b=>b.addEventListener('click', ()=>{ PT.agenda=b.dataset.pa; renderParties(); }));
@@ -1741,27 +1760,30 @@ function renderParties(){
 }
 /* two bars per row (one per party), sharing one scale */
 function pairBars(el, items, colors, {labelW=210, rowH=34}={}){
-  const W=cw(el); labelW=Math.min(labelW, W*.42); const m={l:labelW,r:52}, H=items.length*rowH+2, iw=W-m.l-m.r;
-  const mx = niceMax(Math.max(0.01,...items.flatMap(d=>d.vals))), bh=(rowH-10)/2, cpx = labelW/6.4;
+  const W=cw(el), nar = W < 480; labelW = nar ? 0 : Math.min(labelW, W*.42);
+  const RH = nar ? rowH+14 : rowH, top = nar ? 16 : 4, m={l:labelW,r:nar?40:52}, H=items.length*RH+2, iw=W-m.l-m.r;
+  const mx = niceMax(Math.max(0.01,...items.flatMap(d=>d.vals))), bh=(rowH-10)/2, cpx = nar ? W/6.6 : labelW/6.4;
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Paired bar chart">`;
-  items.forEach((d,i)=>{ const y=i*rowH+1, lab=d.label.length>cpx?d.label.slice(0,Math.floor(cpx)-1)+'…':d.label;
-    s += `<g class="hb" data-i="${i}" style="cursor:${d.onclick?'pointer':'default'}"><rect x="0" y="${y}" width="${W}" height="${rowH}" fill="transparent"/><text x="${m.l-8}" y="${y+rowH/2+4}" text-anchor="end" style="fill:var(--ink-2);font-size:12px">${esc(lab)}</text>`;
-    d.vals.forEach((v,j)=>{ const w=Math.max(v>0?2:0, iw*v/mx), yy=y+4+j*(bh+2);
+  items.forEach((d,i)=>{ const y=i*RH+1, lab=d.label.length>cpx?d.label.slice(0,Math.floor(cpx)-1)+'…':d.label;
+    s += `<g class="hb" data-i="${i}" style="cursor:${d.onclick?'pointer':'default'}"><rect x="0" y="${y}" width="${W}" height="${RH}" fill="transparent"/>`
+      + (nar ? `<text x="2" y="${y+12}" style="fill:var(--ink-2);font-size:12px">${esc(lab)}</text>` : `<text x="${m.l-8}" y="${y+rowH/2+4}" text-anchor="end" style="fill:var(--ink-2);font-size:12px">${esc(lab)}</text>`);
+    d.vals.forEach((v,j)=>{ const w=Math.max(v>0?2:0, iw*v/mx), yy=y+top+j*(bh+2);
       s += `<path d="${rRight(m.l,yy,w,bh,2)}" style="fill:var(${colors[j]})"/><text x="${m.l+w+5}" y="${yy+bh-1.5}" style="fill:var(--ink-2);font-size:10.5px">${pct(v,0)}</text>`; });
     s += `</g>`; });
-  s += `<line class="base" x1="${m.l}" x2="${m.l}" y1="0" y2="${H}"/></svg>`;
+  if (!nar) s += `<line class="base" x1="${m.l}" x2="${m.l}" y1="0" y2="${H}"/>`;
+  s += `</svg>`;
   el.innerHTML = s; el.classList.add('chart');
   $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i]; bindTip(g, ()=>`<div class="t"><span class="mono">${d.code}</span> ${esc(d.label)}</div>${d.tip||''}`); if (d.onclick) g.addEventListener('click', d.onclick); });
 }
 /* bars to the left (negative) or right (positive) of a center line */
 function divBars(el, items, colors, ends, {rowH=21}={}){
-  const W=cw(el), H=items.length*rowH+22, mid=W*0.5, lab=150, half=Math.min(mid-lab-30, W-mid-40);
-  const mx = Math.max(0.01,...items.map(d=>Math.abs(d.value)));
+  const W=cw(el), lab = Math.min(170, Math.round(W*0.36)), plot = W-lab-8, mid = lab + plot/2, half = plot/2 - 34, H=items.length*rowH+24;
+  const mx = Math.max(0.01,...items.map(d=>Math.abs(d.value))), cpx = lab/6.3;
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Difference chart"><text x="${mid-6}" y="12" text-anchor="end" style="font-size:11px;fill:var(${colors[0]})">← ${ends[0]}</text><text x="${mid+6}" y="12" style="font-size:11px;fill:var(${colors[1]})">${ends[1]} →</text>`;
   items.forEach((d,i)=>{ const y=20+i*rowH, w=half*Math.abs(d.value)/mx, pos=d.value>=0, x=pos?mid:mid-w, pts=(d.value*100).toFixed(1);
     s += `<g class="hb" data-i="${i}"><rect x="0" y="${y}" width="${W}" height="${rowH}" fill="transparent"/>`
+      + `<text x="${lab-6}" y="${y+rowH/2+4}" text-anchor="end" style="fill:var(--ink-2);font-size:11.5px">${esc(d.label.length>cpx?d.label.slice(0,Math.floor(cpx)-1)+'…':d.label)}</text>`
       + `<rect x="${x}" y="${y+4}" width="${Math.max(1,w)}" height="${rowH-8}" rx="2" style="fill:var(${colors[pos?1:0]})"/>`
-      + `<text x="${pos?mid-6:mid+6}" y="${y+rowH/2+4}" text-anchor="${pos?'end':'start'}" style="fill:var(--ink-2);font-size:11.5px">${esc(d.label.length>24?d.label.slice(0,23)+'…':d.label)}</text>`
       + `<text x="${pos?mid+w+4:mid-w-4}" y="${y+rowH/2+4}" text-anchor="${pos?'start':'end'}" style="fill:var(--ink-2);font-size:10.5px">${pos?'+':''}${pts}</text></g>`; });
   s += `<line class="base" x1="${mid}" x2="${mid}" y1="16" y2="${H}"/></svg>`;
   el.innerHTML = s; el.classList.add('chart');
@@ -1989,6 +2011,10 @@ document.addEventListener('click', e=>{ const a = e.target.closest('a[href^="#"]
 addEventListener('popstate', ()=>{ const t = location.hash.slice(1); if (parseRoute(t) && t !== CUR){ if (STACK.length && STACK[STACK.length-1].token === t) return back(); nav(t, {record:false}); } });
 addEventListener('hashchange', ()=>{ const t = location.hash.slice(1); if (parseRoute(t) && t !== CUR) nav(t); });
 let lastW = innerWidth, rz; addEventListener('resize', ()=>{ if (Math.abs(innerWidth-lastW)<40) return; lastW=innerWidth; clearTimeout(rz); rz=setTimeout(()=>{ if (R.length) nav(CUR, {record:false, keep:true}); },250); });
+/* give every cell of a data table its column's name, for the phone layout above */
+function labelTables(root){ for (const t of root.querySelectorAll('table.dt')){ const hs = [...t.querySelectorAll('thead th')].map(th=>th.textContent.replace(/[▲▼]/g,'').trim());
+  for (const tr of t.querySelectorAll('tbody tr')) [...tr.children].forEach((td,i)=>{ if (td.tagName==='TD' && !td.hasAttribute('data-l') && td.colSpan===1) td.setAttribute('data-l', hs[i]||''); }); } }
+new MutationObserver(()=>labelTables(document)).observe(document.getElementById('view'), {childList:true, subtree:true});
 let start = location.hash.slice(1); if (!parseRoute(start||'')) start='home';
 nav(start, {record:false});
 load().then(()=>nav(CUR, {record:false, keep:true})).catch(e=>{ $('#view').innerHTML = `<div class="loading">Could not load the data files (${esc(e.message)}). Reload the page to try again.</div>`; });
