@@ -859,7 +859,8 @@ function renderSpeeches(){
     <div class="kpi"><span class="l">Coded sentences</span><span class="v">${fmt(all.length)}</span><span class="s">${fmt(pol.length)} with policy content</span></div>
     <div class="kpi"><span class="l">Most-mentioned topic</span><span class="v" style="font-size:19px;padding-block:4px">${esc(CB.majors[topM[0]])}</span><span class="s">${pct(topM[1]/pol.length)} of policy sentences</span></div>
   </div>
-  <div class="panel" style="margin-bottom:16px"><div class="chead"><h3>The addresses</h3><div class="fbar" style="margin:0"><label class="ink2" for="s-major" style="font-size:13px">Mark sentences on</label><select id="s-major">${majorOptions(SP.major,'No topic')}</select></div></div>
+  <div class="panel" style="margin-bottom:16px"><div class="chead"><h3>The addresses</h3></div>
+    <div class="fbar" style="margin:8px 0 12px;justify-content:flex-start"><label class="ink2" for="s-major" style="font-size:13px">Mark sentences on</label><select id="s-major">${majorOptions(SP.major,'No topic')}</select></div>
     <div class="addrs">${years.map(y=>{ const ss=all.filter(r=>r.year===y).sort((a,b)=>a.id-b.id); const n=SP.major==null?0:ss.filter(r=>r.major===SP.major).length;
       return `<a class="addr" href="#speech-${y}"><span class="yr">${y}</span><span class="gv">${esc(govLabel(govOf(y), y))}</span>
         <span class="mstrip">${ss.map(r=>`<i class="${SP.major!=null&&r.major===SP.major?'on':''}"></i>`).join('')}</span>
