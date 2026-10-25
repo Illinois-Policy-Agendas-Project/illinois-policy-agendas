@@ -64,7 +64,7 @@ input[type=search]{padding:8px 12px}
 .fbar select{flex:0 1 auto;min-width:0;text-overflow:ellipsis}
 .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
 .grid-wide{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.kpis{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:12px;margin-bottom:16px}
 .kpi{background:var(--sunk);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:1px}
 .kpi .l{font-size:12.5px;color:var(--ink-2)} .kpi .v{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25} .kpi .s{font-size:12px;color:var(--muted)}
 .fbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-block:6px 12px}
@@ -649,12 +649,10 @@ function renderBills(){
             ['Policy-coded', fmt(all.filter(isPol).length), `${fmt(all.filter(r=>r.sub==null).length)} not yet coded`],
             ['Primary sponsors', fmt(chiefs.size), 'legislators who introduced at least one bill']],
     committee: [['Bills out of committee', fmt(out.length), `${pct(out.length/Math.max(1,B.length))} of bills introduced`],
-            ['Went on to pass a chamber', fmt(B.filter(r=>r.x.stage>=3).length), `${pct(B.filter(r=>r.x.stage>=3).length/Math.max(1,out.length))} of bills out of committee`],
             ['Became law', fmt(laws.length), `${pct(laws.length/Math.max(1,out.length))} of bills out of committee`],
             ['Busiest committee', topCmte ? esc(topCmte[0].replace(/ Committee$/,'')) : '—', topCmte ? `${fmt(topCmte[1])} bills advanced` : '']],
     law: [['Bills that became law', fmt(laws.length), `${pct(laws.length/Math.max(1,B.length))} of ${fmt(B.length)} bills introduced`],
             ['Median time to law', median(lawDays)!=null ? `${fmt(median(lawDays))} days` : '—', 'from introduction to Public Act'],
-            ['Passed both chambers', fmt(B.filter(r=>r.x.stage>=4).length), `${fmt(B.filter(r=>r.x.stage===4).length)} not (yet) law`],
             ['Vetoed', fmt(B.filter(r=>r.x.veto).length), 'total, amendatory or item veto']]
   }[V];
   const big = v => String(v).length > 14 ? 'font-size:17px;padding-block:5px' : '';
@@ -679,7 +677,7 @@ function renderBills(){
     const inner = `<span class="fs">${s}</span><span class="fn num">${fmt(funnel[i])}</span><span class="fp">${i?pct(funnel[i]/Math.max(1,funnel[0]),1)+' of bills':'substantive bills'}</span><i class="fbar-in" style="width:${(funnel[i]/Math.max(1,funnel[0])*100).toFixed(1)}%"></i>`;
     return link ? `<a class="fstep ${on?'on':''}" href="#${link}">${inner}</a>` : `<div class="fstep">${inner}</div>`; }).join('<span class="farrow" aria-hidden="true">›</span>')}</div>
   <p class="muted" style="font-size:12px;margin:-6px 0 14px">${BL.major!=null?`Bills on ${esc(BL.sub!=null?CB.subs[BL.sub]:CB.majors[BL.major])} only. `:''}Furthest stage each bill reached, read from its ILGA action history. "Out of committee" includes bills sent straight to the floor by Senate Assignments.</p>
-  <div class="kpis">${kpis.map(([l,v,s])=>`<div class="kpi"><span class="l">${l}</span><span class="v" style="${big(v)}">${v}</span><span class="s">${s}</span></div>`).join('')}</div>
+  <div class="kpis" style="--n:${kpis.length}">${kpis.map(([l,v,s])=>`<div class="kpi"><span class="l">${l}</span><span class="v" style="${big(v)}">${v}</span><span class="s">${s}</span></div>`).join('')}</div>
   <div class="grid-wide" id="b-charts"></div>
   <div class="fbar">
     <input type="search" id="b-q" placeholder="Search bill text, number or sponsor" value="${esc(BL.q)}" aria-label="Search bills">
