@@ -1,0 +1,7 @@
+# generated locally by the build; only docs/ (the published site) is committed
+build/
+__pycache__/
+*.pyc
+.DS_Store
+# data never lives in this repository; it stays in Dropbox
+inputs/

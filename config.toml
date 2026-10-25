@@ -1,0 +1,107 @@
+# Illinois Policy Agendas website: where the data comes from and where the site goes.
+# Two kinds of paths:
+#   data   (bill scrapes, coding files, speeches, reports, subtopic index, governors) are relative to the Dropbox
+#          folder IAP/Website, which the "Update website" launcher passes in. "../Bills/..." means IAP/Bills/...
+#   content (home page text, think tank profiles, logos) live in this repository under content/.
+
+title = "Illinois Policy Agendas"
+
+[codebook]
+# The project's Illinois subtopic index: topic labels shown on the site and the list of valid codes.
+file = "../illinois_subtopic_index.csv"
+columns = { label = "subtopic_name", code = "", major = "majortopic", major_label = "majortopic_name" }
+# Codes to accept even though they are not in the index (none needed now).
+extra_codes = []
+
+# Governor and party for each year, used on speech pages and as backdrop on trend charts.
+[governors]
+file = "../governor_metadata.xlsx"
+columns = { year = "year", governor = "governor_name", party = "party" }
+
+# ---------------------------------------------------------------- bills
+# One [[bills.sessions]] block per General Assembly. To add a session, copy a block,
+# change `ga`, and point `details` at the scraper output for that session.
+#   details: the scraped bill file (titles, synopses, sponsors, actions). Any codes in it are used
+#            unless a codes file gives a different code.
+#   codes:   folder of coding files. Every .xlsx / .csv in it is read. Each needs a `bill` column
+#            (e.g. "HB 1234") and a `subtopic` column. Codes here override the details file.
+[[bills.sessions]]
+ga = 104
+years = "2025-2026"
+details = "../Bills/Live data/igbills_2025_2026_complete.xlsx"
+codes = "inputs/codes/104"
+
+# Placeholder for the next General Assembly. While the bill file below doesn't exist, the site lists the
+# session as "not started" and the check passes. Once the scraper saves the file there, it goes live by itself;
+# then delete the `status` line. Rename `details` if the scraper uses a different file name.
+[[bills.sessions]]
+ga = 105
+years = "2027-2028"
+starts = "January 2027"
+status = "upcoming"
+details = "../Bills/Live data/igbills_2027_2028_complete.xlsx"
+codes = "inputs/codes/105"
+
+# Which measures count as "substantive bills" (everything else is left out of the site).
+[bills]
+include_types = ["HB", "SB"]      # House and Senate bills; drops resolutions, appointment messages, executive orders
+exclude_flags = ["C", "N"]        # C = commemorative, N = nomination
+
+# Column names in the scraped bill files (change these if the scraper output changes).
+[bills.columns]
+bill = "bill_title"
+link = "html_link"
+sponsors = "sponsors"
+introduced = "first_intro_date"
+last_action_date = "last_action_date"
+last_action = "last_action"
+actions = "all_actions"
+synopsis = "bill_text"
+short = "shortdesc"
+chamber = "chamber"
+subtopic = "minor_code"
+became_law = "became_law"
+commemorative = "commemorative"
+appropriation = "appropriation"
+nomination = "nomination"
+roll_call = "roll_call_vote"
+
+# Column names in the coders' files.
+[bills.code_columns]
+bill = "bill"
+subtopic = "subtopic"
+
+# ---------------------------------------------------------------- speeches and reports
+[sots]
+file = "../SOTS/IL_SOTS_2005_2025.xls"
+columns = { id = "id", governor = "governor", year = "year", text = "text", subtopic = "minortopic" }
+
+[thinktanks]
+file = "inputs/thinktanks/Illinois_Think_Tank_Reports.xlsx"
+profiles = "content/thinktanks/profiles.toml"   # in this repository; bios, and logos in content/thinktanks/logos/
+columns = { id = "id", org = "think_tank", date = "date", year = "year", title = "title", abstract = "abstract", url = "url", pdf = "pdf_url", subtopic = "subtopic" }
+
+# ---------------------------------------------------------------- home page
+[site]
+home = "content/home/home.toml"   # in this repository; overview, methods, sponsors, people, logos and photos
+
+# ---------------------------------------------------------------- output and publishing
+[build]
+site_template = "site"      # the website files (index.html)
+output = "build"            # the built site goes to build/site, the report to build/report.html
+
+[publish]
+# method: "github" commits the site to a GitHub repository served by GitHub Pages (set github_repo)
+#         "folder" copies the site into `folder` (a mapped network drive or mounted web folder)
+#         "sftp"   uploads changed files to `host`:`remote_dir` (password is asked for, never stored)
+#         "zip"    writes a dated zip into `zip_dir` to hand to IT
+# With "github", the site is committed to docs/ in this repository; GitHub Pages serves main /docs.
+method = "github"
+github_repo = "https://github.com/Illinois-Policy-Agendas-Project/illinois-policy-agendas"
+github_branch = "main"
+folder = ""
+host = ""
+port = 22
+username = ""
+remote_dir = "public_html"
+zip_dir = "build/releases"
