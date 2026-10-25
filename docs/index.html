@@ -297,6 +297,11 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 .cb-link{font-weight:600} .cb-link.soon{color:var(--muted)}
 .panel.upcoming{border-style:dashed;background:var(--sunk);gap:12px;padding:22px}
 .cmlist{margin-bottom:0} .orgcard.cmcard{grid-template-columns:minmax(0,1fr);padding:10px 12px}
+.net{position:relative;width:100%;height:600px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.net svg{width:100%;height:100%;display:block;touch-action:none} .net line{stroke:var(--muted);stroke-linecap:round} .net circle{stroke:var(--surface);stroke-width:1.2;cursor:pointer}
+.net text{font-size:10.5px;fill:var(--ink-2);pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-width:3px}
+.net.focus line{opacity:.08} .net.focus line.on{opacity:1;stroke:var(--ink-2)} .net.focus circle{opacity:.18} .net.focus circle.on{opacity:1} .net.focus text{opacity:.15} .net.focus text.on{opacity:1;fill:var(--ink)}
+@media (max-width:560px){ .net{height:420px} }
 .orglist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
 .orgcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .orgcard:hover{border-color:var(--s-tt)}
@@ -1285,8 +1290,117 @@ function sponsorStats(p, major, sub=null){
   return {all:bs.length, C:n('C'), H:n('H'), O:n('O'), S:n('S'), T:n('T'), law:cb.filter(b=>b.r.x.stage>=5).length, bills:cb.length, top:tc?tc[0]:null};
 }
 
+
+/* ---- co-sponsorship network ----
+   One chamber at a time. For each bill, the chamber's lead sponsor is its primary sponsor (C) or, in the second
+   chamber, its sponsor there (S); every other member of that chamber on the bill (H, O, T) is a co-sponsor of the lead.
+   tie(a,b) counts the bills on which one of them co-sponsored the other's bill. Layout: a small force simulation
+   (repulsion between all legislators, springs along ties) with a fixed seed, so the same data always draws the same map. */
+function netData(ch, major, sub){
+  const people = SPON.filter(p=>p.ch===ch), mine = new Set(people.map(p=>p.i));
+  const ties = new Map(), signs = new Map(), lead = new Map();   // signs: "co>lead" -> n
+  const seen = new Set();
+  for (const p of people) for (const {r} of p.bills){ if (seen.has(r)) continue; seen.add(r);
+    if (!isBillHBSB(r) || (major!=null && r.major!==major) || (sub!=null && r.sub!==sub)) continue;
+    const here = (r.sp||[]).filter(([i])=>mine.has(i)); if (here.length < 1) continue;
+    const L = here.find(([,ro])=>ro==='C') || here.find(([,ro])=>ro==='S'); if (!L) continue;
+    lead.set(L[0], (lead.get(L[0])||0) + 1);
+    for (const [i,ro] of here){ if (i===L[0] || !'HOT'.includes(ro)) continue;
+      const k = i<L[0] ? i+'-'+L[0] : L[0]+'-'+i; ties.set(k, (ties.get(k)||0)+1); const d = i+'>'+L[0]; signs.set(d, (signs.get(d)||0)+1); } }
+  return {people, ties, signs, lead};
+}
+function netLayout(nodes, edges, W, H){
+  let seed = 7; const rnd = ()=>{ seed = (seed*1664525 + 1013904223) % 4294967296; return seed/4294967296; };
+  const n = nodes.length, k = Math.sqrt(W*H/Math.max(1,n))*0.75;
+  nodes.forEach((d,i)=>{ const a = i/n*2*Math.PI, r = Math.min(W,H)*0.35*(0.5+rnd()*0.5); d.x = W/2 + r*Math.cos(a); d.y = H/2 + r*Math.sin(a); });
+  const idx = new Map(nodes.map((d,i)=>[d.i,i])), E = edges.map(e=>[idx.get(e.a), idx.get(e.b), Math.log1p(e.w)]);
+  let t = W/8;
+  for (let it=0; it<450; it++){
+    const dx = new Float64Array(n), dy = new Float64Array(n);
+    for (let i=0;i<n;i++) for (let j=i+1;j<n;j++){ let x=nodes[i].x-nodes[j].x, y=nodes[i].y-nodes[j].y, d2=x*x+y*y+0.01, d=Math.sqrt(d2), f=k*k/d;
+      dx[i]+=x/d*f; dy[i]+=y/d*f; dx[j]-=x/d*f; dy[j]-=y/d*f; }
+    for (const [a,b,w] of E){ let x=nodes[a].x-nodes[b].x, y=nodes[a].y-nodes[b].y, d=Math.sqrt(x*x+y*y)+0.01, f=d*d/k*w*0.18;
+      dx[a]-=x/d*f; dy[a]-=y/d*f; dx[b]+=x/d*f; dy[b]+=y/d*f; }
+    for (let i=0;i<n;i++){ dx[i] += (W/2-nodes[i].x)*0.06; dy[i] += (H/2-nodes[i].y)*0.06;
+      const m = Math.sqrt(dx[i]*dx[i]+dy[i]*dy[i])||1; nodes[i].x += dx[i]/m*Math.min(m,t); nodes[i].y += dy[i]/m*Math.min(m,t); }
+    t = Math.max(0.5, t*0.985);
+  }
+  // fit into the box
+  // turn the map so its long side runs across the (wide) box
+  { const mx = nodes.reduce((a,d)=>a+d.x,0)/n, my = nodes.reduce((a,d)=>a+d.y,0)/n; let sxx=0, syy=0, sxy=0;
+    for (const d of nodes){ const x=d.x-mx, y=d.y-my; sxx+=x*x; syy+=y*y; sxy+=x*y; }
+    const th = 0.5*Math.atan2(2*sxy, sxx-syy), c = Math.cos(-th), si = Math.sin(-th);
+    for (const d of nodes){ const x=d.x-mx, y=d.y-my; d.x = x*c - y*si; d.y = x*si + y*c; } }
+  const q = (a,f) => { const s = a.slice().sort((u,v)=>u-v); return s[Math.min(s.length-1, Math.max(0, Math.round(f*(s.length-1))))]; };
+  const xs = nodes.map(d=>d.x), ys = nodes.map(d=>d.y), pad = 40, x0=q(xs,.02), x1=q(xs,.98), y0=q(ys,.02), y1=q(ys,.98), sc = Math.min((W-2*pad)/Math.max(1,x1-x0), (H-2*pad)/Math.max(1,y1-y0));
+  nodes.forEach(d=>{ d.x = Math.min(W-14, Math.max(14, pad + (d.x-x0)*sc + ((W-2*pad)-(x1-x0)*sc)/2)); d.y = Math.min(H-12, Math.max(12, pad + (d.y-y0)*sc + ((H-2*pad)-(y1-y0)*sc)/2)); });
+}
+function netGroups(nodes, edges){   // weighted label propagation, fixed order; returns group per node
+  const nb = new Map(nodes.map(d=>[d.i, []])); for (const e of edges){ nb.get(e.a).push([e.b,e.w]); nb.get(e.b).push([e.a,e.w]); }
+  const lab = new Map(nodes.map(d=>[d.i, d.i])), order = nodes.slice().sort((a,b)=>b.deg-a.deg);
+  for (let round=0; round<25; round++){ let moved = false;
+    for (const d of order){ const sc = new Map(); for (const [j,w] of nb.get(d.i)) sc.set(lab.get(j), (sc.get(lab.get(j))||0)+w);
+      if (!sc.size) continue; const best = [...sc].sort((a,b)=>b[1]-a[1] || a[0]-b[0])[0][0]; if (best!==lab.get(d.i)){ lab.set(d.i, best); moved = true; } }
+    if (!moved) break; }
+  const sizes = count(nodes, d=>lab.get(d.i)), rank = [...sizes].sort((a,b)=>b[1]-a[1]).map(([l])=>l);
+  nodes.forEach(d=>{ const g = rank.indexOf(lab.get(d.i)); d.g = sizes.get(lab.get(d.i))>=3 ? g : -1; });
+  return rank.filter(l=>sizes.get(l)>=3).map(l=>sizes.get(l));
+}
+const NETCOL = ['hsl(178 55% 36%)','hsl(32 85% 50%)','hsl(268 42% 55%)','hsl(95 45% 40%)','hsl(320 45% 52%)','hsl(48 80% 44%)','hsl(200 25% 45%)','hsl(15 55% 50%)'];   // deliberately not red/blue: groups are found from ties, not party
+let NETVIEW = null;
+function drawNetwork(){
+  const box = $('#net'); if (!box) return;
+  const {people, ties, signs, lead} = netData(NET.ch, SN.major, SN.sub);
+  let edges = [...ties].map(([k,w])=>{ const [a,b]=k.split('-').map(Number); return {a,b,w}; });
+  // automatic threshold: the smallest number of shared bills that keeps about four ties per legislator
+  let min = NET.min;
+  if (min==='auto'){ min = 1; for (const m of [1,2,3,4,5,6,8,10,15,20,30]){ min = m; if (edges.filter(e=>e.w>=m).length <= people.length*5) break; } }
+  edges = edges.filter(e=>e.w>=min);
+  const deg = new Map(); for (const e of edges){ deg.set(e.a,(deg.get(e.a)||0)+e.w); deg.set(e.b,(deg.get(e.b)||0)+e.w); }
+  const nodes = people.filter(p=>deg.has(p.i)).map(p=>({i:p.i, p, deg:deg.get(p.i), lead:lead.get(p.i)||0}));
+  const W = Math.max(320, box.clientWidth), H = box.clientHeight || 600;
+  $('#net-t').textContent = `Co-sponsorship network · ${chamberName(NET.ch)}${snTopic()?' · '+snTopic():''}`;
+  $('#net-sub').textContent = nodes.length ? `${pl(nodes.length,'legislator')} · ${pl(edges.length,'tie')} of ${pl(min,'shared bill')} or more` : '';
+  $('#net-find').innerHTML = '<option value="">Find a legislator…</option>' + nodes.slice().sort((a,b)=>a.p.name.localeCompare(b.p.name)).map(d=>`<option value="${d.i}">${esc(d.p.name)}</option>`).join('');
+  if (!nodes.length){ box.innerHTML = '<p class="muted" style="padding:16px">No co-sponsorship ties at this level. Lower the threshold or pick another topic.</p>'; $('#net-leg').innerHTML=''; NETVIEW=null; return; }
+  netLayout(nodes, edges, W, H); const groups = netGroups(nodes, edges);
+  const maxL = Math.max(1, ...nodes.map(d=>d.lead)), maxW = Math.max(...edges.map(e=>e.w)), at = new Map(nodes.map(d=>[d.i,d]));
+  const rad = d => 3 + 9*Math.sqrt(d.lead/maxL), col = d => d.g>=0 && d.g<NETCOL.length ? NETCOL[d.g] : 'hsl(220 8% 62%)';
+  const last = n => n.replace(/,? (Jr\.|Sr\.|II|III|IV)$/,'').split(' ').slice(-1)[0];
+  const labelled = new Set(), boxes = [];   // label the best-connected legislators whose names fit without overlapping
+  for (const d of nodes.slice().sort((a,b)=>b.deg-a.deg)){ if (labelled.size >= 18) break;
+    const bx = [d.x+rad(d)+2, d.y-7, d.x+rad(d)+4+last(d.p.name).length*6, d.y+6];
+    if (bx[2] > W || boxes.some(b=>bx[0]<b[2] && bx[2]>b[0] && bx[1]<b[3] && bx[3]>b[1])) continue; boxes.push(bx); labelled.add(d.i); }
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Co-sponsorship network">
+    <g>${edges.map((e,j)=>`<line data-e="${j}" x1="${at.get(e.a).x.toFixed(1)}" y1="${at.get(e.a).y.toFixed(1)}" x2="${at.get(e.b).x.toFixed(1)}" y2="${at.get(e.b).y.toFixed(1)}" style="stroke-width:${(0.6+2.6*e.w/maxW).toFixed(2)};opacity:${(0.18+0.5*e.w/maxW).toFixed(2)}"/>`).join('')}</g>
+    <g>${nodes.map(d=>`<circle data-n="${d.i}" cx="${d.x.toFixed(1)}" cy="${d.y.toFixed(1)}" r="${rad(d).toFixed(1)}" style="fill:${col(d)}"/>`).join('')}</g>
+    <g>${nodes.map(d=>`<text data-t="${d.i}" x="${(d.x+rad(d)+3).toFixed(1)}" y="${(d.y+3.5).toFixed(1)}" ${labelled.has(d.i)?'':'visibility="hidden"'}>${esc(last(d.p.name))}</text>`).join('')}</g></svg>`;
+  $('#net-leg').innerHTML = groups.slice(0, NETCOL.length).map((n,g)=>`<span><i class="dot" style="background:${NETCOL[g]}"></i>Group ${g+1} (${n})</span>`).join('') + (nodes.some(d=>d.g<0||d.g>=NETCOL.length)?`<span><i class="dot" style="background:hsl(220 8% 62%)"></i>Small groups</span>`:'');
+  const nbr = new Map(nodes.map(d=>[d.i,new Set()])); edges.forEach((e,j)=>{ nbr.get(e.a).add(e.b); nbr.get(e.b).add(e.a); });
+  NETVIEW = {edges, nbr, labelled};
+  const top = (i, dir) => [...signs].filter(([k])=>dir==='in' ? k.endsWith('>'+i) : k.startsWith(i+'>')).map(([k,n])=>[+k.split('>')[dir==='in'?0:1], n]).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const tipFor = d => { const a = top(d.i,'in'), b = top(d.i,'out'), row = ([j,n]) => `<div class="r"><span>${esc(SPON[j].name)}</span><b class="num">${fmt(n)}</b></div>`;
+    return `<div class="t">${esc(d.p.title)}</div><div class="muted" style="margin-bottom:4px">${pl(d.lead,'bill')} as lead sponsor${d.g>=0&&d.g<NETCOL.length?` · Group ${d.g+1}`:''}</div>`
+      + (a.length?`<div style="font-weight:600;margin-top:4px">Co-sponsor their bills most</div>${a.map(row).join('')}`:'')
+      + (b.length?`<div style="font-weight:600;margin-top:4px">They co-sponsor bills by</div>${b.map(row).join('')}`:'') + '<div class="muted" style="margin-top:4px">Click for their page</div>'; };
+  $$('circle[data-n]', box).forEach(c=>{ const d = at.get(+c.dataset.n);
+    c.addEventListener('pointermove', e=>{ netFocus(d.i); showTip(e, tipFor(d)); });
+    c.addEventListener('pointerleave', ()=>{ hideTip(); netFocus(NET.find); });
+    c.addEventListener('click', ()=>nav('sponsor-'+d.p.slug)); });
+  if (NET.find!=null && at.has(NET.find)){ $('#net-find').value = NET.find; netFocus(NET.find); } else NET.find = null;
+}
+function netFocus(i){
+  const box = $('#net'); if (!box || !NETVIEW) return; const {edges, nbr, labelled} = NETVIEW;
+  box.classList.toggle('focus', i!=null);
+  const on = i==null ? new Set() : new Set([i, ...(nbr.get(i)||[])]);
+  $$('circle[data-n]', box).forEach(c=>c.classList.toggle('on', on.has(+c.dataset.n)));
+  $$('text[data-t]', box).forEach(t=>{ const j=+t.dataset.t; t.classList.toggle('on', on.has(j)); t.setAttribute('visibility', (i==null ? labelled.has(j) : on.has(j)) ? 'visible' : 'hidden'); });
+  $$('line[data-e]', box).forEach(l=>{ const e = edges[+l.dataset.e]; l.classList.toggle('on', i!=null && (e.a===i || e.b===i)); });
+}
+
 /* ---- index tab ---- */
 const SN = { q:'', ch:'all', major:null, sub:null, sort:'C', dir:-1 };
+const NET = { ch:'Sen', min:'auto', find:null };
 const snTopic = () => SN.sub!=null ? CB.subs[SN.sub] : SN.major!=null ? CB.majors[SN.major] : null;
 function renderSponsors(){
   const reps = SPON.filter(p=>p.ch==='Rep'), sens = SPON.filter(p=>p.ch==='Sen');
@@ -1312,12 +1426,24 @@ function renderSponsors(){
     <div class="panel"><div class="chead"><h3 id="sn-ct-Sen"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Sen"></div></div>
     <div class="panel"><div class="chead"><h3 id="sn-ct-Rep"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Rep"></div></div>
   </div>
+  <div class="panel" style="margin-bottom:16px"><div class="chead"><h3 id="net-t">Co-sponsorship network</h3><span class="muted" style="font-size:12px" id="net-sub"></span></div>
+    <div class="fbar" style="margin:4px 0 8px">
+      <div class="seg" role="group" aria-label="Chamber">${[['Sen','Senate'],['Rep','House']].map(([k,l])=>`<button data-nc="${k}" aria-pressed="${NET.ch===k}">${l}</button>`).join('')}</div>
+      <label class="ink2" for="net-min" style="font-size:13px">Show ties of at least</label><select id="net-min">${[['auto','Automatic'],...[1,2,3,5,10,20].map(n=>[n, pl(n,'shared bill')])].map(([v,l])=>`<option value="${v}" ${String(NET.min)===String(v)?'selected':''}>${l}</option>`).join('')}</select>
+      <select id="net-find" aria-label="Find a legislator"><option value="">Find a legislator…</option></select>
+    </div>
+    <div id="net" class="net"></div>
+    <div class="legend" id="net-leg" style="margin-top:6px"></div>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">Each circle is a legislator, sized by the bills they filed as primary sponsor. A line joins two legislators when one co-sponsored the other's bills; thicker lines mean more shared bills. Legislators who sign onto each other's bills are pulled together, so blocs appear as clusters. Colors mark groups the network finds on its own (it does not know party). Hover a legislator to see their ties; click to open their page. Follows the topic menus above.</p></div>
   <div style="margin-bottom:16px">
     <div class="panel"><div class="chead"><h3>How sponsorship is recorded</h3></div>
       <dl class="facts"><dt>Primary sponsor</dt><dd>Filed the bill with the clerk</dd><dt>Original co-sponsor</dt><dd>Co-sponsored the bill at introduction</dd><dt>Co-sponsor</dt><dd>Added to the bill later</dd><dt>Second chamber</dt><dd>Carried the bill after it passed the first chamber</dd></dl>
       <p class="muted" style="margin:0;font-size:12.5px">Names are parsed from the ILGA sponsor field in the bills file. Spelling variants of the same legislator are merged.</p></div>
   </div>
   <div class="tscroll"><table class="dt" id="sn-t" style="min-width:0"><thead><tr>${[['name','Legislator'],['C','Primary sponsor'],['law','Bills that became law']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${k!=='name'?'text-align:right;width:180px':''}">${l} <span class="muted">${SN.sort===k?(SN.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
+  $$('[data-nc]').forEach(b=>b.addEventListener('click', ()=>{ NET.ch=b.dataset.nc; NET.find=null; $$('[data-nc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); drawNetwork(); }));
+  $('#net-min').addEventListener('change', e=>{ NET.min = e.target.value==='auto' ? 'auto' : +e.target.value; drawNetwork(); });
+  $('#net-find').addEventListener('change', e=>{ NET.find = e.target.value==='' ? null : +e.target.value; netFocus(NET.find); });
   let deb; $('#sn-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ SN.q=e.target.value; snUpdate(); },120); });
   $$('[data-ch]').forEach(b=>b.addEventListener('click', ()=>{ SN.ch=b.dataset.ch; $$('[data-ch]').forEach(x=>x.setAttribute('aria-pressed', x===b)); snUpdate(); }));
   $('#sn-m').addEventListener('change', e=>{ SN.major=e.target.value===''?null:+e.target.value; SN.sub=null; renderSponsors(); });
@@ -1337,6 +1463,7 @@ function snRows(){
 function snUpdate(){
   const rows = snRows();
   // one chart per chamber; they follow the topic filters but not the chamber buttons or name search, which narrow the table
+  drawNetwork();
   const tops = Object.fromEntries(['Sen','Rep'].map(ch=>[ch, SPON.filter(p=>p.ch===ch).map(p=>[p, sponsorStats(p, SN.major, SN.sub)]).filter(([,s])=>s.law>0).sort((a,b)=>b[1].law-a[1].law || b[1].C-a[1].C || a[0].name.localeCompare(b[0].name)).slice(0,10)]));
   const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.law))));   // same scale in both charts
   for (const ch of ['Sen','Rep']){
@@ -1361,6 +1488,12 @@ SECTIONS.sponsor.push(
         <div class="kpi"><span class="l">Bills that became law</span><span class="v">${fmt(s.law)}</span><span class="s">${s.bills?pct(s.law/s.bills)+' of their bills':'no bills as primary sponsor'}</span></div>
         <div class="kpi"><span class="l">Original co-sponsor</span><span class="v">${fmt(s.H)}</span><span class="s">co-sponsored at introduction</span></div>
         <div class="kpi"><span class="l">Co-sponsor</span><span class="v">${fmt(s.O)}</span><span class="s">${fmt(s.S+s.T)} more in the other chamber</span></div></div>`; } },
+  { id:'ties', title:'Co-sponsorship ties', side:true, render(p, el){
+      const {signs} = netData(p.ch, null, null);
+      const list = dir => [...signs].filter(([k])=>dir==='in' ? k.endsWith('>'+p.i) : k.startsWith(p.i+'>')).map(([k,n])=>[SPON[+k.split('>')[dir==='in'?0:1]], n]).sort((a,b)=>b[1]-a[1]).slice(0,6);
+      const a = list('in'), b = list('out'), rows = l => l.map(([q,n])=>`<div class="r" style="display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:2px 0">${spLink(q)}<b class="num">${fmt(n)}</b></div>`).join('');
+      el.innerHTML = (a.length||b.length) ? `${a.length?`<div class="eyebrow" style="margin-bottom:4px">Co-sponsor their bills most</div>${rows(a)}`:''}${b.length?`<div class="eyebrow" style="margin:10px 0 4px">They co-sponsor bills by</div>${rows(b)}`:''}
+        <p class="muted" style="margin:8px 0 0;font-size:12px">Within the ${chamberName(p.ch)}, counting shared bills. <a href="#sponsors">See the network</a>.</p>` : '<p class="muted" style="margin:0">No co-sponsorship ties in their chamber.</p>'; } },
   { id:'topics', title:'What they introduce', render(p, el){
       const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r)).map(b=>b.r);
       if (!mine.length){ el.innerHTML = '<p class="muted" style="margin:0">No policy-coded bills as primary sponsor.</p>'; return; }
