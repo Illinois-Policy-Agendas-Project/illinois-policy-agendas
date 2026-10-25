@@ -369,8 +369,6 @@ def build_bills(cfg, valid, rep):
                 rep.note(ds, f'Kept {pl(len(bills), "substantive bill")}; left out {pl(sum(excluded.values()), "other measure")} ({", ".join(f"{n:,} {k}" for k, n in excluded.most_common())}).')
         if unparsed:
             rep.warn(ds, f'{pl(len(unparsed), "row has", "rows have")} a bill number the build cannot read and {"was" if len(unparsed) == 1 else "were"} skipped.', unparsed)
-        if bad_codes:
-            rep.error(ds, f'{pl(len(bad_codes), "bill")} in the bill file {"has a code" if len(bad_codes) == 1 else "have codes"} not in the codebook. {"It shows" if len(bad_codes) == 1 else "They show"} as "Not yet coded" until fixed.', bad_codes)
         dup = rep.stats.pop(f'dupes_{ga}', [])
         if dup:
             rep.warn(ds, f'{pl(len(dup), "bill appears", "bills appear")} more than once in the bill file. The site uses the most recent row of each.', sorted(set(dup)))
@@ -432,6 +430,11 @@ def build_bills(cfg, valid, rep):
                 rep.warn(ds, f'{pl(len(unknown), "coded bill is", "coded bills are")} not in the bill file (a typo in the bill number, or the scraper has not picked {"it" if len(unknown) == 1 else "them"} up yet).', unknown)
         elif cdir:
             rep.note(ds, f'No coding folder at {sess["codes"]} yet; using codes from the bill file only.')
+
+        # a bad code in the bill file only matters if no coding file has replaced it
+        bad_codes = [b for b in bad_codes if bills.get(f'{ga}-{b.split(":")[0].replace(" ", "")}', {}).get('source') != 'codes']
+        if bad_codes:
+            rep.error(ds, f'{pl(len(bad_codes), "bill")} in the bill file {"has a code" if len(bad_codes) == 1 else "have codes"} not in the codebook. {"It shows" if len(bad_codes) == 1 else "They show"} as "Not yet coded" until fixed, or until a coding file gives {"it" if len(bad_codes) == 1 else "them"} a code.', bad_codes)
 
         n = len(bills)
         coded = sum(1 for b in bills.values() if b['sub'] not in (None,))
