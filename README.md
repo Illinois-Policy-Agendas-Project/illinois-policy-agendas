@@ -66,6 +66,11 @@ Commit and push, and the site updates. Lab computers pick up the change the next
   `reviewed = true` once checked). **Fetch logos** in the control panel (or `python pipeline/fetch_logos.py`) saves each
   organization's logo from its website into `content/thinktanks/logos/`. Check them with **Review logos**, then commit.
   Use logos with each organization's permission.
+- **Legislators' party, district and photos:** click **Fetch legislators** in the control panel (or run
+  `python pipeline/fetch_legislators.py`). It reads the House and Senate member lists on ilga.gov and saves
+  `content/legislators/members.csv` and `content/legislators/photos/`. Check them with **Review legislators**, then publish.
+  Run it at the start of each General Assembly. Sponsor pages then show party, district and photo, and the
+  co-sponsorship network can be colored by party.
 - **Design and features:** `site/index.html`.
 
 ## Common data changes (edit `config.toml`)
@@ -92,6 +97,7 @@ Dropbox folder `IAP/Website/`; `profiles` and `home` are relative to this reposi
 | `pipeline/refresh_docs.py` | Updates `docs/` after design or content changes, without the data |
 | `pipeline/app.py` | The control panel |
 | `pipeline/fetch_logos.py` | Collects think tank logos from their websites |
+| `pipeline/fetch_legislators.py` | Collects legislators' party, district and photos from ilga.gov |
 | `launcher/` | The files that go in Dropbox `IAP/Website/` |
 | `site/index.html` | The website itself |
 | `content/` | Home page text, think tank profiles, logos and photos |

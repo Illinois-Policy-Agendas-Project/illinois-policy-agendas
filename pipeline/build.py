@@ -720,7 +720,33 @@ def dump(path, obj):
     return hashlib.sha1(data.encode()).hexdigest()[:10]
 
 
-def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=None, logo_copies=(), governors=(), home=None):
+def build_legislators(cfg, rep):
+    """Party, district and photo for each legislator, from content/legislators/members.csv (made by fetch_legislators.py)."""
+    ds = 'Legislators'
+    path = ROOT / cfg.get('legislators', {}).get('file', 'content/legislators/members.csv')
+    if not path.exists():
+        rep.note(ds, f'No member list at {show(path)} yet; sponsor pages show no party or photo. Run "Fetch legislators" to collect them.')
+        return [], []
+    rows, copies, no_photo = [], [], 0
+    with open(path, newline='', encoding='utf-8') as f:
+        for r in csv.DictReader(f):
+            name, chamber = (r.get('name') or '').strip(), (r.get('chamber') or '').strip()
+            if not name or chamber not in ('House', 'Senate'):
+                continue
+            photo = (r.get('photo') or '').strip()
+            src = path.parent / 'photos' / photo if photo else None
+            if src and src.exists():
+                copies.append((src, f'legislators/{photo}'))
+            else:
+                no_photo += 1
+                photo = ''
+            rows.append({'ch': 'Rep' if chamber == 'House' else 'Sen', 'name': name, 'party': (r.get('party') or '').strip(),
+                         'district': (r.get('district') or '').strip(), 'url': (r.get('url') or '').strip(), 'photo': f'legislators/{photo}' if photo else ''})
+    rep.note(ds, f'{len(rows)} legislators in {path.name}; {no_photo} without a photo, {sum(1 for r in rows if not r["party"])} without a party.')
+    return rows, copies
+
+
+def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=None, logo_copies=(), governors=(), home=None, legislators=None):
     out = ROOT / cfg['build']['output'] / 'site'
     if out.exists():
         shutil.rmtree(out)
@@ -748,6 +774,8 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
         (d / dest).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, d / dest)
     files['orgs'] = dump(d / 'orgs.json', profiles or {})
+    if legislators:
+        files['legislators'] = dump(d / 'legislators.json', legislators)
     files['governors'] = dump(d / 'governors.json', list(governors))
     if home:
         files['home'] = dump(d / 'home.json', home)
@@ -860,12 +888,13 @@ def main(argv=None):
     tt = build_tt(cfg, valid, rep)
     governors = load_governors(cfg, sots, rep)
     home, home_media = build_home(cfg, rep)
+    legislators, leg_photos = build_legislators(cfg, rep)
     profiles, logo_copies = build_profiles(cfg, tt, rep)
     if a.worksheet:
         write_worksheet(a.worksheet, sessions, rep)
     state, snapshot = compare_with_last(cfg, sessions, sots, tt, rep)
     print('Writing the site…', flush=True)
-    out, manifest = write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles, list(logo_copies) + home_media, governors, home)
+    out, manifest = write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles, list(logo_copies) + home_media + leg_photos, governors, home, legislators)
     report = ROOT / cfg['build']['output'] / 'report.html'
     (ROOT / cfg['build']['output'] / 'status.json').write_text(json.dumps({'ok': not rep.errors, 'errors': len(rep.errors), 'built': manifest['updated']}))
     state.parent.mkdir(parents=True, exist_ok=True)

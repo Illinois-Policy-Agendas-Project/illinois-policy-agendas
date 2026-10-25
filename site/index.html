@@ -302,6 +302,8 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 .net text{font-size:10.5px;fill:var(--ink-2);pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-width:3px}
 .net.focus line{opacity:.08} .net.focus line.on{opacity:1;stroke:var(--ink-2)} .net.focus circle{opacity:.18} .net.focus circle.on{opacity:1} .net.focus text{opacity:.15} .net.focus text.on{opacity:1;fill:var(--ink)}
 @media (max-width:560px){ .net{height:420px} }
+.leg-photo{flex:none;width:84px;height:104px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--sunk)} .leg-photo img{width:100%;height:100%;object-fit:cover;display:block}
+@media (max-width:560px){ .leg-photo{width:64px;height:80px} }
 .orglist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
 .orgcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .orgcard:hover{border-color:var(--s-tt)}
@@ -416,7 +418,7 @@ async function load(){
   MAN = await fetch('data/manifest.json?t='+Date.now()).then(r=>{ if (!r.ok) throw new Error('manifest'); return r.json(); });
   /* SESSIONS: sessions with bills. ALL_SESSIONS also has placeholders for sessions that haven't started (shown only in the Bills session menu). */
   ALL_SESSIONS = MAN.sessions.slice().sort((a,b)=>a.ga-b.ga); SESSIONS = ALL_SESSIONS.filter(s=>!s.upcoming); LATEST = SESSIONS[SESSIONS.length-1]?.ga;
-  const [cb,b,s,t,pp,op,gv,hm] = await Promise.all(['codebook','bills/summary','sots','thinktanks','people', MAN.v?.orgs ? 'orgs' : null, MAN.v?.governors ? 'governors' : null, MAN.v?.home ? 'home' : null].map(f=>f ? get(f) : null));
+  const [cb,b,s,t,pp,op,gv,hm,lg] = await Promise.all(['codebook','bills/summary','sots','thinktanks','people', MAN.v?.orgs ? 'orgs' : null, MAN.v?.governors ? 'governors' : null, MAN.v?.home ? 'home' : null, MAN.v?.legislators ? 'legislators' : null].map(f=>f ? get(f).catch(()=>null) : null));
   HOME = hm; ORGPROF = op || {}; GOV = Object.fromEntries((gv||[]).map(g=>[g.year, g]));
   CB = cb; RAW = {bills:b, sots:s, tt:t};
   const obj = d => d.rows.map(r => Object.fromEntries(d.cols.map((c,i)=>[c,r[i]])));
@@ -428,7 +430,7 @@ async function load(){
   const sp = BYDS.sots.slice().sort((a,b)=>a.id-b.id);
   sp.forEach((r,i)=>{ const p=sp[i-1], n=sp[i+1]; r.prev = p && p.year===r.year ? p : null; r.next = n && n.year===r.year ? n : null; });
   BILLKEY = new Map(BYDS.bills.map(r=>[r.key, r]));
-  buildSponsors(pp.people);
+  buildSponsors(pp.people); attachLegislators(lg || []);
   for (const r of R){ r.major = majorOf(r.sub); setHay(r); if (r.major!=null && r.major!==NOPOL) USED_MAJORS.add(r.major); }
   const u = $('#updated'); const c = MAN.changes?.bills || {}, bits = [c.new && `${fmt(c.new)} new bills`, c.newly_coded && `${fmt(c.newly_coded)} newly coded`, c.recoded && `${fmt(c.recoded)} recoded`].filter(Boolean);
   if (u) u.textContent = `Data updated ${new Date(MAN.updated.replace(' ','T')).toLocaleDateString('en-US',{month:'long', day:'numeric', year:'numeric'})}${bits.length?' ('+bits.join(', ')+')':''}`;
@@ -1111,8 +1113,9 @@ const HEADS = {
     return { crumb:['thinktanks','Think tanks'], logo:orgLogo(o, 'lg'),
       eyebrow:[P.official_name && P.official_name!==o.name ? esc(P.official_name) : 'Think tank or policy institute', P.founded && `Founded ${P.founded}`, P.based && esc(P.based)].filter(Boolean).join(' · '),
       title:esc(o.name), sub:'', chips:'', actions: web ? `<a class="btn" href="${esc(web.url)}" target="_blank" rel="noopener">${esc(web.host)} ↗</a>` : '' }; },
-  sponsor: (p) => ({ crumb:['sponsors','Sponsors'], eyebrow:`${p.ch==='Rep'?'State Representative':'State Senator'} · ${esc(p.gas().map(gaName).join(', '))}`, title:esc(p.title), sub:'',
-      chips:'', actions:'' }),
+  sponsor: (p) => ({ crumb:['sponsors','Sponsors'], logo: p.photo ? `<span class="leg-photo"><img src="data/${esc(p.photo)}" alt="${esc(p.name)}" title="Photo: Illinois General Assembly"></span>` : '',
+      eyebrow:[p.ch==='Rep'?'State Representative':'State Senator', p.party && esc(p.party), p.district && `District ${esc(p.district)}`, esc(p.gas().map(gaName).join(', '))].filter(Boolean).join(' · '), title:esc(p.title), sub:'',
+      chips:'', actions: p.ilga ? `<a class="btn" href="${esc(p.ilga)}" target="_blank" rel="noopener">Member page on ilga.gov ↗</a>` : '' }),
   speech: (s) => { const yrs = range(2005,2025);
     return { crumb:['speeches','Speeches'], eyebrow:`State of the State address${GOV[s.year]?.party ? ' · ' + esc(GOV[s.year].party) + ' governor' : ''}`, title:`${s.year} · ${esc(s.gov)}`, sub:'',
       chips:'', actions:`${s.year>yrs[0]?`<a class="btn" href="#speech-${s.year-1}">← ${s.year-1}</a>`:''}${s.year<yrs[yrs.length-1]?`<a class="btn" href="#speech-${s.year+1}">${s.year+1} →</a>`:''}` }; }
@@ -1276,6 +1279,24 @@ function buildSponsors(people){
     gas(){ return [...new Set(this.bills.map(b=>b.r.x.ga))].sort((a,b)=>a-b); }}));
   SPONKEY = new Map(SPON.map(p=>[p.slug,p]));
 }
+/* party, district and photo from legislators.json (pipeline/fetch_legislators.py), matched by chamber and name:
+   first and last name (or nickname and last name), ignoring middle initials, suffixes and accents; last name alone when that is unique */
+const nameParts = n => { const a = n.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/,?\s+(jr|sr|ii|iii|iv)\.?$/,'');
+  const nick = (a.match(/"([^"]+)"/)||[])[1]; const w = a.replace(/"[^"]*"/g,' ').replace(/\b[a-z]\.(?=\s)/g,' ').replace(/[^a-z' -]/g,' ').split(/\s+/).filter(Boolean);
+  return {first:w[0]||'', last:w[w.length-1]||'', nick:nick?nick.trim().split(/\s+/)[0]:null}; };
+let LEGS = [];
+function attachLegislators(list){
+  LEGS = list; if (!list.length) return;
+  const full = new Map(), byLast = new Map();
+  for (const l of list){ const n = nameParts(l.name); for (const f of [n.first, n.nick].filter(Boolean)) full.set(`${l.ch}|${f}|${n.last}`, l);
+    const k = `${l.ch}|${n.last}`; byLast.set(k, byLast.has(k) ? null : l); }
+  for (const p of SPON){ const n = nameParts(p.name);
+    const l = full.get(`${p.ch}|${n.first}|${n.last}`) || (n.nick && full.get(`${p.ch}|${n.nick}|${n.last}`)) || byLast.get(`${p.ch}|${n.last}`);
+    if (l) Object.assign(p, {party:l.party||'', district:l.district||'', photo:l.photo||'', ilga:l.url||''}); }
+}
+const partyAbbr1 = party => ({Democratic:'D', Republican:'R', Independent:'I'})[party] || '';
+const withParty = p => p.party ? `${p.name} (${partyAbbr1(p.party)})` : p.name;
+const hasParties = ch => { const ps = SPON.filter(p=>p.ch===ch); return ps.length && ps.filter(p=>p.party).length >= ps.length*0.5; };
 function attachLinks(links){
   for (const [key, list] of Object.entries(links)){ const r = BILLKEY.get(key); if (!r) continue; r.sp = list; for (const [i,role] of list) SPON[i].bills.push({r, role}); }
 }
@@ -1365,7 +1386,8 @@ function drawNetwork(){
   if (!nodes.length){ box.innerHTML = '<p class="muted" style="padding:16px">No co-sponsorship ties at this level. Lower the threshold or pick another topic.</p>'; $('#net-leg').innerHTML=''; NETVIEW=null; return; }
   netLayout(nodes, edges, W, H); const groups = netGroups(nodes, edges);
   const maxL = Math.max(1, ...nodes.map(d=>d.lead)), maxW = Math.max(...edges.map(e=>e.w)), at = new Map(nodes.map(d=>[d.i,d]));
-  const rad = d => 3 + 9*Math.sqrt(d.lead/maxL), col = d => d.g>=0 && d.g<NETCOL.length ? NETCOL[d.g] : 'hsl(220 8% 62%)';
+  const byParty = NET.color==='party' && hasParties(NET.ch), PCOL = {Democratic:'hsl(214 65% 48%)', Republican:'hsl(357 62% 52%)', Independent:'hsl(275 40% 55%)'};
+  const rad = d => 3 + 9*Math.sqrt(d.lead/maxL), col = d => byParty ? (PCOL[d.p.party] || 'hsl(220 8% 62%)') : d.g>=0 && d.g<NETCOL.length ? NETCOL[d.g] : 'hsl(220 8% 62%)';
   const last = n => n.replace(/,? (Jr\.|Sr\.|II|III|IV)$/,'').split(' ').slice(-1)[0];
   const labelled = new Set(), boxes = [];   // label the best-connected legislators whose names fit without overlapping
   for (const d of nodes.slice().sort((a,b)=>b.deg-a.deg)){ if (labelled.size >= 18) break;
@@ -1375,12 +1397,13 @@ function drawNetwork(){
     <g>${edges.map((e,j)=>`<line data-e="${j}" x1="${at.get(e.a).x.toFixed(1)}" y1="${at.get(e.a).y.toFixed(1)}" x2="${at.get(e.b).x.toFixed(1)}" y2="${at.get(e.b).y.toFixed(1)}" style="stroke-width:${(0.6+2.6*e.w/maxW).toFixed(2)};opacity:${(0.18+0.5*e.w/maxW).toFixed(2)}"/>`).join('')}</g>
     <g>${nodes.map(d=>`<circle data-n="${d.i}" cx="${d.x.toFixed(1)}" cy="${d.y.toFixed(1)}" r="${rad(d).toFixed(1)}" style="fill:${col(d)}"/>`).join('')}</g>
     <g>${nodes.map(d=>`<text data-t="${d.i}" x="${(d.x+rad(d)+3).toFixed(1)}" y="${(d.y+3.5).toFixed(1)}" ${labelled.has(d.i)?'':'visibility="hidden"'}>${esc(last(d.p.name))}</text>`).join('')}</g></svg>`;
-  $('#net-leg').innerHTML = groups.slice(0, NETCOL.length).map((n,g)=>`<span><i class="dot" style="background:${NETCOL[g]}"></i>Group ${g+1} (${n})</span>`).join('') + (nodes.some(d=>d.g<0||d.g>=NETCOL.length)?`<span><i class="dot" style="background:hsl(220 8% 62%)"></i>Small groups</span>`:'');
+  $('#net-leg').innerHTML = byParty ? ['Democratic','Republican','Independent'].map(pt=>[pt, nodes.filter(d=>d.p.party===pt).length]).filter(([,n])=>n).map(([pt,n])=>`<span><i class="dot" style="background:${PCOL[pt]}"></i>${pt} (${n})</span>`).join('') + (nodes.some(d=>!d.p.party)?`<span><i class="dot" style="background:hsl(220 8% 62%)"></i>Party not known (${nodes.filter(d=>!d.p.party).length})</span>`:'')
+    : groups.slice(0, NETCOL.length).map((n,g)=>`<span><i class="dot" style="background:${NETCOL[g]}"></i>Group ${g+1} (${n})</span>`).join('') + (nodes.some(d=>d.g<0||d.g>=NETCOL.length)?`<span><i class="dot" style="background:hsl(220 8% 62%)"></i>Small groups</span>`:'');
   const nbr = new Map(nodes.map(d=>[d.i,new Set()])); edges.forEach((e,j)=>{ nbr.get(e.a).add(e.b); nbr.get(e.b).add(e.a); });
   NETVIEW = {edges, nbr, labelled};
   const top = (i, dir) => [...signs].filter(([k])=>dir==='in' ? k.endsWith('>'+i) : k.startsWith(i+'>')).map(([k,n])=>[+k.split('>')[dir==='in'?0:1], n]).sort((a,b)=>b[1]-a[1]).slice(0,4);
   const tipFor = d => { const a = top(d.i,'in'), b = top(d.i,'out'), row = ([j,n]) => `<div class="r"><span>${esc(SPON[j].name)}</span><b class="num">${fmt(n)}</b></div>`;
-    return `<div class="t">${esc(d.p.title)}</div><div class="muted" style="margin-bottom:4px">${pl(d.lead,'bill')} as lead sponsor${d.g>=0&&d.g<NETCOL.length?` · Group ${d.g+1}`:''}</div>`
+    return `<div class="t">${esc(d.p.title)}${d.p.party?` <span class="muted" style="font-weight:400">(${partyAbbr1(d.p.party)}${d.p.district?'-'+esc(d.p.district):''})</span>`:''}</div><div class="muted" style="margin-bottom:4px">${pl(d.lead,'bill')} as lead sponsor${!byParty&&d.g>=0&&d.g<NETCOL.length?` · Group ${d.g+1}`:''}</div>`
       + (a.length?`<div style="font-weight:600;margin-top:4px">Co-sponsor their bills most</div>${a.map(row).join('')}`:'')
       + (b.length?`<div style="font-weight:600;margin-top:4px">They co-sponsor bills by</div>${b.map(row).join('')}`:'') + '<div class="muted" style="margin-top:4px">Click for their page</div>'; };
   $$('circle[data-n]', box).forEach(c=>{ const d = at.get(+c.dataset.n);
@@ -1400,7 +1423,7 @@ function netFocus(i){
 
 /* ---- index tab ---- */
 const SN = { q:'', ch:'all', major:null, sub:null, sort:'C', dir:-1 };
-const NET = { ch:'Sen', min:'auto', find:null };
+const NET = { ch:'Sen', min:'auto', find:null, color:'party' };
 const snTopic = () => SN.sub!=null ? CB.subs[SN.sub] : SN.major!=null ? CB.majors[SN.major] : null;
 function renderSponsors(){
   const reps = SPON.filter(p=>p.ch==='Rep'), sens = SPON.filter(p=>p.ch==='Sen');
@@ -1431,10 +1454,11 @@ function renderSponsors(){
       <div class="seg" role="group" aria-label="Chamber">${[['Sen','Senate'],['Rep','House']].map(([k,l])=>`<button data-nc="${k}" aria-pressed="${NET.ch===k}">${l}</button>`).join('')}</div>
       <label class="ink2" for="net-min" style="font-size:13px">Show ties of at least</label><select id="net-min">${[['auto','Automatic'],...[1,2,3,5,10,20].map(n=>[n, pl(n,'shared bill')])].map(([v,l])=>`<option value="${v}" ${String(NET.min)===String(v)?'selected':''}>${l}</option>`).join('')}</select>
       <select id="net-find" aria-label="Find a legislator"><option value="">Find a legislator…</option></select>
+      ${LEGS.length?`<label class="ink2" for="net-col" style="font-size:13px">Color by</label><select id="net-col"><option value="party" ${NET.color==='party'?'selected':''}>Party</option><option value="group" ${NET.color==='group'?'selected':''}>Groups found in the network</option></select>`:''}
     </div>
     <div id="net" class="net"></div>
     <div class="legend" id="net-leg" style="margin-top:6px"></div>
-    <p class="muted" style="margin:6px 0 0;font-size:12px">Each circle is a legislator, sized by the bills they filed as primary sponsor. A line joins two legislators when one co-sponsored the other's bills; thicker lines mean more shared bills. Legislators who sign onto each other's bills are pulled together, so blocs appear as clusters. Colors mark groups the network finds on its own (it does not know party). Hover a legislator to see their ties; click to open their page. Follows the topic menus above.</p></div>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">Each circle is a legislator, sized by the bills they filed as primary sponsor. A line joins two legislators when one co-sponsored the other's bills; thicker lines mean more shared bills. Legislators who sign onto each other's bills are pulled together, so blocs appear as clusters. ${LEGS.length?'Colors show party, from the General Assembly member lists; switch to groups to see the blocs the network finds on its own.':'Colors mark groups the network finds on its own (it does not know party).'} Hover a legislator to see their ties; click to open their page. Follows the topic menus above.</p></div>
   <div style="margin-bottom:16px">
     <div class="panel"><div class="chead"><h3>How sponsorship is recorded</h3></div>
       <dl class="facts"><dt>Primary sponsor</dt><dd>Filed the bill with the clerk</dd><dt>Original co-sponsor</dt><dd>Co-sponsored the bill at introduction</dd><dt>Co-sponsor</dt><dd>Added to the bill later</dd><dt>Second chamber</dt><dd>Carried the bill after it passed the first chamber</dd></dl>
@@ -1443,6 +1467,7 @@ function renderSponsors(){
   <div class="tscroll"><table class="dt" id="sn-t" style="min-width:0"><thead><tr>${[['name','Legislator'],['C','Primary sponsor'],['law','Bills that became law']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${k!=='name'?'text-align:right;width:180px':''}">${l} <span class="muted">${SN.sort===k?(SN.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
   $$('[data-nc]').forEach(b=>b.addEventListener('click', ()=>{ NET.ch=b.dataset.nc; NET.find=null; $$('[data-nc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); drawNetwork(); }));
   $('#net-min').addEventListener('change', e=>{ NET.min = e.target.value==='auto' ? 'auto' : +e.target.value; drawNetwork(); });
+  $('#net-col')?.addEventListener('change', e=>{ NET.color = e.target.value; drawNetwork(); });
   $('#net-find').addEventListener('change', e=>{ NET.find = e.target.value==='' ? null : +e.target.value; netFocus(NET.find); });
   let deb; $('#sn-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ SN.q=e.target.value; snUpdate(); },120); });
   $$('[data-ch]').forEach(b=>b.addEventListener('click', ()=>{ SN.ch=b.dataset.ch; $$('[data-ch]').forEach(x=>x.setAttribute('aria-pressed', x===b)); snUpdate(); }));
@@ -1470,9 +1495,9 @@ function snUpdate(){
     $('#sn-ct-'+ch).textContent = `${ch==='Sen'?'Senators':'Representatives'}${snTopic()?' · '+snTopic():''}`;
     const top = tops[ch];
     if (!top.length) { $('#sn-top-'+ch).innerHTML = '<p class="muted" style="margin:0">No enacted bills on this topic.</p>'; continue; }
-    hbars($('#sn-top-'+ch), top.map(([p,s])=>({label:p.name, value:s.law, color:'--s-bills', tip:`<div class="r"><span>Enacted bills</span><b class="num">${fmt(s.law)}</b></div><div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(s.C)}</b></div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:170, rowH:23, max:shared});
+    hbars($('#sn-top-'+ch), top.map(([p,s])=>({label:withParty(p), value:s.law, color:'--s-bills', tip:`<div class="r"><span>Enacted bills</span><b class="num">${fmt(s.law)}</b></div><div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(s.C)}</b></div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:170, rowH:23, max:shared});
   }
-  $('#sn-t tbody').innerHTML = rows.map(([p,s])=>`<tr class="row" data-h="#sponsor-${p.slug}"><td>${spLink(p)}</td>
+  $('#sn-t tbody').innerHTML = rows.map(([p,s])=>`<tr class="row" data-h="#sponsor-${p.slug}"><td>${spLink(p)}${p.party?` <span class="muted">(${partyAbbr1(p.party)}${p.district?'-'+esc(p.district):''})</span>`:''}</td>
     <td class="num" style="text-align:right">${s.C?fmt(s.C):'<span class="muted">·</span>'}</td><td class="num" style="text-align:right">${s.law?fmt(s.law):'<span class="muted">·</span>'}</td></tr>`).join('')
     || `<tr><td colspan="3" class="muted" style="padding:20px">No legislators ${snTopic()?'introduced a bill on this topic':'match'}.</td></tr>`;
   $$('#sn-t tr.row').forEach(tr=>tr.addEventListener('click', e=>{ if (!e.target.closest('a')) nav(tr.dataset.h.slice(1)); }));

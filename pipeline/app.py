@@ -75,6 +75,8 @@ pre{background:#0f1720;color:#dbe4ee;border-radius:8px;padding:12px;font:12.5px/
     <div class="act row"><input type="password" id="pw" placeholder="Server password" hidden><button class="primary" id="publish">Publish</button></div></div>
   <div class="step"><span class="n">+</span><div><h2>Think tank logos</h2><p>Visits each think tank's website (listed in <code>profiles.toml</code>) and saves its logo into <code>content/thinktanks/logos</code>. Review them before publishing, and use them with each organization's permission.</p></div>
     <div class="act row"><button id="logos">Fetch logos</button><a class="btn" href="/logos" target="_blank">Review logos</a></div></div>
+  <div class="step"><span class="n">+</span><div><h2>Legislators</h2><p>Reads the House and Senate member lists on ilga.gov and saves each member's party, district and official photo into <code>content/legislators</code>. Run it at the start of each session or when members change, then review and publish.</p></div>
+    <div class="act row"><button id="legs">Fetch legislators</button><a class="btn" href="/legislators" target="_blank">Review legislators</a></div></div>
   <div class="step"><span class="n">+</span><div><h2>Coding worksheet</h2><p>Makes a spreadsheet of every bill not yet coded in a session, in <code>inputs/worksheets</code>. Fill in <code>subtopic</code> and save it into that session's codes folder.</p></div>
     <div class="act row"><select id="ga"></select><button id="sheet">Make worksheet</button></div></div>
 </div>
@@ -92,7 +94,7 @@ async function poll(){
   $('#version').textContent = 'Site code version ' + s.version + ' (updates from GitHub each time you open Update website)';
   $('#pubdesc').textContent = desc[s.method] || '';
   $('#pw').hidden = s.method !== 'sftp';
-  for (const id of ['build','sheet','logos']) $('#'+id).disabled = busy;
+  for (const id of ['build','sheet','logos','legs']) $('#'+id).disabled = busy;
   $('#publish').disabled = busy || !b || !b.ok;
   if (!$('#ga').options.length) $('#ga').innerHTML = s.sessions.slice().reverse().map(g=>`<option value="${g}">${g}th General Assembly</option>`).join('');
   if (s.log.length){ const L = $('#log'); L.hidden = false; const atEnd = L.scrollTop + L.clientHeight >= L.scrollHeight - 8; L.textContent = s.log.join('\n'); if (atEnd) L.scrollTop = L.scrollHeight; }
@@ -102,6 +104,7 @@ const post = (url, body) => fetch(url, {method:'POST', headers:{'content-type':'
 $('#build').onclick = () => post('/run/build');
 $('#sheet').onclick = () => post('/run/worksheet', {ga: +$('#ga').value});
 $('#logos').onclick = () => post('/run/logos');
+$('#legs').onclick = () => post('/run/legislators');
 $('#publish').onclick = () => post('/run/publish', {password: $('#pw').value || null});
 poll();
 </script>'''
@@ -132,6 +135,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/logos':
             f = OUT / 'logos.html'
             return self.send(200, f.read_bytes()) if f.exists() else self.send(404, 'Run "Fetch logos" first.')
+        if path == '/legislators':
+            f = OUT / 'legislators.html'
+            return self.send(200, f.read_bytes()) if f.exists() else self.send(404, 'Run "Fetch legislators" first.')
+        if path.startswith('/content/legislators/photos/'):  # images on the legislator review page
+            base = (ROOT / 'content' / 'legislators' / 'photos').resolve()
+            f = (ROOT / path.lstrip('/')).resolve()
+            if f.parent != base or not f.is_file():
+                return self.send(404, 'Not found')
+            return self.send(200, f.read_bytes(), mimetypes.guess_type(f.name)[0] or 'application/octet-stream')
         if path.startswith('/content/thinktanks/logos/'):  # images shown on the logo review page
             base = (ROOT / 'content' / 'thinktanks' / 'logos').resolve()
             f = (ROOT / path.lstrip('/')).resolve()
@@ -157,6 +169,8 @@ class Handler(BaseHTTPRequestHandler):
             ok = run('making a worksheet', ['pipeline/build.py', '--worksheet', str(int(body.get('ga')))])
         elif path == '/run/logos':
             ok = run('fetching think tank logos', ['pipeline/fetch_logos.py'])
+        elif path == '/run/legislators':
+            ok = run('fetching legislators from ilga.gov', ['pipeline/fetch_legislators.py'])
         elif path == '/run/publish':
             env = {'IL_AGENDAS_SFTP_PASSWORD': body['password']} if body.get('password') else None
             ok = run('publishing', ['pipeline/publish.py'], env)

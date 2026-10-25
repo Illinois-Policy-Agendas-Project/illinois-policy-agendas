@@ -76,6 +76,11 @@ subtopic = "subtopic"
 file = "../SOTS/IL_SOTS_2005_2025.xls"
 columns = { id = "id", governor = "governor", year = "year", text = "text", subtopic = "minortopic" }
 
+# Party, district and photo for each legislator. Made by "Fetch legislators" (pipeline/fetch_legislators.py) from ilga.gov;
+# photos go in content/legislators/photos/. Lives in this repository, like the think tank profiles.
+[legislators]
+file = "content/legislators/members.csv"
+
 [thinktanks]
 file = "inputs/thinktanks/Illinois Think Tank Reports.xlsx"
 profiles = "content/thinktanks/profiles.toml"   # in this repository; bios, and logos in content/thinktanks/logos/
