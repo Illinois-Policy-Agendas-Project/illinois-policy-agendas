@@ -836,7 +836,8 @@ function billsUpdate(){
 function snippet(text, terms){ const t=String(text||''), i=t.toLowerCase().indexOf(terms[0]); if (i<0) return t.slice(0,140)+'…'; const a=Math.max(0,i-60); return (a?'…':'')+t.slice(a, i+100)+'…'; }
 
 /* =================== SPEECHES =================== */
-const SP = { major:3, codes:false };   // topic highlighted on the tab and on speech pages
+const SP = { major:'all', codes:false };   // topic highlighted on the tab and on speech pages ('all' colors every sentence by its topic on the tab)
+const spMajor = () => typeof SP.major === 'number' ? SP.major : null;
 function speechData(){
   const all = byDs('sots'); const years = range(2005,2025); const pol = all.filter(isPol);
   const tot = count(pol, r=>r.year); const cell = new Map(); for (const r of pol){ const k=r.major+':'+r.year; cell.set(k,(cell.get(k)||0)+1); }
@@ -860,11 +861,11 @@ function renderSpeeches(){
     <div class="kpi"><span class="l">Most-mentioned topic</span><span class="v" style="font-size:19px;padding-block:4px">${esc(CB.majors[topM[0]])}</span><span class="s">${pct(topM[1]/pol.length)} of policy sentences</span></div>
   </div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h3>The addresses</h3></div>
-    <div class="fbar" style="margin:8px 0 12px;justify-content:flex-start"><label class="ink2" for="s-major" style="font-size:13px">Mark sentences on</label><select id="s-major">${majorOptions(SP.major,'No topic')}</select></div>
-    <div class="addrs">${years.map(y=>{ const ss=all.filter(r=>r.year===y).sort((a,b)=>a.id-b.id); const n=SP.major==null?0:ss.filter(r=>r.major===SP.major).length;
+    <div class="fbar" style="margin:8px 0 12px;justify-content:flex-start"><label class="ink2" for="s-major" style="font-size:13px">Mark sentences on</label><select id="s-major"><option value="all" ${SP.major==='all'?'selected':''}>All topics</option>${majorOptions(spMajor(),'No topic').replace(/^<option value="">No topic<\/option>/,'')}</select></div>
+    <div class="addrs">${years.map(y=>{ const ss=all.filter(r=>r.year===y).sort((a,b)=>a.id-b.id); const M=spMajor(), n=M==null?ss.filter(isPol).length:ss.filter(r=>r.major===M).length;
       return `<a class="addr" href="#speech-${y}"><span class="yr">${y}</span><span class="gv">${esc(govLabel(govOf(y), y))}</span>
-        <span class="mstrip">${ss.map(r=>`<i class="${SP.major!=null&&r.major===SP.major?'on':''}"></i>`).join('')}</span>
-        <span class="muted num" style="font-size:12px">${fmt(ss.length)} sentences${SP.major!=null?` · ${fmt(n)} on ${esc(CB.majors[SP.major].split(/,| and /)[0])}`:''}</span></a>`; }).join('')}</div></div>
+        <span class="mstrip">${ss.map(r=>M==null ? (isPol(r)?`<i style="background:${shade(r.major,0,1)}"></i>`:'<i></i>') : `<i class="${r.major===M?'on':''}"></i>`).join('')}</span>
+        <span class="muted num" style="font-size:12px">${fmt(ss.length)} sentences · ${M==null?`${fmt(n)} on policy`:`${fmt(n)} on ${esc(CB.majors[M].split(/,| and /)[0])}`}</span></a>`; }).join('')}</div></div>
   <div class="panel"><div class="chead"><h3>Topic share of each address</h3><span class="muted" style="font-size:12px">Share of the year's policy sentences. Click a cell to open that address with the topic marked.</span></div>
     <div class="hscroll"><table class="heat"><thead><tr class="gov"><th></th>${spans.map((s,i)=>`<th colspan="${s.n}">${esc(govLabel(s.g, years[spans.slice(0,i).reduce((a,x)=>a+x.n,0)]))}</th>`).join('')}</tr><tr><th></th>${years.map(y=>`<th>'${String(y).slice(2)}</th>`).join('')}</tr></thead>
     <tbody>${MAJORS().map(m=>`<tr><th class="rh" title="${esc(CB.majors[m])}"><span class="code">${m}</span> ${esc(CB.majors[m])}</th>${years.map(y=>{ const v=share(m,y); return `<td data-m="${m}" data-y="${y}" style="${heatBg(v,mx)}">${v>=0.005?Math.round(v*100):v>0?'<1':'·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
@@ -872,7 +873,7 @@ function renderSpeeches(){
   $$('table.heat td').forEach(td=>{ const m=+td.dataset.m, y=+td.dataset.y;
     bindTip(td, ()=>`<div class="t">${y} · ${esc(govOf(y))}</div><div>${esc(CB.majors[m])}</div><div class="r"><span>Share of policy sentences</span><b class="num">${pct(share(m,y))}</b></div><div class="muted">${fmt(cell.get(m+':'+y)||0)} of ${fmt(tot.get(y)||0)} sentences</div>`);
     td.addEventListener('click', ()=>{ SP.major=m; nav('speech-'+y); }); });
-  $('#s-major').addEventListener('change', e=>{ SP.major=e.target.value===''?null:+e.target.value; renderSpeeches(); });
+  $('#s-major').addEventListener('change', e=>{ SP.major=e.target.value==='all'?'all':+e.target.value; renderSpeeches(); });
   $('#s-all').addEventListener('click', ()=>save('illinois-state-of-the-state-2005-2025.csv', csvFor(all)));
 }
 
@@ -1211,14 +1212,14 @@ SECTIONS.report.push(
 SECTIONS.speech.push(
   { id:'reader', title:'', render(s, el){
       el.innerHTML = `<div class="chead"><h3 class="sec-t" style="margin:0">Full text</h3><div class="fbar" style="margin:0">
-          <label class="ink2" for="rd-m" style="font-size:13px">Mark</label><select id="rd-m">${majorOptions(SP.major,'No topic')}</select>
+          <label class="ink2" for="rd-m" style="font-size:13px">Mark</label><select id="rd-m">${majorOptions(spMajor(),'No topic')}</select>
           <label class="check"><input type="checkbox" id="rd-c" ${SP.codes?'checked':''}>Show codes</label></div></div>
         <div id="rd-meta" class="ink2" style="font-size:13.5px"></div>
         <div class="strip" id="rd-strip" aria-label="Sentence map"></div>
         <div class="muted" style="font-size:12px;margin-top:-4px">One tick per sentence, in speaking order. Marked ticks are in the chosen topic. Click a tick or a sentence to select it.</div>
         <div class="speech" id="rd-text"></div>`;
-      const draw = ()=>{ const hit = r => SP.major!=null && r.major===SP.major; const pol = s.sent.filter(isPol).length, n = s.sent.filter(hit).length;
-        $('#rd-meta').innerHTML = `${fmt(s.sent.length)} sentences, ${fmt(pol)} with policy content.` + (SP.major!=null ? ` <b style="color:var(--ink)">${fmt(n)}</b> on ${esc(CB.majors[SP.major])} (${pct(n/Math.max(1,pol))} of policy sentences).` : '');
+      const draw = ()=>{ const hit = r => spMajor()!=null && r.major===spMajor(); const pol = s.sent.filter(isPol).length, n = s.sent.filter(hit).length;
+        $('#rd-meta').innerHTML = `${fmt(s.sent.length)} sentences, ${fmt(pol)} with policy content.` + (spMajor()!=null ? ` <b style="color:var(--ink)">${fmt(n)}</b> on ${esc(CB.majors[spMajor()])} (${pct(n/Math.max(1,pol))} of policy sentences).` : '');
         $('#rd-strip').innerHTML = s.sent.map(r=>`<i data-id="${r.id}" class="${hit(r)?'on':r.sub===NOPOL?'np':''}"></i>`).join('');
         let html='<p>'; s.sent.forEach((r,i)=>{ if (i && i%5===0) html+='</p><p>'; html += `<span id="sn-${r.id}" data-id="${r.id}" class="${hit(r)?'on':r.sub===NOPOL?'np':''} ${s.sid===r.id?'sel':''}">${esc(r.text)}${SP.codes||hit(r)?`<sup>${r.sub===NOPOL?'−555':r.sub}</sup>`:''}</span> `; }); $('#rd-text').innerHTML = html+'</p>';
         const byId = new Map(s.sent.map(r=>[r.id,r]));
