@@ -1308,8 +1308,11 @@ function renderSponsors(){
     <select id="sn-m" aria-label="Major topic">${majorOptions(SN.major,'Bills on any topic')}</select>
     ${SN.major!=null?`<select id="sn-s" aria-label="Subtopic">${subOptions(SN.major, SN.sub)}</select>`:''}
   </div>
-  <div class="grid-wide">
-    <div class="panel"><div class="chead"><h3 id="sn-ct"></h3><span class="muted" style="font-size:12px">Click a name to open their page</span></div><div id="sn-top"></div></div>
+  <div class="grid2">
+    <div class="panel"><div class="chead"><h3 id="sn-ct-Sen"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Sen"></div></div>
+    <div class="panel"><div class="chead"><h3 id="sn-ct-Rep"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Rep"></div></div>
+  </div>
+  <div style="margin-bottom:16px">
     <div class="panel"><div class="chead"><h3>How sponsorship is recorded</h3></div>
       <dl class="facts"><dt>Primary sponsor</dt><dd>Filed the bill with the clerk</dd><dt>Original co-sponsor</dt><dd>Co-sponsored the bill at introduction</dd><dt>Co-sponsor</dt><dd>Added to the bill later</dd><dt>Second chamber</dt><dd>Carried the bill after it passed the first chamber</dd></dl>
       <p class="muted" style="margin:0;font-size:12.5px">Names are parsed from the ILGA sponsor field in the bills file. Spelling variants of the same legislator are merged.</p></div>
@@ -1333,10 +1336,15 @@ function snRows(){
 }
 function snUpdate(){
   const rows = snRows();
-  $('#sn-ct').textContent = `Most enacted bills as primary sponsor${snTopic()?' on '+snTopic():''}${SN.ch!=='all'?' · '+chamberName(SN.ch):''}`;
-  const top = rows.filter(([,s])=>s.law>0).sort((a,b)=>b[1].law-a[1].law || b[1].C-a[1].C).slice(0,12);
-  if (!top.length) $('#sn-top').innerHTML = '<p class="muted" style="margin:0">No enacted bills match these filters.</p>'; else
-  hbars($('#sn-top'), top.map(([p,s])=>({label:p.title, value:s.law, color:'--s-bills', tip:`<div class="r"><span>Enacted bills</span><b class="num">${fmt(s.law)}</b></div><div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(s.C)}</b></div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:200, rowH:23});
+  // one chart per chamber; they follow the topic filters but not the chamber buttons or name search, which narrow the table
+  const tops = Object.fromEntries(['Sen','Rep'].map(ch=>[ch, SPON.filter(p=>p.ch===ch).map(p=>[p, sponsorStats(p, SN.major, SN.sub)]).filter(([,s])=>s.law>0).sort((a,b)=>b[1].law-a[1].law || b[1].C-a[1].C || a[0].name.localeCompare(b[0].name)).slice(0,10)]));
+  const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.law))));   // same scale in both charts
+  for (const ch of ['Sen','Rep']){
+    $('#sn-ct-'+ch).textContent = `${ch==='Sen'?'Senators':'Representatives'}${snTopic()?' · '+snTopic():''}`;
+    const top = tops[ch];
+    if (!top.length) { $('#sn-top-'+ch).innerHTML = '<p class="muted" style="margin:0">No enacted bills on this topic.</p>'; continue; }
+    hbars($('#sn-top-'+ch), top.map(([p,s])=>({label:p.name, value:s.law, color:'--s-bills', tip:`<div class="r"><span>Enacted bills</span><b class="num">${fmt(s.law)}</b></div><div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(s.C)}</b></div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:170, rowH:23, max:shared});
+  }
   $('#sn-t tbody').innerHTML = rows.map(([p,s])=>`<tr class="row" data-h="#sponsor-${p.slug}"><td>${spLink(p)}</td>
     <td class="num" style="text-align:right">${s.C?fmt(s.C):'<span class="muted">·</span>'}</td><td class="num" style="text-align:right">${s.law?fmt(s.law):'<span class="muted">·</span>'}</td></tr>`).join('')
     || `<tr><td colspan="3" class="muted" style="padding:20px">No legislators ${snTopic()?'introduced a bill on this topic':'match'}.</td></tr>`;
