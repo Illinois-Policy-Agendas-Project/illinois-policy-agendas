@@ -700,13 +700,8 @@ function renderBills(){
     hbars($('#b-cm'), cc.map(([c,n])=>({label:c.replace(/ Committee$/,''), value:n, color:'--s-bills', on:BL.cmte===c, onclick:()=>{ BL.cmte = BL.cmte===c?'':c; BL.page=0; renderBills(); }})), {labelW:260, rowH:22});
   } else {
     charts.innerHTML = `<div class="panel"><div class="chead"><h3>Laws by major topic</h3><span class="muted" style="font-size:12px">Hover for the share of the topic's bills that became law. Click to filter</span></div><div id="b-top"></div></div>
-      <div class="panel"><div class="chead"><h3>Public Acts by month</h3><span class="muted" style="font-size:12px">Date each bill became law</span></div><div id="b-mo"></div>
-      <h3 style="margin-top:8px">Days from introduction to law</h3><div id="b-dd"></div></div>`;
-    const ls = laws.filter(r=>r.x.law_date && inTopic(r)); const months = [...new Set(ls.map(r=>r.x.law_date.slice(0,7)))].sort();
-    if (months.length){ const fill = []; for (let d=new Date(months[0]+'-15'); d<=new Date(months[months.length-1]+'-15'); d.setMonth(d.getMonth()+1)) fill.push(d.toISOString().slice(0,7));
-      const mc = count(ls, r=>r.x.law_date.slice(0,7));
-      columns($('#b-mo'), fill.map(k=>new Date(k+'-15').toLocaleString('en-US',{month:'short'}) + (k.endsWith('-01')||k===fill[0]?" '"+k.slice(2,4):'')), [{label:'Public Acts', cls:'ds-bills', color:'--s-bills', values:fill.map(k=>mc.get(k)||0)}], {height:150}); }
-    else $('#b-mo').innerHTML = '<p class="muted">No dated Public Acts.</p>';
+      <div class="panel"><div class="chead"><h3>Days from introduction to law</h3><span class="muted" style="font-size:12px">From first introduction to the date it became law</span></div><div id="b-dd"></div></div>`;
+    const ls = laws.filter(r=>r.x.law_date && inTopic(r));
     const bins = [[0,180,'Under 6 months'],[180,240,'6–8 months'],[240,365,'8–12 months'],[365,9999,'Over a year']];
     const dd = ls.filter(r=>r.x.intro).map(r=>daysBetween(r.x.intro, r.x.law_date));
     hbars($('#b-dd'), bins.map(([a,b,l])=>({label:l, value:dd.filter(d=>d>=a && d<b).length, color:'--h3'})), {labelW:140, rowH:22});
