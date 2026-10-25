@@ -77,7 +77,7 @@ file = "../SOTS/IL_SOTS_2005_2025.xls"
 columns = { id = "id", governor = "governor", year = "year", text = "text", subtopic = "minortopic" }
 
 [thinktanks]
-file = "inputs/thinktanks/Illinois_Think_Tank_Reports.xlsx"
+file = "inputs/thinktanks/Illinois Think Tank Reports.xlsx"
 profiles = "content/thinktanks/profiles.toml"   # in this repository; bios, and logos in content/thinktanks/logos/
 columns = { id = "id", org = "think_tank", date = "date", year = "year", title = "title", abstract = "abstract", url = "url", pdf = "pdf_url", subtopic = "subtopic" }
 
