@@ -741,7 +741,8 @@ def build_legislators(cfg, rep):
                 no_photo += 1
                 photo = ''
             rows.append({'ch': 'Rep' if chamber == 'House' else 'Sen', 'name': name, 'party': (r.get('party') or '').strip(),
-                         'district': (r.get('district') or '').strip(), 'url': (r.get('url') or '').strip(), 'photo': f'legislators/{photo}' if photo else ''})
+                         'district': (r.get('district') or '').strip(), 'url': (r.get('url') or '').strip(), 'photo': f'legislators/{photo}' if photo else '',
+                         'current': (r.get('source') or '').strip() != 'manual'})   # manual rows are mostly members who left; seats use current ones
     rep.note(ds, f'{len(rows)} legislators in {path.name}; {no_photo} without a photo, {sum(1 for r in rows if not r["party"])} without a party.')
     return rows, copies
 

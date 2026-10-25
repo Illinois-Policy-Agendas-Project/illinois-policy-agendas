@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&family=Figtree:wght@400;500;600;700&family=Literata:opsz,wght@7..72,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: masthead + tabs (home, three datasets, topics, sponsors, search). Light-only by design ("Lakefront"). */
-:root{
+:root{--pd:hsl(214 65% 48%);--pr:hsl(357 62% 52%);--pi:hsl(275 40% 55%);
   color-scheme:light;
   --bg:#ffffff; --band:#eef5fc; --sunk:#f4f7fb; --surface:#ffffff;
   --ink:#1b2330; --ink-2:#4b5566; --muted:#7b8494; --line:#e4e9f0; --line-2:#cfd7e2;
@@ -304,6 +304,8 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 @media (max-width:560px){ .net{height:420px} }
 .leg-photo{flex:none;width:84px;height:104px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--sunk)} .leg-photo img{width:100%;height:100%;object-fit:cover;display:block}
 @media (max-width:560px){ .leg-photo{width:64px;height:80px} }
+.pfun{width:100%;border-collapse:collapse;font-size:13.5px} .pfun th{text-align:left;font-weight:600;color:var(--ink-2);font-size:12px;padding:6px 8px} .pfun tbody th{font-size:13.5px;color:var(--ink);white-space:nowrap}
+.pfun td{padding:8px;position:relative;vertical-align:top;border-top:1px solid var(--line)} .pfun .pbar{display:block;height:5px;border-radius:3px;margin-top:5px;opacity:.85}
 .orglist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
 .orgcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .orgcard:hover{border-color:var(--s-tt)}
@@ -364,7 +366,7 @@ const DS = {
   tt:{name:'Think tank reports', short:'Think tanks', cls:'ds-tt'}
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Sponsors'],['committees','Committees'],['search','Search']];
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Sponsors'],['parties','Parties'],['committees','Committees'],['search','Search']];
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
 let GOV = {}, USED_MAJORS = new Set();   // year -> {governor, party}; major topics that have records
@@ -1294,6 +1296,7 @@ function attachLegislators(list){
     const l = full.get(`${p.ch}|${n.first}|${n.last}`) || (n.nick && full.get(`${p.ch}|${n.nick}|${n.last}`)) || byLast.get(`${p.ch}|${n.last}`);
     if (l) Object.assign(p, {party:l.party||'', district:l.district||'', photo:l.photo||'', ilga:l.url||''}); }
 }
+const LEGSEAT = () => { const by = new Map(); for (const l of LEGS){ const k = l.ch+'|'+l.district; if (!by.has(k) || (l.current!==false && by.get(k).current===false)) by.set(k, l); } return [...by.values()]; };
 const partyAbbr1 = party => ({Democratic:'D', Republican:'R', Independent:'I'})[party] || '';
 const withParty = p => p.party ? `${p.name} (${partyAbbr1(p.party)})` : p.name;
 const hasParties = ch => { const ps = SPON.filter(p=>p.ch===ch); return ps.length && ps.filter(p=>p.party).length >= ps.length*0.5; };
@@ -1386,7 +1389,7 @@ function drawNetwork(){
   if (!nodes.length){ box.innerHTML = '<p class="muted" style="padding:16px">No co-sponsorship ties at this level. Lower the threshold or pick another topic.</p>'; $('#net-leg').innerHTML=''; NETVIEW=null; return; }
   netLayout(nodes, edges, W, H); const groups = netGroups(nodes, edges);
   const maxL = Math.max(1, ...nodes.map(d=>d.lead)), maxW = Math.max(...edges.map(e=>e.w)), at = new Map(nodes.map(d=>[d.i,d]));
-  const byParty = NET.color==='party' && hasParties(NET.ch), PCOL = {Democratic:'hsl(214 65% 48%)', Republican:'hsl(357 62% 52%)', Independent:'hsl(275 40% 55%)'};
+  const byParty = NET.color==='party' && hasParties(NET.ch), PCOL = {Democratic:'var(--pd)', Republican:'var(--pr)', Independent:'var(--pi)'};
   const rad = d => 3 + 9*Math.sqrt(d.lead/maxL), col = d => byParty ? (PCOL[d.p.party] || 'hsl(220 8% 62%)') : d.g>=0 && d.g<NETCOL.length ? NETCOL[d.g] : 'hsl(220 8% 62%)';
   const last = n => n.replace(/,? (Jr\.|Sr\.|II|III|IV)$/,'').split(' ').slice(-1)[0];
   const labelled = new Set(), boxes = [];   // label the best-connected legislators whose names fit without overlapping
@@ -1660,6 +1663,111 @@ SECTIONS.org.push(
 );
 
 
+
+/* =================== PARTIES ===================
+   Democrats and Republicans in the current General Assembly. A bill's party is its primary sponsor's party
+   (from content/legislators/members.csv via legislators.json). A bill is bipartisan when anyone else on its sponsor
+   list, in either chamber, belongs to the other party. Seats count current members, one per district. */
+const PT = { ch:'all', agenda:'intro' };
+const PARTIES = ['Democratic','Republican'];
+const PCSS = {Democratic:'--pd', Republican:'--pr', Independent:'--pi'};
+const PNOUN = {Democratic:'Democrats', Republican:'Republicans', Independent:'Independents'};
+const billParty = r => chiefOf(r)?.party || null;
+const isBipartisan = r => { const c = chiefOf(r); if (!c?.party) return false; return (r.sp||[]).some(([i,ro])=>ro!=='C' && SPON[i].party && SPON[i].party!==c.party); };
+function renderParties(){
+  if (!LEGS.length){ $('#view').innerHTML = `<div class="phead"><div><h1>Parties</h1><p>Party comparisons appear once the legislator list is published. Run <b>Fetch legislators</b> in the control panel, then Check data and Publish.</p></div></div>`; return; }
+  const ga = LATEST, inCh = r => PT.ch==='all' || chiefOf(r)?.ch===PT.ch;
+  const B = billsOf(ga).filter(r=>isBillT(r) && billParty(r) && inCh(r)), by = pt => B.filter(r=>billParty(r)===pt);
+  const seats = LEGSEAT(), seat = (ch, pt) => seats.filter(l=>l.ch===ch && l.party===pt).length;
+  const st = Object.fromEntries(PARTIES.map(pt=>{ const b = by(pt); return [pt, {n:b.length, out:b.filter(r=>r.x.stage>=2).length, law:b.filter(r=>r.x.stage>=5).length, bi:b.filter(isBipartisan).length}]; }));
+  const lawAll = B.filter(r=>r.x.stage>=5), biAll = B.filter(isBipartisan);
+  const chip = pt => `<i class="dot" style="background:var(${PCSS[pt]})"></i>`;
+  $('#view').innerHTML = `
+  <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset and the General Assembly's member lists</div><h1>Parties</h1>
+    <p>Democrats and Republicans in the ${gaName(ga)}: seats, what each party's members introduce and pass, and how often bills draw sponsors from across the aisle. A bill's party is its primary sponsor's party.</p></div>
+    <button class="btn primary" id="pt-dl">Download party comparison (CSV)</button></div>
+  <div class="kpis">
+    <div class="kpi"><span class="l">Seats</span><span class="v" style="font-size:19px;line-height:1.3;padding-block:2px"><span style="white-space:nowrap">House ${seat('Rep','Democratic')}–${seat('Rep','Republican')}</span><br><span style="white-space:nowrap">Senate ${seat('Sen','Democratic')}–${seat('Sen','Republican')}</span></span><span class="s">Democrats–Republicans, current members</span></div>
+    <div class="kpi"><span class="l">Bills introduced</span><span class="v">${pct(st.Democratic.n/Math.max(1,B.length),0)} D</span><span class="s">${fmt(st.Democratic.n)} by Democrats, ${fmt(st.Republican.n)} by Republicans</span></div>
+    <div class="kpi"><span class="l">Laws</span><span class="v">${pct(st.Democratic.law/Math.max(1,lawAll.length),0)} D</span><span class="s">${fmt(st.Democratic.law)} by Democrats, ${fmt(st.Republican.law)} by Republicans</span></div>
+    <div class="kpi"><span class="l">Bipartisan bills</span><span class="v">${pct(biAll.length/Math.max(1,B.length),0)}</span><span class="s">${fmt(biAll.length)} bills with a sponsor from each party</span></div>
+  </div>
+  <div class="fbar"><div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['Rep','House bills'],['Sen','Senate bills']].map(([k,l])=>`<button data-pc="${k}" aria-pressed="${PT.ch===k}">${l}</button>`).join('')}</div>
+    <span class="muted" style="font-size:12.5px">By the chamber of the primary sponsor</span></div>
+  <div class="grid2">
+    <div class="panel"><div class="chead"><h3>From introduction to law</h3><span class="muted" style="font-size:12px">Share of each party's bills reaching each stage</span></div>
+      <table class="pfun"><thead><tr><th></th><th>Introduced</th><th>Out of committee</th><th>Became law</th></tr></thead><tbody>${PARTIES.map(pt=>{ const s = st[pt], cell = (v,ref) => `<td><b class="num">${fmt(v)}</b><span class="muted num"> ${ref?pct(v/Math.max(1,ref),0):''}</span><i class="pbar" style="width:${(100*v/Math.max(1,s.n)).toFixed(1)}%;background:var(${PCSS[pt]})"></i></td>`;
+        return `<tr><th><span style="display:inline-flex;align-items:center;gap:7px">${chip(pt)}${PNOUN[pt]}</span></th>${cell(s.n)}${cell(s.out, s.n)}${cell(s.law, s.n)}</tr>`; }).join('')}</tbody></table>
+      <p class="muted" style="margin:8px 0 0;font-size:12.5px">${(()=>{ const d = st.Democratic, r = st.Republican, rd = d.law/Math.max(1,d.n), rr = r.law/Math.max(1,r.n); return `A Democratic bill was ${rr ? (rd/rr).toFixed(1)+' times' : 'far'} as likely to become law as a Republican one (${pct(rd,1)} against ${pct(rr,1)}).`; })()}</p></div>
+    <div class="panel"><div class="chead"><h3>Bills with sponsors from both parties</h3><span class="muted" style="font-size:12px">Share of each party's bills</span></div><div id="pt-bi"></div>
+      <p class="muted" style="margin:8px 0 0;font-size:12.5px">Bipartisan: at least one other sponsor, in either chamber, from the other party. ${pct(lawAll.filter(isBipartisan).length/Math.max(1,lawAll.length),0)} of laws were bipartisan, against ${pct(biAll.length/Math.max(1,B.length),0)} of all bills.</p></div>
+  </div>
+  <div class="panel" style="margin-bottom:16px"><div class="chead"><h3>What each party introduces</h3>
+      <div class="seg" role="group" aria-label="Bills">${[['intro','Bills introduced'],['law','Laws']].map(([k,l])=>`<button data-pa="${k}" aria-pressed="${PT.agenda===k}">${l}</button>`).join('')}</div></div>
+    <div class="legend" style="margin:2px 0 6px">${PARTIES.map(pt=>`<span>${chip(pt)}${PNOUN[pt]}</span>`).join('')}</div><div id="pt-ag"></div>
+    <p class="muted" style="margin:6px 0 0;font-size:12.5px">Share of each party's policy-coded ${PT.agenda==='law'?'laws':'bills'} in each major topic. Hover for the leading subtopics; click to see the topic.</p></div>
+  <div class="grid2">
+    <div class="panel"><div class="chead"><h3>Where the parties' agendas differ</h3><span class="muted" style="font-size:12px">Democratic share minus Republican share, in points</span></div><div id="pt-df"></div></div>
+    <div class="panel"><div class="chead"><h3>Bipartisan bills by topic</h3><span class="muted" style="font-size:12px">Share of the topic's bills with sponsors from both parties</span></div><div id="pt-bt"></div></div>
+  </div>
+  <div class="grid2">${PARTIES.map(pt=>`<div class="panel"><div class="chead"><h3>${PNOUN[pt]} who draw the most cross-party sponsors</h3><span class="muted" style="font-size:12px">Share of their bills as primary sponsor; at least 10 bills</span></div><div id="pt-x-${pt[0]}"></div></div>`).join('')}</div>`;
+
+  // bipartisan share by party
+  hbars($('#pt-bi'), PARTIES.map(pt=>({label:PNOUN[pt], value:st[pt].bi/Math.max(1,st[pt].n), color:PCSS[pt], tip:`<div class="r"><span>Bipartisan bills</span><b class="num">${fmt(st[pt].bi)} of ${fmt(st[pt].n)}</b></div>`})), {labelW:110, rowH:30, valFmt:v=>pct(v,0), max:1});
+  // agenda: paired bars per topic
+  const pool = pt => (PT.agenda==='law' ? by(pt).filter(r=>r.x.stage>=5) : by(pt)).filter(isPol);
+  const P = Object.fromEntries(PARTIES.map(pt=>[pt, pool(pt)])), C = Object.fromEntries(PARTIES.map(pt=>[pt, count(P[pt], r=>r.major)]));
+  const share = (pt,m) => (C[pt].get(m)||0)/Math.max(1,P[pt].length);
+  const majors = [...new Set(PARTIES.flatMap(pt=>[...C[pt].keys()]))].sort((a,b)=>(share('Democratic',b)+share('Republican',b))-(share('Democratic',a)+share('Republican',a)));
+  pairBars($('#pt-ag'), majors.map(m=>({label:CB.majors[m], code:m, vals:PARTIES.map(pt=>share(pt,m)),
+    tip:PARTIES.map(pt=>{ const top = [...count(P[pt].filter(r=>r.major===m), r=>r.sub)].sort((a,b)=>b[1]-a[1]).slice(0,3);
+      return `<div style="margin-top:4px">${chip(pt)}<b>${PNOUN[pt]}</b> ${pct(share(pt,m),1)} <span class="muted">(${fmt(C[pt].get(m)||0)})</span></div>${top.map(([c,n])=>`<div class="muted" style="padding-left:16px">${c} ${esc(CB.subs[c]||'')} · ${fmt(n)}</div>`).join('')}`; }).join(''),
+    onclick:()=>{ Object.assign(TP,{major:m, sub:null, page:0}); nav('topics'); }})), PARTIES.map(pt=>PCSS[pt]));
+  // difference
+  divBars($('#pt-df'), majors.map(m=>({label:CB.majors[m], code:m, value:share('Democratic',m)-share('Republican',m)})).sort((a,b)=>b.value-a.value), ['--pr','--pd'], ['More Republican','More Democratic']);
+  // bipartisan by topic
+  const bt = [...count(B.filter(isPol), r=>r.major)].filter(([,n])=>n>=20).map(([m,n])=>[m, B.filter(r=>r.major===m && isBipartisan(r)).length, n]).sort((a,b)=>b[1]/b[2]-a[1]/a[2]);
+  hbars($('#pt-bt'), bt.map(([m,k,n])=>({label:CB.majors[m], code:m, value:k/n, color:'--h3', tip:`<div class="r"><span>Bipartisan</span><b class="num">${fmt(k)} of ${fmt(n)}</b></div>`})), {labelW:200, rowH:21, valFmt:v=>pct(v,0), max:1});
+  // legislators who draw cross-party sponsors
+  for (const pt of PARTIES){
+    const rows = SPON.filter(p=>p.party===pt && (PT.ch==='all'||p.ch===PT.ch)).map(p=>{ const mine = p.bills.filter(b=>b.role==='C' && b.r.x.ga===ga && isBillT(b.r)).map(b=>b.r); return [p, mine.length, mine.filter(isBipartisan).length]; })
+      .filter(([,n])=>n>=10).sort((a,b)=>b[2]/b[1]-a[2]/a[1] || b[2]-a[2]).slice(0,10);
+    hbars($('#pt-x-'+pt[0]), rows.map(([p,n,k])=>({label:p.title, value:k/n, color:PCSS[pt], tip:`<div class="r"><span>Bipartisan bills</span><b class="num">${fmt(k)} of ${fmt(n)}</b></div><div class="muted">Click for their page</div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:190, rowH:22, valFmt:v=>pct(v,0), max:1});
+  }
+  $$('[data-pc]').forEach(b=>b.addEventListener('click', ()=>{ PT.ch=b.dataset.pc; renderParties(); }));
+  $$('[data-pa]').forEach(b=>b.addEventListener('click', ()=>{ PT.agenda=b.dataset.pa; renderParties(); }));
+  $('#pt-dl').addEventListener('click', ()=>save(`illinois-${ga}-parties-by-topic.csv`, toCSV(['general_assembly','chamber','major_topic','major_topic_label',...PARTIES.flatMap(pt=>[`${pt.toLowerCase()}_bills`,`${pt.toLowerCase()}_share`,`${pt.toLowerCase()}_laws`]),'bipartisan_bills'],
+    majors.map(m=>[ga, PT.ch==='all'?'both':chamberName(PT.ch), m, CB.majors[m], ...PARTIES.flatMap(pt=>{ const b = by(pt).filter(r=>r.major===m); return [b.length, (b.length/Math.max(1,by(pt).filter(isPol).length)).toFixed(4), b.filter(r=>r.x.stage>=5).length]; }), B.filter(r=>r.major===m && isBipartisan(r)).length]))));
+}
+/* two bars per row (one per party), sharing one scale */
+function pairBars(el, items, colors, {labelW=210, rowH=34}={}){
+  const W=cw(el); labelW=Math.min(labelW, W*.42); const m={l:labelW,r:52}, H=items.length*rowH+2, iw=W-m.l-m.r;
+  const mx = niceMax(Math.max(0.01,...items.flatMap(d=>d.vals))), bh=(rowH-10)/2, cpx = labelW/6.4;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Paired bar chart">`;
+  items.forEach((d,i)=>{ const y=i*rowH+1, lab=d.label.length>cpx?d.label.slice(0,Math.floor(cpx)-1)+'…':d.label;
+    s += `<g class="hb" data-i="${i}" style="cursor:${d.onclick?'pointer':'default'}"><rect x="0" y="${y}" width="${W}" height="${rowH}" fill="transparent"/><text x="${m.l-8}" y="${y+rowH/2+4}" text-anchor="end" style="fill:var(--ink-2);font-size:12px">${esc(lab)}</text>`;
+    d.vals.forEach((v,j)=>{ const w=Math.max(v>0?2:0, iw*v/mx), yy=y+4+j*(bh+2);
+      s += `<path d="${rRight(m.l,yy,w,bh,2)}" style="fill:var(${colors[j]})"/><text x="${m.l+w+5}" y="${yy+bh-1.5}" style="fill:var(--ink-2);font-size:10.5px">${pct(v,0)}</text>`; });
+    s += `</g>`; });
+  s += `<line class="base" x1="${m.l}" x2="${m.l}" y1="0" y2="${H}"/></svg>`;
+  el.innerHTML = s; el.classList.add('chart');
+  $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i]; bindTip(g, ()=>`<div class="t"><span class="mono">${d.code}</span> ${esc(d.label)}</div>${d.tip||''}`); if (d.onclick) g.addEventListener('click', d.onclick); });
+}
+/* bars to the left (negative) or right (positive) of a center line */
+function divBars(el, items, colors, ends, {rowH=21}={}){
+  const W=cw(el), H=items.length*rowH+22, mid=W*0.5, lab=150, half=Math.min(mid-lab-30, W-mid-40);
+  const mx = Math.max(0.01,...items.map(d=>Math.abs(d.value)));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Difference chart"><text x="${mid-6}" y="12" text-anchor="end" style="font-size:11px;fill:var(${colors[0]})">← ${ends[0]}</text><text x="${mid+6}" y="12" style="font-size:11px;fill:var(${colors[1]})">${ends[1]} →</text>`;
+  items.forEach((d,i)=>{ const y=20+i*rowH, w=half*Math.abs(d.value)/mx, pos=d.value>=0, x=pos?mid:mid-w, pts=(d.value*100).toFixed(1);
+    s += `<g class="hb" data-i="${i}"><rect x="0" y="${y}" width="${W}" height="${rowH}" fill="transparent"/>`
+      + `<rect x="${x}" y="${y+4}" width="${Math.max(1,w)}" height="${rowH-8}" rx="2" style="fill:var(${colors[pos?1:0]})"/>`
+      + `<text x="${pos?mid-6:mid+6}" y="${y+rowH/2+4}" text-anchor="${pos?'end':'start'}" style="fill:var(--ink-2);font-size:11.5px">${esc(d.label.length>24?d.label.slice(0,23)+'…':d.label)}</text>`
+      + `<text x="${pos?mid+w+4:mid-w-4}" y="${y+rowH/2+4}" text-anchor="${pos?'start':'end'}" style="fill:var(--ink-2);font-size:10.5px">${pos?'+':''}${pts}</text></g>`; });
+  s += `<line class="base" x1="${mid}" x2="${mid}" y1="16" y2="${H}"/></svg>`;
+  el.innerHTML = s; el.classList.add('chart');
+  $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i]; bindTip(g, ()=>`<div class="t"><span class="mono">${d.code}</span> ${esc(d.label)}</div><div class="r"><span>Democratic minus Republican share</span><b class="num">${d.value>=0?'+':''}${(d.value*100).toFixed(1)} points</b></div>`); });
+}
+
 /* =================== COMMITTEES ===================
    Built in the browser from each bill's ILGA action history (bills/<ga>/actions.json), so it needs no extra data files.
    A bill counts for a committee when it was assigned (or re-assigned) to it, and as approved when the committee reported it
@@ -1825,7 +1933,7 @@ SECTIONS.committee.push(
 );
 
 /* =================== shell & routing =================== */
-const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, committees:renderCommittees, search:renderSearch};
+const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, parties:renderParties, committees:renderCommittees, search:renderSearch};
 let CUR = null, ROUTE = {view:'bills'}; const STACK = [];
 function parseRoute(t){
   if (RENDER[t]) return {view:t};
@@ -1867,6 +1975,7 @@ function needsFor(rt){
     case 'search': return {details: SR.gas==='latest' ? [LATEST] : all, links:all};
     case 'topics': case 'sponsors': case 'sponsor': return {details:[], links:all};
     case 'committees': return {details:[], links:[CM.ga ?? LATEST]};
+    case 'parties': return {details:[], links:[LATEST]};
     case 'committee': return {details:[], links:[rt.ga]};
     default: return {details:[], links:[]};
   }
