@@ -487,19 +487,25 @@ STAGE_CMTE = re.compile(r'^(Do Pass|Recommends Be Adopted|Recommends Do Adopt|Re
 CMTE_NAME = re.compile(r'^(?:Do Pass(?: as Amended)?(?: / (?:Short|Standard) Debate)?|Recommends Be Adopted(?: as Amended)?|Recommends Do (?:Adopt|Consent)|Approved for Consideration|Reported Out Of Committee to)\s*(.*)$', re.I)
 
 
-def bill_stage(steps, last_action, last_date):
+def bill_stage(steps, last_action, last_date, origin=None):
     """Furthest stage a measure reached, from its ILGA action history:
     1 introduced, 2 out of committee, 3 passed one chamber, 4 passed both chambers, 5 became law (has a Public Act).
     Also returns the committee that first approved it, its Public Act number, the date it became law and whether it was vetoed."""
     texts = [s if isinstance(s, str) else s[0] for s in steps] + [last_action]
     stage, cmte, pa, law_date = 1, None, None, None
+    chamber = origin  # 'House' or 'Senate'; follows the bill when it arrives in the other chamber
     for t in texts:
+        m = re.match(r'^Arrived? in (?:the )?(House|Senate)', t)
+        if m:
+            chamber = m.group(1)
         if STAGE_CMTE.match(t):
             stage = max(stage, 2)
             if cmte is None:
                 m = CMTE_NAME.match(t)
                 name = (m.group(1) if m else '').strip(' -')
-                if name:
+                if name and chamber:
+                    cmte = f'{chamber} {name}'
+                elif name:  # chamber unknown: House committee names end in "Committee", Senate ones don't
                     cmte = name if name.endswith('Committee') else f'Senate {name}' if not name.startswith('Senate') else name
                     if cmte.endswith('Committee') and not cmte.startswith('House'):
                         cmte = 'House ' + cmte
@@ -725,7 +731,7 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
     cols = ['key', 'ga', 'bill', 'type', 'chamber', 'short', 'intro', 'last_date', 'last_action', 'sub', 'flags', 'link', 'stage', 'cmte', 'pa', 'law_date', 'veto']
     for s in sessions:
         for b in s['bills'].values():
-            b['stage'], b['cmte'], b['pa'], b['law_date'], b['veto'] = bill_stage(parse_actions(b['actions_raw'], b['last_action']), b['last_action'], b['last_date'])
+            b['stage'], b['cmte'], b['pa'], b['law_date'], b['veto'] = bill_stage(parse_actions(b['actions_raw'], b['last_action']), b['last_action'], b['last_date'], {'HB': 'House', 'SB': 'Senate'}.get(b['type']))
             b['veto'] = 1 if b['veto'] else 0
     rows = [[k] + [b[c] for c in cols[1:]] for s in sessions for k, b in sorted(s['bills'].items(), key=lambda kv: (kv[1]['intro'] or '', kv[0]))]
     files['bills'] = dump(d / 'bills' / 'summary.json', {'cols': cols, 'rows': rows})

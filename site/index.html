@@ -684,7 +684,7 @@ function renderBills(){
     <select id="b-type" aria-label="Chamber"><option value="">House and Senate bills</option><option value="HB">House bills (HB)</option><option value="SB">Senate bills (SB)</option></select>
     <select id="b-major" aria-label="Topic">${majorOptions(BL.major)}</select>
     ${BL.major!=null?`<select id="b-sub" aria-label="Subtopic">${subOptions(BL.major, BL.sub)}</select>`:''}
-    ${V==='committee'?`<select id="b-cmte" aria-label="Committee"><option value="">All committees</option>${[...count(out.filter(r=>r.x.cmte), r=>r.x.cmte)].sort((a,b)=>a[0].localeCompare(b[0])).map(([c,n])=>`<option value="${esc(c)}" ${BL.cmte===c?'selected':''}>${esc(c)} (${fmt(n)})</option>`).join('')}</select>`:''}
+    ${V==='committee'?`<select id="b-cmte" aria-label="Committee"><option value="">All committees</option>${[...count(out.filter(r=>r.x.cmte), r=>r.x.cmte)].sort((a,b)=>a[0].localeCompare(b[0])).map(([c,n])=>`<option value="${esc(c)}" ${BL.cmte===c?'selected':''}>${esc(cmText(BL.ga, c))} (${fmt(n)})</option>`).join('')}</select>${BL.cmte && cmKeyOf(BL.ga, BL.cmte)?`<a href="#committee-${cmKeyOf(BL.ga, BL.cmte)}" style="font-size:13.5px">Open the ${esc(cmText(BL.ga, BL.cmte))} committee page →</a>`:''}`:''}
     <select id="b-status" aria-label="Other filters"><option value="">Any bill</option><option value="R">Had a roll-call vote</option><option value="A">Appropriations bills</option></select>
   </div>
   <div class="fbar"><div class="count" style="margin-left:0"><span id="b-n"></span><button class="btn primary" id="b-dl">Download these rows</button></div></div>
@@ -709,7 +709,7 @@ function renderBills(){
       <div class="panel"><div class="chead"><h3>Committees that advanced the most bills</h3><span class="muted" style="font-size:12px">Click to filter</span></div><div id="b-cm"></div>
       <div class="muted" style="font-size:12px">The first committee to approve each bill. House shell bills often move through the Executive Committee.</div></div>`;
     const cc = [...count(billsOf(BL.ga).filter(r=>r.x.stage>=2 && r.x.cmte && inTopic(r)), r=>r.x.cmte)].sort((a,b)=>b[1]-a[1]).slice(0,12);
-    hbars($('#b-cm'), cc.map(([c,n])=>({label:c.replace(/ Committee$/,''), value:n, color:'--s-bills', on:BL.cmte===c, onclick:()=>{ BL.cmte = BL.cmte===c?'':c; BL.page=0; renderBills(); }})), {labelW:260, rowH:22});
+    hbars($('#b-cm'), cc.map(([c,n])=>({label:cmText(BL.ga, c), value:n, color:'--s-bills', on:BL.cmte===c, tip:`<div class="r"><span>Bills it approved first</span><b class="num">${fmt(n)}</b></div><div class="muted">Click to filter the table; the committee's own page is linked above the table</div>`, onclick:()=>{ BL.cmte = BL.cmte===c?'':c; BL.page=0; renderBills(); }})), {labelW:260, rowH:22});
   } else {
     charts.innerHTML = `<div class="panel"><div class="chead"><h3>Laws by major topic</h3><span class="muted" style="font-size:12px">Click a subtopic in a bar to list its laws</span></div><div id="b-top"></div></div>
       <div class="panel"><div class="chead"><h3>${BL.sub!=null ? `Laws on ${esc(CB.subs[BL.sub])}` : BL.major!=null ? `Laws on ${esc(CB.majors[BL.major])}` : 'Laws by subtopic'}</h3>${BL.major!=null?`<span class="muted num" style="font-size:12px">${fmt(laws.filter(inTopic).length)} laws</span>`:''}</div><div id="b-ll" class="lawlist"></div></div>`;
@@ -826,7 +826,7 @@ function billsUpdate(){
     const cells = V==='intro' ? [billCell(r), `<span class="num" style="white-space:nowrap">${x.intro}</span>`, desc(r), `<div style="min-width:190px">${subChip(r.sub)}</div>`,
         `<div style="min-width:170px"><span class="num">${x.last_date}</span><div class="muted" style="font-size:12.5px">${esc(x.last_action)}</div>${x.stage>=5?'<span class="chip" style="margin-top:4px">Became law</span>':''}</div>`]
       : V==='committee' ? [billCell(r), `<span class="num" style="white-space:nowrap">${x.intro}</span>`, desc(r), `<div style="min-width:170px">${subChip(r.sub)}</div>`,
-        `<div style="min-width:150px;font-size:13px">${esc(x.cmte||'—')}</div>`, `<span class="stage s${x.stage}">${STAGES[x.stage-1]}</span>`]
+        `<div style="min-width:150px;font-size:13px">${x.cmte?cmLinkOf(x.ga, x.cmte):'—'}</div>`, `<span class="stage s${x.stage}">${STAGES[x.stage-1]}</span>`]
       : [`<span class="mono" style="white-space:nowrap">${esc(x.pa||'—')}</span>`, billCell(r), desc(r), `<div style="min-width:170px">${subChip(r.sub)}</div>`,
         `<span class="num" style="white-space:nowrap">${x.law_date||'—'}</span>`, `<span class="num">${x.law_date&&x.intro?fmt(daysBetween(x.intro,x.law_date)):'—'}</span>`];
     return `<tr class="row" data-h="${href(r)}">${cells.map(c=>`<td>${c}</td>`).join('')}</tr>`; }).join('')
@@ -1091,7 +1091,7 @@ function recordFor(rt){
   if (rt.view==='sponsor'){ const p = SPONKEY.get(rt.key); if (p && SPG.slug!==p.slug) { /* open on the bills that became law: their own if any, else any they sponsored; all bills if none became law */
       const lawC = p.bills.some(b=>b.role==='C' && b.r.x.stage>=5), lawAny = p.bills.some(b=>b.r.x.stage>=5);
       Object.assign(SPG,{slug:p.slug, role: lawC || !lawAny ? (p.bills.some(b=>b.role==='C')?'C':'all') : 'all', major:null, law:lawAny, page:0}); } return p && {kind:'sponsor', rec:p}; }
-  if (rt.view==='committee'){ const c = CMKEY.get(rt.key); if (c && CMP.slug!==c.slug) Object.assign(CMP,{slug:c.slug, out:'all', major:null, page:0}); return c && {kind:'committee', rec:c}; }
+  if (rt.view==='committee'){ const c = CMKEY.get(cmResolve(rt.key)); if (c && CMP.slug!==c.slug) Object.assign(CMP,{slug:c.slug, out:'all', major:null, page:0}); return c && {kind:'committee', rec:c}; }
   if (rt.view==='speech'){ const s = byDs('sots').filter(r=>r.year===rt.year).sort((a,b)=>a.id-b.id); return s.length && {kind:'speech', rec:{year:rt.year, sent:s, gov:s[0].x.governor, sid:rt.sid}}; }
 }
 const HEADS = {
@@ -1183,7 +1183,7 @@ SECTIONS.bill.push(
       .catch(()=>{ el.innerHTML = '<p class="muted" style="margin:0">The history file did not load. Reload the page to try again.</p>'; }); } },
   { id:'related', title:'Related records', render(r, el){ crossSection(r, el); } },
   { id:'facts', title:'At a glance', side:true, render(r, el){ const x=r.x;
-      el.innerHTML = factList([['Number',`<span class="mono">${esc(x.bill)}</span>`],['Type',esc(BILLTYPE[x.type]||x.type)],['Chamber',esc(x.chamber)],['Introduced',x.intro],['Latest action',`${esc(x.last_action)}<div class="muted">${x.last_date}</div>`],['Furthest stage',`<span class="stage s${x.stage}">${STAGES[(x.stage||1)-1]}</span>`], x.cmte && ['Approved by', esc(x.cmte)], x.pa && ['Public Act', `${esc(x.pa)}${x.law_date?`<div class="muted">${x.law_date}</div>`:''}`], ['Session',`${gaName(x.ga)}<div class="muted">${esc(gaYears(x.ga))}</div>`]]); } },
+      el.innerHTML = factList([['Number',`<span class="mono">${esc(x.bill)}</span>`],['Type',esc(BILLTYPE[x.type]||x.type)],['Chamber',esc(x.chamber)],['Introduced',x.intro],['Latest action',`${esc(x.last_action)}<div class="muted">${x.last_date}</div>`],['Furthest stage',`<span class="stage s${x.stage}">${STAGES[(x.stage||1)-1]}</span>`], x.cmte && ['Approved by', cmLinkOf(x.ga, x.cmte)], x.pa && ['Public Act', `${esc(x.pa)}${x.law_date?`<div class="muted">${x.law_date}</div>`:''}`], ['Session',`${gaName(x.ga)}<div class="muted">${esc(gaYears(x.ga))}</div>`]]); } },
   { id:'coding', title:'Policy Agendas coding', side:true, render: codingSection },
   { id:'sponsors', title:'Sponsors', side:true, render(r, el){
       const sp = r.sp || []; if (!sp.length){ el.innerHTML = '<p class="muted" style="margin:0">No sponsors listed.</p>'; return; }
@@ -1530,6 +1530,12 @@ function buildCommittees(ga, acts){
 }
 const ensureCm = ga => CMDATA[ga] ? Promise.resolve(CMDATA[ga]) : loadActs(ga).then(a=>buildCommittees(ga, a));
 const cmLink = c => `<a href="#committee-${c.key}">${esc(c.name)}</a>`;
+/* the bills data names the first committee to approve a bill as "House Executive Committee" or "Senate Judiciary" */
+/* older builds sometimes put a House committee in the Senate; once the histories are read, fall back to the other chamber */
+const cmResolve = k => { if (!k || CMKEY.has(k)) return k; const o = k.replace(/^(\d+)-(house|senate)-/, (_,g,c)=>`${g}-${c==='house'?'senate':'house'}-`); return CMKEY.has(o) ? o : null; };
+const cmKeyOf = (ga, label) => { const m = /^(House|Senate) (.+)$/.exec(label||''); if (!m || CM_GATE.test(cmName(m[2]))) return null; const k = `${ga}-${m[1].toLowerCase()}-${slug(cmName(m[2]))}`; return CMDATA[ga] ? cmResolve(k) : k; };
+const cmText = (ga, label) => { const k = cmKeyOf(ga, label), c = k && CMKEY.get(k); return c ? `${c.ch} ${c.name}` : (label||'').replace(/ Committee$/,''); };
+const cmLinkOf = (ga, label) => { const k = cmKeyOf(ga, label), c = k && CMKEY.get(k); return k ? `<a href="#committee-${k}">${esc(c ? `${c.ch} ${c.name}` : label.replace(/ Committee$/,''))}</a>` : esc(label||'—'); };
 const cmStats = (c, major=null, sub=null) => { const bs = c.bills.filter(b=>(major==null||b.r.major===major) && (sub==null||b.r.sub===sub));
   const tc = [...count(bs.filter(b=>isPol(b.r)), b=>b.r.major)].sort((a,b)=>b[1]-a[1])[0];
   return {n:bs.length, ok:bs.filter(b=>b.ok).length, law:bs.filter(b=>b.r.x.stage>=5).length, rate:bs.length?bs.filter(b=>b.ok).length/bs.length:0, top:tc?tc[0]:null}; };
@@ -1691,7 +1697,8 @@ let navSeq = 0;
 function needsFor(rt){
   const all = allGAs();
   switch (rt.view){
-    case 'bills': case 'bills-introduced': case 'bills-committee': case 'bills-law': case 'bills-activity': return {details:[BL.ga ?? LATEST], links:[BL.ga ?? LATEST]};
+    case 'bills-committee': { const g = BL.ga ?? LATEST; if (!CMDATA[g]) ensureCm(g).then(()=>{ if (ROUTE.view==='bills-committee') renderBills(); }); return {details:[g], links:[g]}; }
+    case 'bills': case 'bills-introduced': case 'bills-law': case 'bills-activity': return {details:[BL.ga ?? LATEST], links:[BL.ga ?? LATEST]};
     case 'bill': { const r = recordFor(rt)?.rec; return {details:r?[r.x.ga]:[], links:all}; }
     case 'search': return {details: SR.gas==='latest' ? [LATEST] : all, links:all};
     case 'topics': case 'sponsors': case 'sponsor': return {details:[], links:all};
