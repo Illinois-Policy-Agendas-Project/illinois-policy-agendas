@@ -18,6 +18,8 @@ Official headshots are public records of the General Assembly; credit them as "P
 import argparse, csv, html, re, sys, time, tomllib, unicodedata, urllib.error, urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
+
+import webget  # downloads, with fixes for missing certificates
 from urllib.parse import urljoin
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,30 +30,8 @@ PARTY = {'d': 'Democratic', 'r': 'Republican', 'i': 'Independent', 'democrat': '
 MEMBER_LINK = re.compile(r'/(?:House|Senate)/Members/(?:Details|Detail|Profile)/\d+|[?&]MemberID=\d+', re.I)
 
 
-def _ssl_contexts():
-    """The system's certificates first; then certifi's list, for Python from python.org on a Mac, which ships without one
-    (the cause of "CERTIFICATE_VERIFY_FAILED ... unable to get local issuer certificate")."""
-    import ssl
-    yield None
-    try:
-        import certifi
-        yield ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        pass
-
-
 def get(url, timeout=25):
-    req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': '*/*'})
-    err = None
-    for ctx in _ssl_contexts():
-        try:
-            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
-                return r.read(), r.headers.get('Content-Type', '').split(';')[0].strip().lower(), r.geturl()
-        except urllib.error.URLError as e:
-            if 'CERTIFICATE_VERIFY_FAILED' not in str(e):
-                raise
-            err = e
-    raise urllib.error.URLError(f'{err.reason}. On a Mac, run "Install Certificates.command" in the Python folder under Applications, or run Update website again so it can install certifi.')
+    return webget.get(url, UA, timeout)
 
 
 def clean(s):
