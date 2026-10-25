@@ -356,7 +356,7 @@ const DS = {
   tt:{name:'Think tank reports', short:'Think tanks', cls:'ds-tt'}
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Sponsors'],['search','Search']];
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Sponsors'],['committees','Committees'],['search','Search']];
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
 let GOV = {}, USED_MAJORS = new Set();   // year -> {governor, party}; major topics that have records
@@ -493,7 +493,7 @@ function hbars(el, items, {color='--accent', valFmt=fmt, labelW=200, rowH=24, ma
   const head = d => `<div class="t">${d.code!=null?`<span class="mono">${d.code}</span> `:''}${esc(d.label)}</div>`;
   $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i];
     g.addEventListener('pointermove', e=>{ const sg = e.target.closest('.seg'), p = sg && d.segs[+sg.dataset.j];
-      showTip(e, p ? `<div class="muted" style="font-size:11.5px">${d.code!=null?d.code+' · ':''}${esc(d.label)}</div><div class="seg-t">${p.color?`<i class="dot" style="background:${cssColor(p.color)};border-radius:2px"></i> `:''}<span class="mono">${p.code}</span> ${esc(p.label)}</div>${p.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(p.value)}</b></div>`}<div class="muted">${pct(p.value/Math.max(d.value,1e-9),0)} of this topic${d.onSeg?' · click to select':''}</div>`
+      showTip(e, p ? `<div class="muted" style="font-size:11.5px">${d.code!=null?d.code+' · ':''}${esc(d.label)}</div><div class="seg-t">${p.color?`<i class="dot" style="background:${cssColor(p.color)};border-radius:2px"></i> `:''}${p.code!=null?`<span class="mono">${p.code}</span> `:''}${esc(p.label)}</div>${p.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(p.value)}</b></div>`}${d.code!=null?`<div class="muted">${pct(p.value/Math.max(d.value,1e-9),0)} of this topic${d.onSeg?' · click to select':''}</div>`:''}`
                      : head(d) + (d.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(d.value)}</b></div>`) + (d.segs?.length ? '<div class="muted">Hover a segment for its subtopic</div>' : '')); });
     g.addEventListener('pointerleave', hideTip);
     if (d.onclick || d.onSeg) g.addEventListener('click', e=>{ const sg = e.target.closest('.seg'); if (sg && d.onSeg) d.onSeg(d.segs[+sg.dataset.j]); else d.onclick?.(); }); });
@@ -1091,6 +1091,7 @@ function recordFor(rt){
   if (rt.view==='sponsor'){ const p = SPONKEY.get(rt.key); if (p && SPG.slug!==p.slug) { /* open on the bills that became law: their own if any, else any they sponsored; all bills if none became law */
       const lawC = p.bills.some(b=>b.role==='C' && b.r.x.stage>=5), lawAny = p.bills.some(b=>b.r.x.stage>=5);
       Object.assign(SPG,{slug:p.slug, role: lawC || !lawAny ? (p.bills.some(b=>b.role==='C')?'C':'all') : 'all', major:null, law:lawAny, page:0}); } return p && {kind:'sponsor', rec:p}; }
+  if (rt.view==='committee'){ const c = CMKEY.get(rt.key); if (c && CMP.slug!==c.slug) Object.assign(CMP,{slug:c.slug, out:'all', major:null, page:0}); return c && {kind:'committee', rec:c}; }
   if (rt.view==='speech'){ const s = byDs('sots').filter(r=>r.year===rt.year).sort((a,b)=>a.id-b.id); return s.length && {kind:'speech', rec:{year:rt.year, sent:s, gov:s[0].x.governor, sid:rt.sid}}; }
 }
 const HEADS = {
@@ -1110,8 +1111,8 @@ const HEADS = {
     return { crumb:['speeches','Speeches'], eyebrow:`State of the State address${GOV[s.year]?.party ? ' · ' + esc(GOV[s.year].party) + ' governor' : ''}`, title:`${s.year} · ${esc(s.gov)}`, sub:'',
       chips:'', actions:`${s.year>yrs[0]?`<a class="btn" href="#speech-${s.year-1}">← ${s.year-1}</a>`:''}${s.year<yrs[yrs.length-1]?`<a class="btn" href="#speech-${s.year+1}">${s.year+1} →</a>`:''}` }; }
 };
-const recRows = (kind, rec) => kind==='org' ? newest(rec.reports) : kind==='speech' ? rec.sent : kind==='sponsor' ? newest(rec.bills.map(b=>b.r)) : [rec];
-const recFile = (kind, rec) => kind==='org' ? `illinois-${rec.slug}-reports.csv` : kind==='sponsor' ? `illinois-${rec.slug}-bills.csv` : kind==='speech' ? `illinois-state-of-the-state-${rec.year}.csv` : kind==='bill' ? `illinois-${rec.x.ga}-${rec.x.bill.replace(' ','').toLowerCase()}.csv` : `illinois-report-${rec.id}-${slug(rec.title)}.csv`;
+const recRows = (kind, rec) => kind==='committee' ? newest(rec.bills.map(b=>b.r)) : kind==='org' ? newest(rec.reports) : kind==='speech' ? rec.sent : kind==='sponsor' ? newest(rec.bills.map(b=>b.r)) : [rec];
+const recFile = (kind, rec) => kind==='committee' ? `illinois-${rec.ga}-${rec.slug}-committee-bills.csv` : kind==='org' ? `illinois-${rec.slug}-reports.csv` : kind==='sponsor' ? `illinois-${rec.slug}-bills.csv` : kind==='speech' ? `illinois-state-of-the-state-${rec.year}.csv` : kind==='bill' ? `illinois-${rec.x.ga}-${rec.x.bill.replace(' ','').toLowerCase()}.csv` : `illinois-report-${rec.id}-${slug(rec.title)}.csv`;
 
 function renderRecord(){
   const found = recordFor(ROUTE);
@@ -1119,10 +1120,10 @@ function renderRecord(){
   const {kind, rec} = found, h = HEADS[kind](rec, found);
   const secs = SECTIONS[kind].filter(s=>!s.show || s.show(rec, found));
   $('#view').innerHTML = `
-  <div class="crumbs"><button class="btn ghost" id="r-back">← ${STACK.length?'Back':'All '+h.crumb[1].toLowerCase()}</button><a href="#${h.crumb[0]}">${h.crumb[1]}</a><span>›</span><span class="ink2">${kind==='speech'?rec.year:kind==='bill'?esc(rec.x.bill):kind==='sponsor'?esc(rec.title):kind==='org'?esc(rec.name):esc(rec.x.org)}</span></div>
-  <div class="rec-head ${kind==='bill'||kind==='sponsor'?'ds-bills':kind==='report'||kind==='org'?'ds-tt':'ds-sots'}">
+  <div class="crumbs"><button class="btn ghost" id="r-back">← ${STACK.length?'Back':'All '+h.crumb[1].toLowerCase()}</button><a href="#${h.crumb[0]}">${h.crumb[1]}</a><span>›</span><span class="ink2">${kind==='speech'?rec.year:kind==='bill'?esc(rec.x.bill):kind==='sponsor'?esc(rec.title):kind==='committee'?esc(rec.name):kind==='org'?esc(rec.name):esc(rec.x.org)}</span></div>
+  <div class="rec-head ${kind==='bill'||kind==='sponsor'||kind==='committee'?'ds-bills':kind==='report'||kind==='org'?'ds-tt':'ds-sots'}">
     <div class="rec-title">${h.logo||''}<div style="min-width:0"><div class="eyebrow"><i class="dot"></i> ${h.eyebrow}</div><h1 class="${kind==='bill'?'mono-h':''}">${h.title}</h1>${h.sub?`<div class="rec-sub">${h.sub}</div>`:''}${h.chips?`<div class="chips">${h.chips}</div>`:''}</div></div>
-    <div class="rec-actions">${h.actions}<button class="btn" id="r-copy">Copy link</button><button class="btn primary" id="r-dl">Download ${kind==='speech'?'address':kind==='sponsor'?'all their bills':kind==='org'?'all their reports':'record'} (CSV)</button></div>
+    <div class="rec-actions">${h.actions}<button class="btn" id="r-copy">Copy link</button><button class="btn primary" id="r-dl">Download ${kind==='speech'?'address':kind==='sponsor'?'all their bills':kind==='committee'?'all its bills':kind==='org'?'all their reports':'record'} (CSV)</button></div>
   </div>
   <div class="rec-grid ${kind==='speech'?'sticky':''}"><div class="rec-main">${secs.filter(s=>!s.side).map(sec).join('')}</div><aside class="rec-side">${secs.filter(s=>s.side).map(sec).join('')}</aside></div>`;
   function sec(s){ return `<section class="panel" id="sec-${s.id}">${s.title?`<h3 class="sec-t">${s.title}</h3>`:''}<div class="sec-b"></div></section>`; }
@@ -1499,8 +1500,162 @@ SECTIONS.org.push(
       $$('.subrow', el).forEach(btn=>btn.addEventListener('click', ()=>{ const s=+btn.dataset.s; Object.assign(TP,{major:Math.floor(s/100), sub:s, ds:'all', page:0}); nav('topics'); })); } }
 );
 
+
+/* =================== COMMITTEES ===================
+   Built in the browser from each bill's ILGA action history (bills/<ga>/actions.json), so it needs no extra data files.
+   A bill counts for a committee when it was assigned (or re-assigned) to it, and as approved when the committee reported it
+   out ("Do Pass…", "Recommends Be Adopted…"). The chamber is the bill's chamber of origin until it arrives in the other one.
+   House Rules and Senate Assignments, which route bills to committees, are left out. Committee pages: #committee-104-house-executive */
+const CM = { ga:null, ch:'all', q:'', major:null, sub:null, sort:'n', dir:-1 };
+const CMP = { slug:null, out:'all', major:null, page:0 };
+const CMDATA = {}, CMKEY = new Map();
+const cmName = n => n.replace(/\s+Committee$/,'').replace(/\s*-\s*/g,' - ').replace(/\s+/g,' ').trim();
+const CM_ASSIGN = /^(?:Re-)?[Aa]ssigned to (.+)$/;
+const CM_PASS = /^(?:Do Pass(?: as Amended)?(?: \/ (?:Short|Standard) Debate)?|Recommends Be Adopted(?: as Amended)?|Recommends Do (?:Adopt|Consent))\s+(.+)$/i;
+const CM_GATE = /^(Rules|Assignments)$/;
+function buildCommittees(ga, acts){
+  const by = new Map();
+  for (const r of billsOf(ga).filter(isBillT)){
+    let ch = r.x.type==='SB' ? 'Senate' : 'House'; const mine = new Map();
+    for (const a of acts[r.x.key] || []){ const t = typeof a==='string' ? a : a[0]; let m;
+      if ((m = /^Arrived? in (?:the )?(House|Senate)/.exec(t))) { ch = m[1]; continue; }
+      const hit = (m = CM_ASSIGN.exec(t)) ? [m[1], false] : (m = CM_PASS.exec(t)) ? [m[1], true] : null;
+      if (!hit) continue; const name = cmName(hit[0]); if (!name || CM_GATE.test(name)) continue;
+      const id = `${ga}-${ch.toLowerCase()}-${slug(name)}`; const b = mine.get(id) || {id, name, ch, ok:false}; b.ok ||= hit[1]; mine.set(id, b); }
+    for (const b of mine.values()){ let c = by.get(b.id);
+      if (!c){ c = {key:b.id, slug:b.id.split('-').slice(1).join('-'), ga, name:b.name, ch:b.ch, bills:[]}; by.set(b.id, c); CMKEY.set(b.id, c); }
+      c.bills.push({r, ok:b.ok}); }
+  }
+  return CMDATA[ga] = [...by.values()].filter(c=>c.bills.length>=2);   // drops one-off names (typos in the history)
+}
+const ensureCm = ga => CMDATA[ga] ? Promise.resolve(CMDATA[ga]) : loadActs(ga).then(a=>buildCommittees(ga, a));
+const cmLink = c => `<a href="#committee-${c.key}">${esc(c.name)}</a>`;
+const cmStats = (c, major=null, sub=null) => { const bs = c.bills.filter(b=>(major==null||b.r.major===major) && (sub==null||b.r.sub===sub));
+  const tc = [...count(bs.filter(b=>isPol(b.r)), b=>b.r.major)].sort((a,b)=>b[1]-a[1])[0];
+  return {n:bs.length, ok:bs.filter(b=>b.ok).length, law:bs.filter(b=>b.r.x.stage>=5).length, rate:bs.length?bs.filter(b=>b.ok).length/bs.length:0, top:tc?tc[0]:null}; };
+
+function renderCommittees(){
+  const ga = CM.ga ??= LATEST;
+  if (!CMDATA[ga]){ $('#view').innerHTML = '<div class="loading">Reading committee assignments from the bill histories…</div>';
+    const me = CUR; withLoading(ensureCm(ga)).then(()=>{ if (CUR===me) renderCommittees(); }); return; }
+  const all = CMDATA[ga], B = billsOf(ga).filter(isBillT), assigned = new Set(all.flatMap(c=>c.bills.map(b=>b.r))), okd = new Set(all.flatMap(c=>c.bills.filter(b=>b.ok).map(b=>b.r)));
+  const busiest = all.slice().sort((a,b)=>b.bills.length-a.bills.length)[0];
+  $('#view').innerHTML = `
+  <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Committees</h1>
+    <p>Standing committees of the House and Senate: how many substantive bills each was assigned, how many it approved and how many became law. Read from each bill's ILGA action history. The House Rules Committee and Senate Assignments, which send bills to committees, are left out. Open a committee for its bills.</p></div>
+    <button class="btn primary" id="cm-dl">Download committee table (CSV)</button></div>
+  <div class="kpis">
+    <div class="kpi"><span class="l">Committees</span><span class="v">${all.length}</span><span class="s">${all.filter(c=>c.ch==='House').length} House, ${all.filter(c=>c.ch==='Senate').length} Senate</span></div>
+    <div class="kpi"><span class="l">Bills sent to a committee</span><span class="v">${fmt(assigned.size)}</span><span class="s">${pct(assigned.size/Math.max(1,B.length))} of ${fmt(B.length)} substantive bills</span></div>
+    <div class="kpi"><span class="l">Approved by a committee</span><span class="v">${fmt(okd.size)}</span><span class="s">${pct(okd.size/Math.max(1,assigned.size))} of bills sent to one</span></div>
+    <div class="kpi"><span class="l">Most bills assigned</span><span class="v" style="font-size:18px;padding-block:5px">${busiest?cmLink(busiest):'—'}</span><span class="s">${busiest?`${busiest.ch} · ${pl(busiest.bills.length,'bill')}`:''}</span></div>
+  </div>
+  <div class="fbar">
+    <input type="search" id="cm-q" placeholder="Find a committee" value="${esc(CM.q)}" aria-label="Find a committee">
+    <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['House','House'],['Senate','Senate']].map(([k,l])=>`<button data-cc="${k}" aria-pressed="${CM.ch===k}">${l}</button>`).join('')}</div>
+    <select id="cm-m" aria-label="Major topic">${majorOptions(CM.major,'Bills on any topic')}</select>
+    ${CM.major!=null?`<select id="cm-s" aria-label="Subtopic">${subOptions(CM.major, CM.sub)}</select>`:''}
+  </div>
+  <div class="grid2">
+    <div class="panel"><div class="chead"><h3 id="cm-ct-Senate"></h3><span class="muted" style="font-size:12px">Bills assigned · darker part approved</span></div><div id="cm-top-Senate"></div></div>
+    <div class="panel"><div class="chead"><h3 id="cm-ct-House"></h3><span class="muted" style="font-size:12px">Bills assigned · darker part approved</span></div><div id="cm-top-House"></div></div>
+  </div>
+  <div class="tscroll"><table class="dt" id="cm-t" style="min-width:640px"><thead><tr>${[['name','Committee'],['ch','Chamber'],['n','Bills assigned'],['ok','Approved'],['rate','Approval rate'],['law','Became law'],['top','Main topic']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${['n','ok','rate','law'].includes(k)?'text-align:right':''}">${l} <span class="muted">${CM.sort===k?(CM.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
+  let deb; $('#cm-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ CM.q=e.target.value; cmUpdate(); },120); });
+  $$('[data-cc]').forEach(b=>b.addEventListener('click', ()=>{ CM.ch=b.dataset.cc; $$('[data-cc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); cmUpdate(); }));
+  $('#cm-m').addEventListener('change', e=>{ CM.major=e.target.value===''?null:+e.target.value; CM.sub=null; renderCommittees(); });
+  $('#cm-s')?.addEventListener('change', e=>{ CM.sub=e.target.value===''?null:+e.target.value; cmUpdate(); });
+  $$('#cm-t th').forEach(th=>th.addEventListener('click', ()=>{ const k=th.dataset.k; CM.dir = CM.sort===k ? -CM.dir : (k==='name'||k==='ch'||k==='top' ? 1 : -1); CM.sort=k; renderCommittees(); }));
+  $('#cm-dl').addEventListener('click', ()=>save(`illinois-${ga}-committees.csv`, toCSV(['general_assembly','chamber','committee','bills_assigned','approved','approval_rate','became_law','main_topic'],
+    cmRows().map(([c,s])=>[ga, c.ch, c.name, s.n, s.ok, s.rate.toFixed(3), s.law, s.top!=null?CB.majors[s.top]:'']))));
+  cmUpdate();
+}
+const cmTopic = () => CM.sub!=null ? CB.subs[CM.sub] : CM.major!=null ? CB.majors[CM.major] : null;
+function cmRows(){
+  const t = CM.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const rows = CMDATA[CM.ga].filter(c=>(CM.ch==='all'||c.ch===CM.ch) && t.every(w=>c.name.toLowerCase().includes(w))).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0);
+  const key = ([c,s]) => CM.sort==='name' ? c.name : CM.sort==='ch' ? c.ch+c.name : CM.sort==='top' ? (s.top!=null?CB.majors[s.top]:'~') : s[CM.sort];
+  return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (x>y?1:x<y?-1:0)*CM.dir || b[1].n-a[1].n || a[0].name.localeCompare(b[0].name); });
+}
+function cmUpdate(){
+  const rows = cmRows();
+  // one chart per chamber, on a shared scale; they follow the topic filters but not the chamber buttons or the search
+  const tops = Object.fromEntries(['Senate','House'].map(ch=>[ch, CMDATA[CM.ga].filter(c=>c.ch===ch).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0).sort((a,b)=>b[1].n-a[1].n).slice(0,12)]));
+  const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.n))));
+  for (const ch of ['Senate','House']){
+    $('#cm-ct-'+ch).textContent = `${ch} committees${cmTopic()?' · '+cmTopic():''}`;
+    if (!tops[ch].length){ $('#cm-top-'+ch).innerHTML = '<p class="muted" style="margin:0">No bills on this topic went to these committees.</p>'; continue; }
+    hbars($('#cm-top-'+ch), tops[ch].map(([c,s])=>({label:c.name, value:s.n, color:'--s-bills',
+      segs:[{label:'Approved', value:s.ok, color:'--s-bills', tip:`<div class="r"><span>Approved</span><b class="num">${fmt(s.ok)} of ${fmt(s.n)} (${pct(s.rate,0)})</b></div>`},
+            {label:'Not approved', value:s.n-s.ok, color:'--h2', tip:`<div class="r"><span>Not approved</span><b class="num">${fmt(s.n-s.ok)}</b></div>`}].filter(g=>g.value>0),
+      tip:`<div class="r"><span>Bills assigned</span><b class="num">${fmt(s.n)}</b></div><div class="r"><span>Approved</span><b class="num">${fmt(s.ok)} (${pct(s.rate,0)})</b></div><div class="r"><span>Became law</span><b class="num">${fmt(s.law)}</b></div><div class="muted">Click for the committee's page</div>`,
+      onclick:()=>nav('committee-'+c.key)})), {labelW:210, rowH:23, max:shared});
+  }
+  $('#cm-t tbody').innerHTML = rows.map(([c,s])=>`<tr class="row" data-h="#committee-${c.key}"><td>${cmLink(c)}</td><td>${c.ch}</td>
+    <td class="num" style="text-align:right">${fmt(s.n)}</td><td class="num" style="text-align:right">${fmt(s.ok)}</td><td class="num" style="text-align:right">${pct(s.rate,0)}</td>
+    <td class="num" style="text-align:right">${s.law?fmt(s.law):'<span class="muted">·</span>'}</td><td>${s.top!=null?`<span class="code">${s.top}</span> ${esc(CB.majors[s.top])}`:'<span class="muted">—</span>'}</td></tr>`).join('')
+    || '<tr><td colspan="7" class="muted" style="padding:24px">No committees match.</td></tr>';
+  $$('#cm-t tr.row').forEach(tr=>tr.addEventListener('click', e=>{ if (!e.target.closest('a')) nav(tr.dataset.h.slice(1)); }));
+}
+
+/* committee pages */
+function renderCommitteePage(){
+  if (!CMDATA[ROUTE.ga]){ $('#view').innerHTML = '<div class="loading">Reading committee assignments from the bill histories…</div>';
+    const me = CUR; withLoading(ensureCm(ROUTE.ga)).then(()=>{ if (CUR===me) renderRecord(); }); return; }
+  renderRecord();
+}
+HEADS.committee = c => ({ crumb:['committees','Committees'], eyebrow:`${c.ch} committee · ${gaName(c.ga)}`, title:esc(c.name), sub:'', chips:'', actions:'' });
+SECTIONS.committee = [];
+SECTIONS.committee.push(
+  { id:'stats', title:'', render(c, el){ const s = cmStats(c), sp = new Set(c.bills.map(b=>chiefOf(b.r)?.i).filter(x=>x!=null));
+      el.innerHTML = `<div class="kpis" style="margin:0;--n:4">
+        <div class="kpi"><span class="l">Bills assigned</span><span class="v">${fmt(s.n)}</span><span class="s">substantive bills sent to it</span></div>
+        <div class="kpi"><span class="l">Approved</span><span class="v">${fmt(s.ok)}</span><span class="s">${pct(s.rate)} of bills assigned</span></div>
+        <div class="kpi"><span class="l">Became law</span><span class="v">${fmt(s.law)}</span><span class="s">${pct(s.law/Math.max(1,s.n))} of bills assigned</span></div>
+        <div class="kpi"><span class="l">Primary sponsors</span><span class="v">${fmt(sp.size)}</span><span class="s">legislators whose bills it heard</span></div></div>`; } },
+  { id:'topics', title:'What it handles', render(c, el){
+      const pol = c.bills.map(b=>b.r).filter(isPol), ct = count(pol, r=>r.major);
+      if (!pol.length){ el.innerHTML = '<p class="muted" style="margin:0">None of its bills are coded yet.</p>'; return; }
+      el.innerHTML = `<p class="ink2" style="margin:0;font-size:13.5px">Major topics of the ${fmt(pol.length)} policy-coded bills assigned to it. Hover a segment for its subtopic; click a topic to list those bills below.</p><div id="cg-tp"></div>`;
+      hbars($('#cg-tp'), [...ct].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([m,v])=>({label:CB.majors[m], code:m, value:v, color:'--s-bills', on:CMP.major===m,
+        segs: subSegs(pol, m, 1, (sc,n)=>`<div class="r"><span>Bills</span><b class="num">${fmt(n)}</b></div>`),
+        tip:`<div class="r"><span>Bills</span><b class="num">${fmt(v)} (${pct(v/pol.length,0)})</b></div>`,
+        onclick:()=>{ CMP.major = CMP.major===m?null:m; CMP.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }})), {labelW:230, rowH:23}); } },
+  { id:'bills', title:'Bills', render(c, el){
+      const n = k => c.bills.filter(b=>k==='all'||(k==='ok'&&b.ok)||(k==='no'&&!b.ok)||(k==='law'&&b.r.x.stage>=5)).length;
+      el.innerHTML = `<div class="fbar" style="margin:0">
+          <div class="seg" role="group" aria-label="Outcome">${[['all','All'],['ok','Approved'],['no','Not approved'],['law','Became law']].map(([k,l])=>`<button data-o="${k}" aria-pressed="${CMP.out===k}" ${n(k)?'':'disabled'}>${l} <span class="muted num">${fmt(n(k))}</span></button>`).join('')}</div>
+          <select id="cg-m" aria-label="Topic">${majorOptions(CMP.major)}</select></div>
+        <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="cg-n"></span><button class="btn primary" id="cg-dl">Download these bills</button></div></div>
+        <div class="tscroll"><table class="dt" style="min-width:640px"><thead><tr><th>Bill</th><th>Description</th><th>Topic</th><th>In this committee</th><th>Furthest stage</th></tr></thead><tbody id="cg-tb"></tbody></table></div><div class="pager" id="cg-pg" style="margin-top:4px"></div>`;
+      const draw = ()=>{ const list = c.bills.filter(b=>(CMP.out==='all'||(CMP.out==='ok'&&b.ok)||(CMP.out==='no'&&!b.ok)||(CMP.out==='law'&&b.r.x.stage>=5)) && (CMP.major==null||b.r.major===CMP.major));
+        const rows = list.slice().sort((a,b)=>(b.r.x.last_date||'').localeCompare(a.r.x.last_date||''));
+        $('#cg-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> bills`; $('#cg-dl').disabled = !rows.length;
+        $('#cg-dl').onclick = ()=>save(`illinois-${c.ga}-${c.slug}-committee-bills.csv`, csvFor(rows.map(b=>b.r)));
+        const PS=40, pages=Math.ceil(rows.length/PS); CMP.page=Math.min(CMP.page,Math.max(0,pages-1));
+        $('#cg-tb').innerHTML = rows.slice(CMP.page*PS, CMP.page*PS+PS).map(({r,ok})=>{ const x=r.x, ch=chiefOf(r);
+          return `<tr class="row" data-h="${href(r)}"><td><a class="mono" href="${href(r)}" style="white-space:nowrap">${esc(x.bill)}</a><div class="muted num" style="font-size:12px">${x.intro||''}</div></td>
+            <td><a class="rl" href="${href(r)}" style="font-weight:600">${esc(x.short)}</a><div class="muted" style="font-size:12.5px">${ch?spLink(ch):''}</div></td>
+            <td style="font-size:12.5px">${subChip(r.sub)}</td><td>${ok?'<span class="chip">Approved</span>':'<span class="muted">Not approved</span>'}</td><td style="font-size:12.5px">${esc(STAGES[(x.stage||1)-1])}</td></tr>`; }).join('')
+          || '<tr><td colspan="5" class="muted" style="padding:24px">No bills match.</td></tr>';
+        $$('#cg-tb tr.row').forEach(tr=>tr.addEventListener('click', e=>{ if (!e.target.closest('a')) nav(tr.dataset.h.slice(1)); }));
+        pager($('#cg-pg'), CMP.page, pages, p=>{ CMP.page=p; draw(); $('#sec-bills').scrollIntoView({block:'start'}); }); };
+      $$('[data-o]', el).forEach(b=>b.addEventListener('click', ()=>{ CMP.out=b.dataset.o; CMP.page=0; $$('[data-o]', el).forEach(x=>x.setAttribute('aria-pressed', x===b)); draw(); }));
+      $('#cg-m').addEventListener('change', e=>{ CMP.major=e.target.value===''?null:+e.target.value; CMP.page=0; renderRecord(); $('#sec-bills').scrollIntoView(); });
+      draw(); } },
+  { id:'facts', title:'At a glance', side:true, render(c, el){ const s = cmStats(c);
+      el.innerHTML = factList([['Chamber', c.ch], ['Session', `${gaName(c.ga)} (${esc(gaYears(c.ga))})`], ['Bills assigned', fmt(s.n)], ['Approved', `${fmt(s.ok)} (${pct(s.rate,0)})`], ['Became law', fmt(s.law)],
+        s.top!=null && ['Main topic', `<span class="code">${s.top}</span> ${esc(CB.majors[s.top])}`]]); } },
+  { id:'sponsors', title:'Whose bills it hears', side:true, render(c, el){
+      const by = new Map(); for (const b of c.bills){ const p = chiefOf(b.r); if (!p) continue; const o = by.get(p.i) || {p, n:0, ok:0}; o.n++; o.ok += b.ok; by.set(p.i, o); }
+      const top = [...by.values()].sort((a,b)=>b.n-a.n || b.ok-a.ok).slice(0,8);
+      el.innerHTML = top.length ? `<p class="muted" style="margin:0 0 6px;font-size:12.5px">Primary sponsors with the most bills assigned here</p><div id="cg-sp"></div>` : '<p class="muted" style="margin:0">No sponsor data.</p>';
+      if (top.length) hbars($('#cg-sp'), top.map(o=>({label:o.p.name, value:o.n, color:'--h3', tip:`<div class="r"><span>Bills assigned</span><b class="num">${fmt(o.n)}</b></div><div class="r"><span>Approved</span><b class="num">${fmt(o.ok)}</b></div><div class="muted">Click for their page</div>`, onclick:()=>nav('sponsor-'+o.p.slug)})), {labelW:150, rowH:22}); } },
+  { id:'how', title:'How this is counted', side:true, render(c, el){ el.innerHTML = `<p class="muted" style="margin:0;font-size:12.5px">A bill counts here when its ILGA history shows it assigned or re-assigned to this committee, and as approved when the committee reported it out ("Do Pass", "Recommends Be Adopted"). Bills held on Rules or Assignments never reach a committee and aren't counted.</p>`; } }
+);
+
 /* =================== shell & routing =================== */
-const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, search:renderSearch};
+const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, committees:renderCommittees, search:renderSearch};
 let CUR = null, ROUTE = {view:'bills'}; const STACK = [];
 function parseRoute(t){
   if (RENDER[t]) return {view:t};
@@ -1510,10 +1665,11 @@ function parseRoute(t){
   if ((m = /^report-(\d+)$/.exec(t))) return {view:'report', key:+m[1]};
   if ((m = /^sponsor-([a-z0-9-]+)$/.exec(t))) return {view:'sponsor', key:m[1]};
   if ((m = /^org-([a-z0-9-]+)$/.exec(t))) return {view:'org', key:m[1]};
+  if ((m = /^committee-(\d+)-([a-z0-9-]+)$/.exec(t))) return {view:'committee', ga:+m[1], key:`${m[1]}-${m[2]}`};
   if ((m = /^speech-(\d{4})(?:-s(\d+))?$/.exec(t))) return {view:'speech', year:+m[1], sid:m[2]?+m[2]:null};
   return null;
 }
-const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors'})[rt.view] || rt.view;
+const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees'})[rt.view] || rt.view;
 function navHTML(side){ const cur = tabOf(ROUTE), groups = ['Datasets','Explore']; let g = 0;
   return TABS.map(t=> t ? `<button role="tab" data-v="${t[0]}" aria-selected="${t[0]===cur}">${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>` : (side?`<div class="lbl">${groups[g++]||''}</div>`:'<span class="sep"></span>')).join(''); }
 function drawNav(){ $('nav.tabs').innerHTML = navHTML(false); $$('[data-v]').forEach(b=>b.addEventListener('click', ()=>nav(b.dataset.v))); }
@@ -1525,7 +1681,7 @@ function nav(token, {record=true, keep=false}={}){
   CUR = token; ROUTE = parseRoute(token); drawNav(); hideTip(); try { localStorage.setItem('ilpa2-view', token); } catch {}
   if (!R.length) return;
   const want = needsFor(ROUTE), me = ++navSeq;
-  const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || renderRecord)(); if (!keep) scrollTo({top:0}); };
+  const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || (ROUTE.view==='committee' ? renderCommitteePage : renderRecord))(); if (!keep) scrollTo({top:0}); };
   const pending = [...want.details.filter(g=>!LOADED.details.has(g)), ...want.links.filter(g=>!LOADED.links.has(g))];
   if (!pending.length) return draw();
   withLoading(need(want)).then(draw);
@@ -1539,6 +1695,8 @@ function needsFor(rt){
     case 'bill': { const r = recordFor(rt)?.rec; return {details:r?[r.x.ga]:[], links:all}; }
     case 'search': return {details: SR.gas==='latest' ? [LATEST] : all, links:all};
     case 'topics': case 'sponsors': case 'sponsor': return {details:[], links:all};
+    case 'committees': return {details:[], links:[CM.ga ?? LATEST]};
+    case 'committee': return {details:[], links:[rt.ga]};
     default: return {details:[], links:[]};
   }
 }
