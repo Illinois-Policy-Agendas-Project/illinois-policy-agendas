@@ -1192,7 +1192,7 @@ SECTIONS.bill.push(
       const chief = grp('C')[0], second = grp('S'), links = ps => ps.map(spLink).join(', ');
       const theirs = chief ? newest(chief.bills.filter(b=>b.role==='C' && b.r!==r).map(b=>b.r)) : [];
       el.innerHTML = `${chief?`<div><span class="eyebrow">Primary sponsor</span><div style="font-weight:600">${spLink(chief)}</div></div>`:''}
-        ${grp('H').length?`<div><span class="eyebrow">Primary co-sponsors</span><div class="splist">${links(grp('H'))}</div></div>`:''}
+        ${grp('H').length?`<div><span class="eyebrow">Original co-sponsors</span><div class="splist">${links(grp('H'))}</div></div>`:''}
         ${grp('O').length?`<details><summary>${fmt(grp('O').length)} co-sponsor${grp('O').length>1?'s':''}</summary><div class="splist" style="margin-top:6px">${links(grp('O'))}</div></details>`:''}
         ${second.length?`<div><span class="eyebrow">Sponsor in the ${chamberName(second[0].ch)}</span><div style="font-weight:600">${links(second)}</div></div>`:''}
         ${grp('T').length?`<details><summary>${fmt(grp('T').length)} co-sponsor${grp('T').length>1?'s':''} in the ${chamberName(grp('T')[0].ch)}</summary><div class="splist" style="margin-top:6px">${links(grp('T'))}</div></details>`:''}
@@ -1261,9 +1261,9 @@ function selectSentence(s, id, scroll){
 
 /* =================== SPONSORS ===================
    SPON[i] = {name, ch:'Rep'|'Sen', title, slug, bills:[{r, role}]}; each bill record has r.sp = [[i, role], ...].
-   Roles come from the order of ILGA's sponsor list: C primary sponsor, H primary co-sponsor, O co-sponsor,
+   Roles come from the order of ILGA's sponsor list: C primary sponsor, H original co-sponsor, O co-sponsor,
    S / T sponsor and co-sponsor in the second chamber. */
-const ROLE = {C:'Primary sponsor', H:'Primary co-sponsor', O:'Co-sponsor', S:'Second-chamber sponsor', T:'Second-chamber co-sponsor'};
+const ROLE = {C:'Primary sponsor', H:'Original co-sponsor', O:'Co-sponsor', S:'Second-chamber sponsor', T:'Second-chamber co-sponsor'};
 let SPON = [], SPONKEY = new Map();
 function buildSponsors(people){
   const ascii = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -1311,7 +1311,7 @@ function renderSponsors(){
   <div class="grid-wide">
     <div class="panel"><div class="chead"><h3 id="sn-ct"></h3><span class="muted" style="font-size:12px">Click a name to open their page</span></div><div id="sn-top"></div></div>
     <div class="panel"><div class="chead"><h3>How sponsorship is recorded</h3></div>
-      <dl class="facts"><dt>Primary sponsor</dt><dd>First name on the bill; introduced it</dd><dt>Primary co-sponsor</dt><dd>Listed with dashes after the primary sponsor</dd><dt>Co-sponsor</dt><dd>Added to the bill later</dd><dt>Second chamber</dt><dd>Carried the bill after it passed the first chamber</dd></dl>
+      <dl class="facts"><dt>Primary sponsor</dt><dd>Filed the bill with the clerk</dd><dt>Original co-sponsor</dt><dd>Co-sponsored the bill at introduction</dd><dt>Co-sponsor</dt><dd>Added to the bill later</dd><dt>Second chamber</dt><dd>Carried the bill after it passed the first chamber</dd></dl>
       <p class="muted" style="margin:0;font-size:12.5px">Names are parsed from the ILGA sponsor field in the bills file. Spelling variants of the same legislator are merged.</p></div>
   </div>
   <div class="tscroll"><table class="dt" id="sn-t" style="min-width:0"><thead><tr>${[['name','Legislator'],['C','Primary sponsor'],['law','Bills that became law']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${k!=='name'?'text-align:right;width:180px':''}">${l} <span class="muted">${SN.sort===k?(SN.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
@@ -1333,9 +1333,10 @@ function snRows(){
 }
 function snUpdate(){
   const rows = snRows();
-  $('#sn-ct').textContent = `Most bills as primary sponsor${snTopic()?' on '+snTopic():''}${SN.ch!=='all'?' · '+chamberName(SN.ch):''}`;
-  const top = rows.slice().sort((a,b)=>b[1].C-a[1].C).slice(0,12);
-  hbars($('#sn-top'), top.map(([p,s])=>({label:p.title, value:s.C, color:'--s-bills', tip:`<div class="r"><span>Primary sponsor</span><b class="num">${fmt(s.C)}</b></div><div class="r"><span>Bills that became law</span><b class="num">${fmt(s.law)}</b></div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:200, rowH:23});
+  $('#sn-ct').textContent = `Most enacted bills as primary sponsor${snTopic()?' on '+snTopic():''}${SN.ch!=='all'?' · '+chamberName(SN.ch):''}`;
+  const top = rows.filter(([,s])=>s.law>0).sort((a,b)=>b[1].law-a[1].law || b[1].C-a[1].C).slice(0,12);
+  if (!top.length) $('#sn-top').innerHTML = '<p class="muted" style="margin:0">No enacted bills match these filters.</p>'; else
+  hbars($('#sn-top'), top.map(([p,s])=>({label:p.title, value:s.law, color:'--s-bills', tip:`<div class="r"><span>Enacted bills</span><b class="num">${fmt(s.law)}</b></div><div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(s.C)}</b></div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:200, rowH:23});
   $('#sn-t tbody').innerHTML = rows.map(([p,s])=>`<tr class="row" data-h="#sponsor-${p.slug}"><td>${spLink(p)}</td>
     <td class="num" style="text-align:right">${s.C?fmt(s.C):'<span class="muted">·</span>'}</td><td class="num" style="text-align:right">${s.law?fmt(s.law):'<span class="muted">·</span>'}</td></tr>`).join('')
     || `<tr><td colspan="3" class="muted" style="padding:20px">No legislators ${snTopic()?'introduced a bill on this topic':'match'}.</td></tr>`;
@@ -1350,7 +1351,7 @@ SECTIONS.sponsor.push(
       el.innerHTML = `<div class="kpis" style="margin:0">
         <div class="kpi"><span class="l">Primary sponsor</span><span class="v">${fmt(s.C)}</span><span class="s">${fmt(s.bills)} of them bills (HB/SB)</span></div>
         <div class="kpi"><span class="l">Bills that became law</span><span class="v">${fmt(s.law)}</span><span class="s">${s.bills?pct(s.law/s.bills)+' of their bills':'no bills as primary sponsor'}</span></div>
-        <div class="kpi"><span class="l">Primary co-sponsor</span><span class="v">${fmt(s.H)}</span><span class="s">listed next to the primary sponsor</span></div>
+        <div class="kpi"><span class="l">Original co-sponsor</span><span class="v">${fmt(s.H)}</span><span class="s">co-sponsored at introduction</span></div>
         <div class="kpi"><span class="l">Co-sponsor</span><span class="v">${fmt(s.O)}</span><span class="s">${fmt(s.S+s.T)} more in the other chamber</span></div></div>`; } },
   { id:'topics', title:'What they introduce', render(p, el){
       const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r)).map(b=>b.r);
@@ -1365,7 +1366,7 @@ SECTIONS.sponsor.push(
   { id:'bills', title:'Bills', render(p, el){
       const counts = {all:p.bills.length}; for (const b of p.bills) counts[b.role]=(counts[b.role]||0)+1;
       el.innerHTML = `<div class="fbar" style="margin:0">
-          <div class="seg" role="group" aria-label="Role">${[['C','Primary sponsor'],['H','Primary co-sponsor'],['O','Co-sponsor'],['ST','Other chamber'],['all','All']].map(([k,l])=>{ const n = k==='ST'?(counts.S||0)+(counts.T||0):counts[k]||0; return `<button data-r="${k}" aria-pressed="${SPG.role===k}" ${n?'':'disabled'}>${l} <span class="muted num">${fmt(n)}</span></button>`; }).join('')}</div>
+          <div class="seg" role="group" aria-label="Role">${[['C','Primary sponsor'],['H','Original co-sponsor'],['O','Co-sponsor'],['ST','Other chamber'],['all','All']].map(([k,l])=>{ const n = k==='ST'?(counts.S||0)+(counts.T||0):counts[k]||0; return `<button data-r="${k}" aria-pressed="${SPG.role===k}" ${n?'':'disabled'}>${l} <span class="muted num">${fmt(n)}</span></button>`; }).join('')}</div>
           <select id="sg-m" aria-label="Topic">${majorOptions(SPG.major)}</select><label class="check"><input type="checkbox" id="sg-l" ${SPG.law?'checked':''}>Became law</label></div>
         <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="sg-n"></span><button class="btn primary" id="sg-dl">Download these bills</button></div></div>
         <div class="tscroll"><table class="dt" style="min-width:640px"><thead><tr><th>Bill</th><th>Description</th><th>Role</th><th>Topic</th><th>Latest action</th></tr></thead><tbody id="sg-tb"></tbody></table></div><div class="pager" id="sg-pg" style="margin-top:4px"></div>`;
