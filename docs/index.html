@@ -617,11 +617,11 @@ function renderHome(){
 }
 
 /* =================== BILLS ===================
-   Three views of the same session: everything introduced (#bills), measures that got out of committee
+   Views of the same session: laws (#bills, the default; #bills-law also works), everything introduced (#bills-introduced), measures that got out of committee
    (#bills-committee) and bills that became law (#bills-law). Stages come from the build (pipeline/build.py bill_stage):
    1 introduced, 2 out of committee, 3 passed one chamber, 4 passed both chambers, 5 became law (Public Act). */
-const BL = { ga:null, view:'intro', q:'', type:'', major:null, sub:null, status:'', cmte:'', page:0 };
-const BVIEWS = { intro:{token:'bills', label:'Introduced'}, committee:{token:'bills-committee', label:'Advanced from committee'}, law:{token:'bills-law', label:'Became law'}, activity:{token:'bills-activity', label:'Latest actions'} };
+const BL = { ga:null, view:'law', q:'', type:'', major:null, sub:null, status:'', cmte:'', page:0 };
+const BVIEWS = { law:{token:'bills', label:'Became law'}, intro:{token:'bills-introduced', label:'Introduced'}, committee:{token:'bills-committee', label:'Advanced from committee'}, activity:{token:'bills-activity', label:'Latest actions'} };
 const STAGES = ['Introduced', 'Out of committee', 'Passed one chamber', 'Passed both chambers', 'Became law'];
 const billsOf = ga => byDs('bills').filter(r=>r.x.ga===ga);
 const isBillT = r => r.x.type==='HB' || r.x.type==='SB';
@@ -675,7 +675,7 @@ function renderBills(){
     return; }
   if (V==='activity') return renderActivity(all, header);
   $('#view').innerHTML = header + `
-  <div class="funnel" aria-label="Substantive bills by furthest stage reached">${STAGES.map((s,i)=>{ const link = i===0?'bills':i===1?'bills-committee':i===4?'bills-law':null, on = (i===0&&V==='intro')||(i===1&&V==='committee')||(i===4&&V==='law');
+  <div class="funnel" aria-label="Substantive bills by furthest stage reached">${STAGES.map((s,i)=>{ const link = i===0?'bills-introduced':i===1?'bills-committee':i===4?'bills':null, on = (i===0&&V==='intro')||(i===1&&V==='committee')||(i===4&&V==='law');
     const inner = `<span class="fs">${s}</span><span class="fn num">${fmt(funnel[i])}</span><span class="fp">${i?pct(funnel[i]/Math.max(1,funnel[0]),1)+' of bills':'substantive bills'}</span><i class="fbar-in" style="width:${(funnel[i]/Math.max(1,funnel[0])*100).toFixed(1)}%"></i>`;
     return link ? `<a class="fstep ${on?'on':''}" href="#${link}">${inner}</a>` : `<div class="fstep">${inner}</div>`; }).join('<span class="farrow" aria-hidden="true">›</span>')}</div>
   <p class="muted" style="font-size:12px;margin:-6px 0 14px">${BL.major!=null?`Bills on ${esc(BL.sub!=null?CB.subs[BL.sub]:CB.majors[BL.major])} only. `:''}Furthest stage each bill reached, read from its ILGA action history. "Out of committee" includes bills sent straight to the floor by Senate Assignments.</p>
@@ -1493,7 +1493,7 @@ SECTIONS.org.push(
 );
 
 /* =================== shell & routing =================== */
-const RENDER = {home:renderHome, bills:()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, search:renderSearch};
+const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, search:renderSearch};
 let CUR = null, ROUTE = {view:'bills'}; const STACK = [];
 function parseRoute(t){
   if (RENDER[t]) return {view:t};
@@ -1506,7 +1506,7 @@ function parseRoute(t){
   if ((m = /^speech-(\d{4})(?:-s(\d+))?$/.exec(t))) return {view:'speech', year:+m[1], sid:m[2]?+m[2]:null};
   return null;
 }
-const tabOf = rt => ({'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors'})[rt.view] || rt.view;
+const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors'})[rt.view] || rt.view;
 function navHTML(side){ const cur = tabOf(ROUTE), groups = ['Datasets','Explore']; let g = 0;
   return TABS.map(t=> t ? `<button role="tab" data-v="${t[0]}" aria-selected="${t[0]===cur}">${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>` : (side?`<div class="lbl">${groups[g++]||''}</div>`:'<span class="sep"></span>')).join(''); }
 function drawNav(){ $('nav.tabs').innerHTML = navHTML(false); $$('[data-v]').forEach(b=>b.addEventListener('click', ()=>nav(b.dataset.v))); }
@@ -1528,7 +1528,7 @@ let navSeq = 0;
 function needsFor(rt){
   const all = allGAs();
   switch (rt.view){
-    case 'bills': case 'bills-committee': case 'bills-law': case 'bills-activity': return {details:[BL.ga ?? LATEST], links:[BL.ga ?? LATEST]};
+    case 'bills': case 'bills-introduced': case 'bills-committee': case 'bills-law': case 'bills-activity': return {details:[BL.ga ?? LATEST], links:[BL.ga ?? LATEST]};
     case 'bill': { const r = recordFor(rt)?.rec; return {details:r?[r.x.ga]:[], links:all}; }
     case 'search': return {details: SR.gas==='latest' ? [LATEST] : all, links:all};
     case 'topics': case 'sponsors': case 'sponsor': return {details:[], links:all};
