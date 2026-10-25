@@ -296,6 +296,10 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 .orglist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
 .orgcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .orgcard:hover{border-color:var(--s-tt)}
+/* the whole card links to the organization's page; the website link sits above that */
+.orgcard{position:relative;cursor:pointer;transition:border-color .12s,box-shadow .12s} .orgcard:hover{box-shadow:0 3px 12px rgba(30,40,60,.08)}
+.orgcard .oc-name::after{content:"";position:absolute;inset:0;border-radius:inherit} .orgcard:hover .oc-name{color:var(--accent);text-decoration:underline}
+.orgcard .oc-links a{position:relative;z-index:1;width:fit-content} .orgcard:focus-within{outline:2px solid var(--accent);outline-offset:2px}
 .org-logo.md{width:44px;height:44px;padding:4px;border-radius:8px} .org-logo.mono.md{font-size:14px}
 /* image logos keep the box height but widen to fit wordmarks */
 .lawlist{max-height:440px;overflow:auto;margin:0 -4px;padding:0 4px} .lawlist ol{list-style:none;margin:0;padding:0} .lawlist li{padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.35} .lawlist li:last-child{border-bottom:0} .lawlist .muted{font-size:12.5px;margin-top:2px}
