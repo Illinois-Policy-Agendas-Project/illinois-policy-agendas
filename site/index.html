@@ -655,7 +655,7 @@ function renderBills(){
     law: [['Bills that became law', fmt(laws.length), `${pct(laws.length/Math.max(1,B.length))} of ${fmt(B.length)} bills introduced`],
             ['Median time to law', median(lawDays)!=null ? `${fmt(median(lawDays))} days` : '—', 'from introduction to Public Act'],
             ['Passed both chambers', fmt(B.filter(r=>r.x.stage>=4).length), `${fmt(B.filter(r=>r.x.stage===4).length)} not (yet) law`],
-            ['Drew a veto', fmt(B.filter(r=>r.x.veto).length), 'total, amendatory or item veto']]
+            ['Vetoed', fmt(B.filter(r=>r.x.veto).length), 'total, amendatory or item veto']]
   }[V];
   const big = v => String(v).length > 14 ? 'font-size:17px;padding-block:5px' : '';
   const header = `
