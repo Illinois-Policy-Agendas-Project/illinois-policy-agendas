@@ -12,7 +12,7 @@ content/thinktanks/logos/ and the `logo` line in profiles.toml is updated to mat
 Then it writes build/logos.html so someone can check every logo before publishing.
 Use logos with each organization's permission.
 """
-import argparse, html, re, sys, tomllib, urllib.request
+import argparse, html, re, sys, tomllib, urllib.error, urllib.request
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -59,10 +59,30 @@ class Candidates(HTMLParser):
             self.in_header -= 1
 
 
+def _ssl_contexts():
+    """The system's certificates first; then certifi's list, for Python from python.org on a Mac, which ships without one
+    (the cause of "CERTIFICATE_VERIFY_FAILED ... unable to get local issuer certificate")."""
+    import ssl
+    yield None
+    try:
+        import certifi
+        yield ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        pass
+
+
 def get(url, timeout=20):
     req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': '*/*'})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read(), r.headers.get('Content-Type', '').split(';')[0].strip().lower(), r.geturl()
+    err = None
+    for ctx in _ssl_contexts():
+        try:
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                return r.read(), r.headers.get('Content-Type', '').split(';')[0].strip().lower(), r.geturl()
+        except urllib.error.URLError as e:
+            if 'CERTIFICATE_VERIFY_FAILED' not in str(e):
+                raise
+            err = e
+    raise urllib.error.URLError(f'{err.reason}. On a Mac, run "Install Certificates.command" in the Python folder under Applications, or run Update website again so it can install certifi.')
 
 
 def find_logo(website, log):
