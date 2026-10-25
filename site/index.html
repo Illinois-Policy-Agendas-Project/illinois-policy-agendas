@@ -295,6 +295,13 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 .orgcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .orgcard:hover{border-color:var(--s-tt)}
 .org-logo.md{width:44px;height:44px;padding:4px;border-radius:8px} .org-logo.mono.md{font-size:14px}
+/* image logos keep the box height but widen to fit wordmarks */
+.org-logo.img{width:auto;height:auto} .org-logo.img img{width:auto;max-height:none;object-fit:contain}
+.org-logo.img.lg{min-width:84px} .org-logo.img.lg img{height:66px;max-width:200px}
+.org-logo.img.md{min-width:44px} .org-logo.img.md img{height:34px;max-width:120px}
+.org-logo.img.xs img{height:18px;max-width:44px}
+.orgcard:has(.org-logo.img){grid-template-columns:minmax(0,1fr)} .orgcard .org-logo.img{justify-self:start} .orgcard .org-logo.img img{height:30px;max-width:190px}
+@media (max-width:560px){ .org-logo.img.lg img{height:48px;max-width:150px} }
 .oc-name{font-weight:600;color:var(--ink);text-decoration:none;line-height:1.3;display:block} .oc-name:hover{color:var(--accent);text-decoration:underline}
 .oc-meta{font-size:12px;color:var(--muted);margin-top:2px}
 .oc-links{display:flex;flex-direction:column;gap:1px;margin-top:6px;font-size:12.5px}
@@ -1384,7 +1391,7 @@ const OG = { slug:null, q:'', major:null, page:0 };
 /* logo from content/thinktanks/logos (via profiles.toml); a monogram until one is supplied */
 function orgLogo(o, size){
   const P = ORGPROF[o.name] || {};
-  if (P.logo) return `<span class="org-logo ${size}"><img src="data/${esc(P.logo)}" alt="${esc(o.name)} logo" loading="lazy"></span>`;
+  if (P.logo) return `<span class="org-logo img ${size}"><img src="data/${esc(P.logo)}" alt="${esc(o.name)} logo" loading="lazy"></span>`;
   const ini = o.name.split(/\s+/).filter(w=>!/^(for|and|of|the|on)$/i.test(w)).map(w=>w[0]).join('').slice(0,3).toUpperCase();
   return `<span class="org-logo mono ${size}" aria-hidden="true">${esc(ini)}</span>`;
 }
