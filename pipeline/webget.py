@@ -1,5 +1,9 @@
-"""Downloading web pages for the collectors (fetch_legislators.py, fetch_logos.py), with two certificate fixes.
+"""Downloading web pages for the collectors (fetch_legislators.py, fetch_logos.py), with three certificate fixes.
 
+0. First it uses the operating system's own trust store (the macOS Keychain or the Windows certificate store) through
+   the `truststore` package, which is what browsers use. That also covers networks that inspect secure traffic and
+   re-sign it with their own certificate (common on campus and corporate networks), since IT installs that
+   certificate in the system store.
 1. Python from python.org on a Mac ships without a list of trusted certificates. If the system's list fails,
    certifi's list is tried.
 2. Some sites, ilga.gov among them, send their certificate without the "intermediate" certificate that links it to a
@@ -15,9 +19,16 @@ EXTRA_CAFILE = None   # tests can point this at their own root certificate
 _FIXED = {}           # host -> ssl context that verified it
 
 
-def _base():
-    """Contexts to try, in order: the system's certificates, then certifi's."""
-    out = [ssl.create_default_context(cafile=EXTRA_CAFILE)] if EXTRA_CAFILE else [ssl.create_default_context()]
+def _base(system_store=True):
+    """Contexts to try, in order: the operating system's trust store, Python's default certificates, then certifi's."""
+    out = []
+    if system_store and not EXTRA_CAFILE:
+        try:
+            import truststore
+            out.append(truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT))
+        except ImportError:
+            pass
+    out += [ssl.create_default_context(cafile=EXTRA_CAFILE)] if EXTRA_CAFILE else [ssl.create_default_context()]
     try:
         import certifi
         out.append(ssl.create_default_context(cafile=certifi.where()))
@@ -52,6 +63,23 @@ def _peer_der(host, port=443, timeout=20):
         return s.getpeercert(binary_form=True)
 
 
+def _issuer_of(host, port=443, timeout=20):
+    """Who issued the certificate a site presents to this computer, e.g. "Sectigo Limited" or a firewall's name."""
+    try:
+        import tempfile, os
+        pem = ssl.DER_cert_to_PEM_cert(_peer_der(host, port, timeout))
+        with tempfile.NamedTemporaryFile('w', suffix='.pem', delete=False) as f:
+            f.write(pem)
+        try:
+            info = ssl._ssl._test_decode_cert(f.name)  # noqa: SLF001 - the standard library's own decoder
+        finally:
+            os.unlink(f.name)
+        parts = dict(x[0] for x in info.get('issuer', ()))
+        return ', '.join(v for v in (parts.get('organizationName'), parts.get('commonName')) if v)
+    except Exception:  # noqa: BLE001 - only used to explain an error
+        return ''
+
+
 def _as_pem(data):
     if data.lstrip().startswith(b'-----BEGIN CERTIFICATE-----'):
         return data.decode('ascii', 'replace')
@@ -75,7 +103,7 @@ def _with_intermediates(host, port, timeout):
     if not pems:
         return []
     out = []
-    for ctx in _base():
+    for ctx in _base(system_store=False):
         # the intermediates only help build the chain: it must still end at a trusted root. Python 3.13+ turns on
         # "partial chain" checking by default, which would trust an added intermediate by itself, so switch it off.
         ctx.verify_flags &= ~getattr(ssl, 'VERIFY_X509_PARTIAL_CHAIN', 0)
@@ -113,6 +141,14 @@ def get(url, ua, timeout=25):
                 if 'CERTIFICATE_VERIFY_FAILED' not in str(e):
                     raise
                 err = e
-    raise urllib.error.URLError(f'{err.reason if err else "could not connect"}. The site\'s certificate could not be verified even after '
-                                'fetching its missing intermediate certificate. On a Mac, run "Install Certificates.command" in the Python '
-                                'folder under Applications, then try again.')
+    who = _issuer_of(host, port, timeout) if u.scheme == 'https' else ''
+    try:
+        import truststore  # noqa: F401
+        ts = ''
+    except ImportError:
+        ts = ' Run Update website again so it can install the "truststore" package, which lets Python use this computer\'s own certificates.'
+    raise urllib.error.URLError(f'{err.reason if err else "could not connect"}. The certificate this computer received for {host} was issued by '
+                                f'"{who or "unknown"}".{ts} If that name is your network\'s firewall or security software rather than a public '
+                                'certificate authority, the network is inspecting secure traffic: ask IT to install its certificate in the system '
+                                'store, or run this from another network. On a Mac you can also run "Install Certificates.command" in the Python '
+                                'folder under Applications.')
