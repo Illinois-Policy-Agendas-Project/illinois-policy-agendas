@@ -532,10 +532,17 @@ def build_sots(cfg, valid, rep):
         rep.error(ds, f'Missing columns: {", ".join(missing)}')
         return []
     df = df.sort_values(c['id'])
-    no_year = df[df[c['year']].isna()]
-    if len(no_year):
-        rep.warn(ds, f'{pl(len(no_year), "sentence has", "sentences have")} no year; each was given the year of the sentence before it.', [f'id {i}' for i in no_year[c['id']]])
-    df[c['year']] = df[c['year']].ffill()
+    # a sentence with no year takes its speech's year: safe when the sentences on either side agree
+    missing = df[c['year']].isna()
+    before, after = df[c['year']].ffill(), df[c['year']].bfill()
+    gov_b, gov_a = df[c['governor']].where(~missing).ffill(), df[c['governor']].where(~missing).bfill()
+    sure = missing & (before == after) & (gov_b == df[c['governor']]) & (gov_a == df[c['governor']])
+    unsure = missing & ~sure
+    if sure.any():
+        rep.note(ds, f'{pl(int(sure.sum()), "sentence has", "sentences have")} no year in the speech file; each sits inside one speech, so it was given that speech\'s year.', [f'id {i}' for i in df.loc[sure, c['id']]])
+    if unsure.any():
+        rep.warn(ds, f'{pl(int(unsure.sum()), "sentence has", "sentences have")} no year and {"falls" if unsure.sum() == 1 else "fall"} between two speeches; each was given the year of the sentence before it. Add the year in the speech file.', [f'id {i}' for i in df.loc[unsure, c['id']]])
+    df[c['year']] = before
     bad, rows = [], []
     for r in df.to_dict('records'):
         code = check_code(to_code(r[c['subtopic']]), valid, rep, ds, f'id {r[c["id"]]}', bad)
