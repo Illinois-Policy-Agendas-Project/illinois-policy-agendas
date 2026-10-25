@@ -296,6 +296,7 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 .cb-line{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:14px 0 0;font-size:13.5px}
 .cb-link{font-weight:600} .cb-link.soon{color:var(--muted)}
 .panel.upcoming{border-style:dashed;background:var(--sunk);gap:12px;padding:22px}
+.cmlist{margin-bottom:0} .orgcard.cmcard{grid-template-columns:minmax(0,1fr);padding:10px 12px}
 .orglist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
 .orgcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .orgcard:hover{border-color:var(--s-tt)}
@@ -1556,6 +1557,11 @@ function renderCommittees(){
     <div class="kpi"><span class="l">Approved by a committee</span><span class="v">${fmt(okd.size)}</span><span class="s">${pct(okd.size/Math.max(1,assigned.size))} of bills sent to one</span></div>
     <div class="kpi"><span class="l">Most bills assigned</span><span class="v" style="font-size:18px;padding-block:5px">${busiest?cmLink(busiest):'—'}</span><span class="s">${busiest?`${busiest.ch} · ${pl(busiest.bills.length,'bill')}`:''}</span></div>
   </div>
+  ${['Senate','House'].map(ch=>{ const cs = all.filter(c=>c.ch===ch).sort((a,b)=>a.name.localeCompare(b.name));
+    return `<div class="panel" style="margin-bottom:16px"><div class="chead"><h3>${ch} committees</h3><span class="muted" style="font-size:12px">${cs.length} committees · click one for its bills</span></div>
+      <section class="orglist cmlist" aria-label="${ch} committees">${cs.map(c=>{ const st = cmStats(c);
+        return `<div class="orgcard cmcard"><div style="min-width:0"><a class="oc-name" href="#committee-${c.key}">${esc(c.name)}</a>
+          <div class="oc-meta num">${pl(st.n,'bill')} · ${pct(st.rate,0)} approved${st.law?` · ${fmt(st.law)} became law`:''}</div></div></div>`; }).join('')}</section></div>`; }).join('')}
   <div class="fbar">
     <input type="search" id="cm-q" placeholder="Find a committee" value="${esc(CM.q)}" aria-label="Find a committee">
     <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['House','House'],['Senate','Senate']].map(([k,l])=>`<button data-cc="${k}" aria-pressed="${CM.ch===k}">${l}</button>`).join('')}</div>
