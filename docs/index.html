@@ -298,6 +298,7 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 .orgcard:hover{border-color:var(--s-tt)}
 .org-logo.md{width:44px;height:44px;padding:4px;border-radius:8px} .org-logo.mono.md{font-size:14px}
 /* image logos keep the box height but widen to fit wordmarks */
+.lawlist{max-height:380px;overflow:auto;margin:0 -4px;padding:0 4px} .lawlist ol{list-style:none;margin:0;padding:0} .lawlist li{padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.35} .lawlist li:last-child{border-bottom:0} .lawlist .muted{font-size:12.5px;margin-top:2px}
 .org-logo.img{width:auto;height:auto} .org-logo.img img{width:auto;max-height:none;object-fit:contain}
 .org-logo.img.lg{min-width:84px} .org-logo.img.lg img{height:66px;max-width:200px}
 .org-logo.img.md{min-width:44px} .org-logo.img.md img{height:34px;max-width:120px}
@@ -485,10 +486,10 @@ function hbars(el, items, {color='--accent', valFmt=fmt, labelW=200, rowH=24, ma
   const head = d => `<div class="t">${d.code!=null?`<span class="mono">${d.code}</span> `:''}${esc(d.label)}</div>`;
   $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i];
     g.addEventListener('pointermove', e=>{ const sg = e.target.closest('.seg'), p = sg && d.segs[+sg.dataset.j];
-      showTip(e, p ? `<div class="muted" style="font-size:11.5px">${d.code!=null?d.code+' · ':''}${esc(d.label)}</div><div class="seg-t"><span class="mono">${p.code}</span> ${esc(p.label)}</div>${p.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(p.value)}</b></div>`}<div class="muted">${pct(p.value/Math.max(d.value,1e-9),0)} of this topic</div>`
+      showTip(e, p ? `<div class="muted" style="font-size:11.5px">${d.code!=null?d.code+' · ':''}${esc(d.label)}</div><div class="seg-t"><span class="mono">${p.code}</span> ${esc(p.label)}</div>${p.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(p.value)}</b></div>`}<div class="muted">${pct(p.value/Math.max(d.value,1e-9),0)} of this topic${d.onSeg?' · click to select':''}</div>`
                      : head(d) + (d.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(d.value)}</b></div>`) + (d.segs?.length>1 ? '<div class="muted">Hover a segment for its subtopic</div>' : '')); });
     g.addEventListener('pointerleave', hideTip);
-    if (d.onclick) g.addEventListener('click', d.onclick); });
+    if (d.onclick || d.onSeg) g.addEventListener('click', e=>{ const sg = e.target.closest('.seg'); if (sg && d.onSeg) d.onSeg(d.segs[+sg.dataset.j]); else d.onclick?.(); }); });
 }
 /* subtopic pieces of one major topic's bar: rows already limited to the bar's records; value = count × scale */
 function subSegs(rows, major, scale=1, tip){
@@ -699,9 +700,14 @@ function renderBills(){
     const cc = [...count(billsOf(BL.ga).filter(r=>r.x.stage>=2 && r.x.cmte && inTopic(r)), r=>r.x.cmte)].sort((a,b)=>b[1]-a[1]).slice(0,12);
     hbars($('#b-cm'), cc.map(([c,n])=>({label:c.replace(/ Committee$/,''), value:n, color:'--s-bills', on:BL.cmte===c, onclick:()=>{ BL.cmte = BL.cmte===c?'':c; BL.page=0; renderBills(); }})), {labelW:260, rowH:22});
   } else {
-    charts.innerHTML = `<div class="panel"><div class="chead"><h3>Laws by major topic</h3><span class="muted" style="font-size:12px">Hover for the share of the topic's bills that became law. Click to filter</span></div><div id="b-top"></div></div>
-      <div class="panel"><div class="chead"><h3>Days from introduction to law</h3><span class="muted" style="font-size:12px">From first introduction to the date it became law</span></div><div id="b-dd"></div></div>`;
+    charts.innerHTML = `<div class="panel"><div class="chead"><h3>Laws by major topic</h3><span class="muted" style="font-size:12px">Click a subtopic in a bar to list its laws</span></div><div id="b-top"></div></div>
+      <div class="panel"><div class="chead"><h3>${BL.sub!=null ? `Laws on ${esc(CB.subs[BL.sub])}` : BL.major!=null ? `Laws on ${esc(CB.majors[BL.major])}` : 'Laws by subtopic'}</h3>${BL.major!=null?`<span class="muted num" style="font-size:12px">${fmt(laws.filter(inTopic).length)} laws</span>`:''}</div><div id="b-ll" class="lawlist"></div>
+      <h3 style="margin-top:14px">Days from introduction to law</h3><div id="b-dd"></div></div>`;
     const ls = laws.filter(r=>r.x.law_date && inTopic(r));
+    const ll = BL.major==null ? [] : laws.filter(inTopic).sort((a,b)=>(b.x.law_date||'').localeCompare(a.x.law_date||''));
+    $('#b-ll').innerHTML = BL.major==null ? '<p class="muted" style="margin:0;font-size:13.5px">Click a subtopic in a bar of the chart (or a topic name, or pick one from the menus above) to list its laws and their primary sponsors here.</p>'
+      : ll.length ? `<ol>${ll.map(r=>{ const c=chiefOf(r); return `<li><a class="rl" href="${href(r)}">${esc(r.x.short)}</a><div class="muted"><span class="mono">${esc(r.x.bill)}</span>${r.x.pa?` · P.A. ${esc(r.x.pa)}`:''}${c?` · ${spLink(c)}`:''}</div></li>`; }).join('')}</ol>`
+      : '<p class="muted" style="margin:0">No laws on this topic yet.</p>';
     const bins = [[0,180,'Under 6 months'],[180,240,'6–8 months'],[240,365,'8–12 months'],[365,9999,'Over a year']];
     const dd = ls.filter(r=>r.x.intro).map(r=>daysBetween(r.x.intro, r.x.law_date));
     hbars($('#b-dd'), bins.map(([a,b,l])=>({label:l, value:dd.filter(d=>d>=a && d<b).length, color:'--h3'})), {labelW:140, rowH:22});
@@ -794,14 +800,16 @@ function billsUpdate(){
     hbars($('#b-top'), [...intro].filter(([,n])=>n>=10).map(([k,n])=>[k, (adv.get(k)||0)/n, n]).sort((a,b)=>b[1]-a[1]).map(([k,v,n])=>({label:CB.majors[k], code:k, value:v, color:'--s-bills', on:BL.major===k,
       segs: subSegs(base.filter(r=>r.x.stage>=2), k, 1/n, (c,a)=>`<div class="r"><span>Out of committee</span><b class="num">${fmt(a)} of ${fmt(base.filter(r=>r.sub===c).length)}</b></div>`),
       tip:`<div class="r"><span>Bills introduced</span><b class="num">${fmt(n)}</b></div><div class="r"><span>Out of committee</span><b class="num">${fmt(adv.get(k)||0)} (${pct(v,0)})</b></div>`,
-      onclick:()=>{ BL.major = BL.major===k?null:k; BL.sub=null; BL.page=0; renderBills(); }})), {labelW:220, rowH:22, valFmt:v=>pct(v,0), max:1});
+      onclick:()=>{ BL.major = BL.major===k?null:k; BL.sub=null; BL.page=0; renderBills(); },
+      onSeg:g=>{ const same = BL.sub===g.code; BL.major = same?null:k; BL.sub = same?null:g.code; BL.page=0; renderBills(); }})), {labelW:220, rowH:22, valFmt:v=>pct(v,0), max:1});
   } else {
     const c = count(forTop, r=>r.major), base = count(billsOf(BL.ga).filter(r=>isBillT(r) && isPol(r)), r=>r.major);
     hbars($('#b-top'), [...c].sort((a,b)=>b[1]-a[1]).map(([k,v])=>({label:CB.majors[k], code:k, value:v, color:'--s-bills', on:BL.major===k,
       segs: subSegs(forTop, k, 1, (c,n)=>`<div class="r"><span>${V==='law'?'Became law':'Bills'}</span><b class="num">${fmt(n)}</b></div>`),
       tip: V==='law' ? `<div class="r"><span>Became law</span><b class="num">${fmt(v)}</b></div><div class="r"><span>Share of the topic's bills</span><b class="num">${pct(v/Math.max(1,base.get(k)||0),1)}</b></div>`
                      : `<div class="r"><span>Bills</span><b class="num">${fmt(v)}</b></div><div class="r"><span>Became law</span><b class="num">${fmt(forTop.filter(r=>r.major===k && r.x.stage>=5).length)}</b></div>`,
-      onclick:()=>{ BL.major = BL.major===k?null:k; BL.sub=null; BL.page=0; renderBills(); }})), {labelW:220, rowH:22});
+      onclick:()=>{ BL.major = BL.major===k?null:k; BL.sub=null; BL.page=0; renderBills(); },
+      onSeg:g=>{ const same = BL.sub===g.code; BL.major = same?null:k; BL.sub = same?null:g.code; BL.page=0; renderBills(); }})), {labelW:220, rowH:22});
   }
   $('#b-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> ${V==='law'?'laws':'bills'} match`; $('#b-dl').disabled = !rows.length;
   const PS=40, pages=Math.ceil(rows.length/PS); BL.page=Math.min(BL.page,Math.max(0,pages-1));
