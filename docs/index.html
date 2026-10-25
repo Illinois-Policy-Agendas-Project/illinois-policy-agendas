@@ -81,7 +81,9 @@ input[type=search]{padding:8px 12px}
 .chart .grid{stroke:var(--line);stroke-width:1} .chart .base{stroke:var(--line-2);stroke-width:1}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)} .legend span{display:inline-flex;align-items:center;gap:6px}
 #tip{position:fixed;pointer-events:none;z-index:30;background:var(--surface);border:1px solid var(--line-2);box-shadow:0 6px 18px rgba(30,40,60,.12);border-radius:6px;padding:8px 10px;font-size:12.5px;max-width:300px}
-#tip .t{font-weight:600;margin-bottom:4px} #tip .r b{white-space:nowrap} #tip .r{display:flex;align-items:center;gap:10px;justify-content:space-between} #tip .r > span:first-child{display:flex;align-items:center;gap:6px}
+#tip .t{font-weight:600;margin-bottom:4px} #tip .r b{white-space:nowrap} #tip .r{display:flex;align-items:center;gap:10px;justify-content:space-between} #tip .seg-t{font-weight:600;margin:2px 0 4px;color:var(--ink)}
+svg .seg:hover{stroke:var(--ink)!important;stroke-width:1.25px!important;fill-opacity:1!important}
+#tip .r > span:first-child{display:flex;align-items:center;gap:6px}
 
 /* heatmaps */
 .hscroll{overflow-x:auto}
@@ -462,18 +464,36 @@ function columns(el, labels, series, {height=190, tipTitle=l=>l, every}={}){
   el.innerHTML = s; el.classList.add('chart');
   $$('.hit', el).forEach(h=>{ const i=+h.dataset.i; bindTip(h, ()=>`<div class="t">${esc(tipTitle(labels[i]))}</div>` + series.map(sr=>tipRow(sr.cls, sr.label, fmt(sr.values[i]||0))).join('')); });
 }
-/* horizontal bars: items [{label, code, value, color, tip, onclick, on}] */
+/* horizontal bars: items [{label, code, value, color, tip, onclick, on, segs}]
+   segs (optional): the bar split into stacked pieces [{code, label, value, tip}], largest first; hover a piece for its own tooltip */
 function hbars(el, items, {color='--accent', valFmt=fmt, labelW=200, rowH=24, max}={}){
   const W=cw(el); labelW=Math.min(labelW, W*.45); const m={l:labelW,r:58}, H=items.length*rowH+2;
-  const mx = max ?? niceMax(Math.max(1,...items.map(d=>d.value))); const cpx = labelW/6.4;
+  const mx = max ?? niceMax(Math.max(1,...items.map(d=>d.value))); const cpx = labelW/6.4, iw = W-m.l-m.r;
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart">`;
-  items.forEach((d,i)=>{ const y=i*rowH+1, w=Math.max(d.value>0?2:0,(W-m.l-m.r)*d.value/mx), lab=d.label.length>cpx?d.label.slice(0,Math.floor(cpx)-1)+'…':d.label;
+  items.forEach((d,i)=>{ const y=i*rowH+1, w=Math.max(d.value>0?2:0,iw*d.value/mx), lab=d.label.length>cpx?d.label.slice(0,Math.floor(cpx)-1)+'…':d.label, fill=`var(${d.color||color})`;
+    let bar = `<path d="${rRight(m.l,y+5,w,rowH-10,3)}" style="fill:${fill}"/>`;
+    if (d.segs?.length > 1){ let x = m.l; bar = '';
+      d.segs.forEach((g,j)=>{ const sw = iw*g.value/mx, last = j===d.segs.length-1, op = j%2 ? .58 : 1;
+        bar += last ? `<path class="seg" data-j="${j}" d="${rRight(x,y+5,Math.max(sw,.5),rowH-10,3)}" style="fill:${fill};fill-opacity:${op}"/>`
+                    : `<rect class="seg" data-j="${j}" x="${x}" y="${y+5}" width="${Math.max(sw,.5)}" height="${rowH-10}" style="fill:${fill};fill-opacity:${op};stroke:var(--surface);stroke-width:.75"/>`;
+        x += sw; }); }
     s += `<g class="hb" data-i="${i}" style="cursor:${d.onclick?'pointer':'default'}"><rect x="0" y="${y}" width="${W}" height="${rowH}" style="fill:${d.on?'var(--sel)':'transparent'}" rx="4"/>`+
       `<text x="${m.l-8}" y="${y+rowH/2+4}" text-anchor="end" style="fill:var(--ink-2);font-size:12px;${d.on?'font-weight:700':''}">${esc(lab)}</text>`+
-      `<path d="${rRight(m.l,y+5,w,rowH-10,3)}" style="fill:var(${d.color||color})"/><text x="${m.l+w+6}" y="${y+rowH/2+4}" style="fill:var(--ink-2)">${valFmt(d.value)}</text></g>`; });
+      `${bar}<text x="${m.l+w+6}" y="${y+rowH/2+4}" style="fill:var(--ink-2)">${valFmt(d.value)}</text></g>`; });
   s += `<line class="base" x1="${m.l}" x2="${m.l}" y1="0" y2="${H}"/></svg>`;
   el.innerHTML = s; el.classList.add('chart');
-  $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i]; bindTip(g, ()=>`<div class="t">${d.code!=null?`<span class="mono">${d.code}</span> `:''}${esc(d.label)}</div>${d.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(d.value)}</b></div>`}`); if (d.onclick) g.addEventListener('click', d.onclick); });
+  const head = d => `<div class="t">${d.code!=null?`<span class="mono">${d.code}</span> `:''}${esc(d.label)}</div>`;
+  $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i];
+    g.addEventListener('pointermove', e=>{ const sg = e.target.closest('.seg'), p = sg && d.segs[+sg.dataset.j];
+      showTip(e, p ? `<div class="muted" style="font-size:11.5px">${d.code!=null?d.code+' · ':''}${esc(d.label)}</div><div class="seg-t"><span class="mono">${p.code}</span> ${esc(p.label)}</div>${p.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(p.value)}</b></div>`}<div class="muted">${pct(p.value/Math.max(d.value,1e-9),0)} of this topic</div>`
+                     : head(d) + (d.tip||`<div class="r"><span>Records</span><b class="num">${valFmt(d.value)}</b></div>`) + (d.segs?.length>1 ? '<div class="muted">Hover a segment for its subtopic</div>' : '')); });
+    g.addEventListener('pointerleave', hideTip);
+    if (d.onclick) g.addEventListener('click', d.onclick); });
+}
+/* subtopic pieces of one major topic's bar: rows already limited to the bar's records; value = count × scale */
+function subSegs(rows, major, scale=1, tip){
+  return [...count(rows.filter(r=>r.major===major && r.sub!=null), r=>r.sub)].sort((a,b)=>b[1]-a[1])
+    .map(([c,n])=>({code:c, label:CB.subs[c]||('Subtopic '+c), value:n*scale, n, tip:tip?.(c,n)}));
 }
 /* line chart, shares; series [{label, cls, color, pts:[[x,share,n,total]]}] */
 function lines(el, xs, series, {height=220, bands=true}={}){
@@ -777,11 +797,13 @@ function billsUpdate(){
   if (V==='committee'){
     const base = billsOf(BL.ga).filter(r=>isBillT(r) && isPol(r)), intro = count(base, r=>r.major), adv = count(base.filter(r=>r.x.stage>=2), r=>r.major);
     hbars($('#b-top'), [...intro].filter(([,n])=>n>=10).map(([k,n])=>[k, (adv.get(k)||0)/n, n]).sort((a,b)=>b[1]-a[1]).map(([k,v,n])=>({label:CB.majors[k], code:k, value:v, color:'--s-bills', on:BL.major===k,
+      segs: subSegs(base.filter(r=>r.x.stage>=2), k, 1/n, (c,a)=>`<div class="r"><span>Out of committee</span><b class="num">${fmt(a)} of ${fmt(base.filter(r=>r.sub===c).length)}</b></div>`),
       tip:`<div class="r"><span>Bills introduced</span><b class="num">${fmt(n)}</b></div><div class="r"><span>Out of committee</span><b class="num">${fmt(adv.get(k)||0)} (${pct(v,0)})</b></div>`,
       onclick:()=>{ BL.major = BL.major===k?null:k; BL.sub=null; BL.page=0; renderBills(); }})), {labelW:220, rowH:22, valFmt:v=>pct(v,0), max:1});
   } else {
     const c = count(forTop, r=>r.major), base = count(billsOf(BL.ga).filter(r=>isBillT(r) && isPol(r)), r=>r.major);
     hbars($('#b-top'), [...c].sort((a,b)=>b[1]-a[1]).map(([k,v])=>({label:CB.majors[k], code:k, value:v, color:'--s-bills', on:BL.major===k,
+      segs: subSegs(forTop, k, 1, (c,n)=>`<div class="r"><span>${V==='law'?'Became law':'Bills'}</span><b class="num">${fmt(n)}</b></div>`),
       tip: V==='law' ? `<div class="r"><span>Became law</span><b class="num">${fmt(v)}</b></div><div class="r"><span>Share of the topic's bills</span><b class="num">${pct(v/Math.max(1,base.get(k)||0),1)}</b></div>`
                      : `<div class="r"><span>Bills</span><b class="num">${fmt(v)}</b></div><div class="r"><span>Became law</span><b class="num">${fmt(forTop.filter(r=>r.major===k && r.x.stage>=5).length)}</b></div>`,
       onclick:()=>{ BL.major = BL.major===k?null:k; BL.sub=null; BL.page=0; renderBills(); }})), {labelW:220, rowH:22});
@@ -1030,6 +1052,7 @@ function srUpdate(){
     return {label:DS[k].short, cls:DS[k].cls, color:'--s-'+k, pts:xs.filter(y=>(tot.get(y)||0)>=(k==='tt'?8:20)).map(y=>[y,(hit.get(y)||0)/tot.get(y),hit.get(y)||0,tot.get(y)])}; }), {height:200});
   const tc = count(rows.filter(isPol), r=>r.major);
   const items = [...tc].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>({label:CB.majors[k], code:k, value:v, color:'--h4', on:SR.major===k,
+    segs: subSegs(rows, k, 1, (c,n)=>DSK.map(d=>tipRow(DS[d].cls, DS[d].short, fmt(rows.filter(r=>r.ds===d&&r.sub===c).length))).join('')),
     tip: DSK.map(d=>tipRow(DS[d].cls, DS[d].short, fmt(rows.filter(r=>r.ds===d&&r.major===k).length))).join(''), onclick:()=>{ SR.major = SR.major===k?null:k; $('#sr-m').value=SR.major??''; SR.page=0; srUpdate(); }}));
   if (items.length) hbars($('#sr-tp'), items, {labelW:190, rowH:24}); else $('#sr-tp').innerHTML = '<p class="muted">No coded matches.</p>';
   $('#sr-sort').value = SR.sort; $('#sr-sort').addEventListener('change', e=>{ SR.sort=e.target.value; SR.page=0; srUpdate(); });
@@ -1204,6 +1227,7 @@ SECTIONS.speech.push(
 function drawProfile(s){
   const pol = s.sent.filter(isPol), c = count(pol, r=>r.major); const all = byDs('sots').filter(isPol), ca = count(all, r=>r.major);
   hbars($('#pf'), [...c].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([m,v])=>({label:CB.majors[m], code:m, value:v/pol.length, color:'--s-sots', on:SP.major===m,
+    segs: subSegs(pol, m, 1/pol.length, (c,n)=>`<div class="r"><span>This address</span><b class="num">${pct(n/pol.length)} (${fmt(n)})</b></div>`),
     tip:`<div class="r"><span>This address</span><b class="num">${pct(v/pol.length)}</b></div><div class="r"><span>All 21 addresses</span><b class="num">${pct((ca.get(m)||0)/all.length)}</b></div>`,
     onclick:()=>{ SP.major = SP.major===m?null:m; $('#rd-m').value = SP.major??''; $('#rd-m').dispatchEvent(new Event('change')); }})), {labelW:150, rowH:22, valFmt:v=>pct(v,0)});
 }
@@ -1322,6 +1346,7 @@ SECTIONS.sponsor.push(
       const c = count(mine, r=>r.major), cp = count(peers, r=>r.major);
       el.innerHTML = `<p class="ink2" style="margin:0;font-size:13.5px">Major topics of the ${fmt(mine.length)} policy bills they introduced. Hover for the ${chamberName(p.ch)} average. Click a topic to list those bills below.</p><div id="sg-tp"></div>`;
       hbars($('#sg-tp'), [...c].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([m,v])=>({label:CB.majors[m], code:m, value:v/mine.length, color:'--s-bills', on:SPG.major===m,
+        segs: subSegs(mine, m, 1/mine.length, (c,n)=>`<div class="r"><span>Their bills</span><b class="num">${pct(n/mine.length)} (${fmt(n)})</b></div>`),
         tip:`<div class="r"><span>Their bills</span><b class="num">${pct(v/mine.length)} (${fmt(v)})</b></div><div class="r"><span>${chamberName(p.ch)} average</span><b class="num">${pct((cp.get(m)||0)/peers.length)}</b></div>`,
         onclick:()=>{ SPG.major = SPG.major===m?null:m; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }})), {labelW:230, rowH:23, valFmt:v=>pct(v,0)}); } },
   { id:'bills', title:'Bills', render(p, el){
