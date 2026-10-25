@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&family=Figtree:wght@400;500;600;700&family=Literata:opsz,wght@7..72,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: masthead + tabs (home, three datasets, topics, sponsors, search). Light-only by design ("Lakefront"). */
+/* Layout: masthead + tabs (home, three datasets, topics, the legislature (sponsors, parties, committees), search). Light-only by design ("Lakefront"). */
 :root{--pd:hsl(214 65% 48%);--pr:hsl(357 62% 52%);--pi:hsl(275 40% 55%);
   color-scheme:light;
   --bg:#ffffff; --band:#eef5fc; --sunk:#f4f7fb; --surface:#ffffff;
@@ -40,6 +40,17 @@ nav.tabs button{border:0;background:none;cursor:pointer;padding:10px 14px;font-s
 nav.tabs button:hover{color:var(--ink)}
 nav.tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--accent)}
 nav.tabs .sep{width:1px;background:var(--line-2);margin:10px 6px}
+nav.tabs{flex-direction:column} .tabs-wide{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav.tabs .menu-btn,nav.tabs .menu-panel{display:none}
+@media (max-width:560px){
+  .tabs-wide{display:none} nav.tabs{margin-bottom:10px}
+  nav.tabs .menu-btn{display:flex;align-items:center;gap:9px;width:100%;border:1px solid var(--line-2);background:var(--surface);border-radius:8px;padding:10px 12px;font:inherit;font-weight:600;color:var(--ink);cursor:pointer}
+  .burger,.burger::before,.burger::after{display:block;width:16px;height:2px;background:var(--ink-2);border-radius:2px;position:relative} .burger::before,.burger::after{content:"";position:absolute;left:0} .burger::before{top:-5px} .burger::after{top:5px}
+  nav.tabs .menu-panel:not([hidden]){display:flex;flex-direction:column;margin-top:6px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);padding:4px 0}
+  .menu-panel button{border:0;border-left:3px solid transparent;border-bottom:0!important;background:none;text-align:left;padding:10px 14px;font:inherit;color:var(--ink-2);display:flex;align-items:center;gap:8px;cursor:pointer}
+  .menu-panel button[aria-selected="true"]{color:var(--ink);font-weight:600;border-left-color:var(--accent);background:var(--sunk)}
+  .menu-lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:10px 14px 2px;border-top:1px solid var(--line);margin-top:4px}
+}
 
 main{padding-block:26px 64px}
 .phead{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:20px}
@@ -318,6 +329,8 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
   table.dt td:has(div,a.rl)::before{display:block!important;margin-bottom:1px}
   .tscroll{overflow:visible}
 }
+.legbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px} .legbar .vtabs{border-bottom:0;margin-bottom:0;flex:1 1 auto}
+.legsess{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;padding-bottom:6px} @media (max-width:560px){ .legsess{width:100%} .legsess select{flex:1} }
 .orglist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
 .orgcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .orgcard:hover{border-color:var(--s-tt)}
@@ -378,7 +391,10 @@ const DS = {
   tt:{name:'Think tank reports', short:'Think tanks', cls:'ds-tt'}
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Sponsors'],['parties','Parties'],['committees','Committees'],['search','Search']];
+/* top menu: [route, label, dot class, section]. Sponsors, Parties and Committees share the Legislature section and its sub-tabs. */
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Legislature',null,'legislature'],['search','Search']];
+const LEGTABS = [['sponsors','Sponsors'],['parties','Parties'],['committees','Committees']];
+const TABLABEL = {sponsors:'Sponsors', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
 let GOV = {}, USED_MAJORS = new Set();   // year -> {governor, party}; major topics that have records
@@ -1143,7 +1159,7 @@ const recFile = (kind, rec) => kind==='committee' ? `illinois-${rec.ga}-${rec.sl
 
 function renderRecord(){
   const found = recordFor(ROUTE);
-  if (!found){ $('#view').innerHTML = `<div class="panel" style="max-width:640px"><h2>Record not found</h2><p class="ink2" style="margin:0">Nothing in the data matches <span class="mono">#${esc(CUR)}</span>. The link may have a typo.</p><div><a class="btn" href="#${tabOf(ROUTE)}">Back to ${esc(TABS.find(t=>t&&t[0]===tabOf(ROUTE))[1])}</a></div></div>`; return; }
+  if (!found){ $('#view').innerHTML = `<div class="panel" style="max-width:640px"><h2>Record not found</h2><p class="ink2" style="margin:0">Nothing in the data matches <span class="mono">#${esc(CUR)}</span>. The link may have a typo.</p><div><a class="btn" href="#${tabOf(ROUTE)}">Back to ${esc(TABLABEL[tabOf(ROUTE)] || TABS.find(t=>t&&t[0]===tabOf(ROUTE))?.[1] || 'the site')}</a></div></div>`; return; }
   const {kind, rec} = found, h = HEADS[kind](rec, found);
   const secs = SECTIONS[kind].filter(s=>!s.show || s.show(rec, found));
   $('#view').innerHTML = `
@@ -1323,8 +1339,8 @@ const chiefOf = r => { const c = (r.sp||[]).find(([,ro])=>ro==='C'); return c ? 
 const spLink = p => `<a class="spn" href="#sponsor-${p.slug}">${esc(p.title)}</a>`;
 const chamberName = ch => ch==='Rep' ? 'House' : 'Senate';
 const isBillHBSB = r => r.x.type==='HB' || r.x.type==='SB';
-function sponsorStats(p, major, sub=null){
-  const bs = p.bills.filter(b=>(major==null || b.r.major===major) && (sub==null || b.r.sub===sub)); const n = k => bs.filter(b=>b.role===k).length;
+function sponsorStats(p, major, sub=null, ga=null){
+  const bs = p.bills.filter(b=>(ga==null || b.r.x.ga===ga) && (major==null || b.r.major===major) && (sub==null || b.r.sub===sub)); const n = k => bs.filter(b=>b.role===k).length;
   const chief = bs.filter(b=>b.role==='C'), cb = chief.filter(b=>isBillHBSB(b.r));
   const tc = [...count(chief.filter(b=>isPol(b.r)), b=>b.r.major)].sort((a,b)=>b[1]-a[1])[0];
   return {all:bs.length, C:n('C'), H:n('H'), O:n('O'), S:n('S'), T:n('T'), law:cb.filter(b=>b.r.x.stage>=5).length, bills:cb.length, top:tc?tc[0]:null};
@@ -1336,12 +1352,12 @@ function sponsorStats(p, major, sub=null){
    chamber, its sponsor there (S); every other member of that chamber on the bill (H, O, T) is a co-sponsor of the lead.
    tie(a,b) counts the bills on which one of them co-sponsored the other's bill. Layout: a small force simulation
    (repulsion between all legislators, springs along ties) with a fixed seed, so the same data always draws the same map. */
-function netData(ch, major, sub){
+function netData(ch, major, sub, ga=null){
   const people = SPON.filter(p=>p.ch===ch), mine = new Set(people.map(p=>p.i));
   const ties = new Map(), signs = new Map(), lead = new Map();   // signs: "co>lead" -> n
   const seen = new Set();
   for (const p of people) for (const {r} of p.bills){ if (seen.has(r)) continue; seen.add(r);
-    if (!isBillHBSB(r) || (major!=null && r.major!==major) || (sub!=null && r.sub!==sub)) continue;
+    if (!isBillHBSB(r) || (ga!=null && r.x.ga!==ga) || (major!=null && r.major!==major) || (sub!=null && r.sub!==sub)) continue;
     const here = (r.sp||[]).filter(([i])=>mine.has(i)); if (here.length < 1) continue;
     const L = here.find(([,ro])=>ro==='C') || here.find(([,ro])=>ro==='S'); if (!L) continue;
     lead.set(L[0], (lead.get(L[0])||0) + 1);
@@ -1390,7 +1406,7 @@ const NETCOL = ['hsl(178 55% 36%)','hsl(32 85% 50%)','hsl(268 42% 55%)','hsl(95 
 let NETVIEW = null;
 function drawNetwork(){
   const box = $('#net'); if (!box) return;
-  const {people, ties, signs, lead} = netData(NET.ch, SN.major, SN.sub);
+  const {people, ties, signs, lead} = netData(NET.ch, SN.major, SN.sub, legGA());
   let edges = [...ties].map(([k,w])=>{ const [a,b]=k.split('-').map(Number); return {a,b,w}; });
   // automatic threshold: the smallest number of shared bills that keeps about four ties per legislator
   let min = NET.min;
@@ -1440,23 +1456,35 @@ function netFocus(i){
   $$('line[data-e]', box).forEach(l=>{ const e = edges[+l.dataset.e]; l.classList.toggle('on', i!=null && (e.a===i || e.b===i)); });
 }
 
+/* ---- Legislature section: sub-tabs and the session menu shared by Sponsors, Parties and Committees (and Bills) ---- */
+const legGA = () => SESSIONS.some(x=>x.ga===BL.ga) ? BL.ga : LATEST;   // a session with bills (the Bills tab can also show one that hasn't started)
+function legBar(cur){
+  return `<div class="legbar"><nav class="vtabs" aria-label="Legislature">${LEGTABS.map(([k,l])=>`<a class="vtab" href="#${k}" ${k===cur?'aria-current="page"':''}>${l}</a>`).join('')}</nav>
+    <label class="ink2 legsess" for="lg-ga">Session <select id="lg-ga">${SESSIONS.slice().reverse().map(x=>`<option value="${x.ga}" ${x.ga===legGA()?'selected':''}>${gaName(x.ga)} (${esc(x.years)})</option>`).join('')}</select></label></div>`;
+}
+function bindLegBar(){
+  $('#lg-ga')?.addEventListener('change', async e=>{ BL.ga = +e.target.value; BL.page = 0; BL.cmte = ''; NET.find = null;
+    await withLoading(need({details:[], links:[BL.ga]})); (RENDER[CUR] || renderSponsors)(); });
+}
+
 /* ---- index tab ---- */
 const SN = { q:'', ch:'all', major:null, sub:null, sort:'C', dir:-1 };
 const NET = { ch:'Sen', min:'auto', find:null, color:'party' };
 const snTopic = () => SN.sub!=null ? CB.subs[SN.sub] : SN.major!=null ? CB.majors[SN.major] : null;
+const inGA = (p, ga) => p.bills.some(b=>b.r.x.ga===ga);
 function renderSponsors(){
-  const reps = SPON.filter(p=>p.ch==='Rep'), sens = SPON.filter(p=>p.ch==='Sen');
-  const most = (k) => SPON.map(p=>[p, p.bills.filter(b=>b.role===k).length]).sort((a,b)=>b[1]-a[1])[0];
+  const ga = legGA(), act = SPON.filter(p=>inGA(p, ga)), reps = act.filter(p=>p.ch==='Rep'), sens = act.filter(p=>p.ch==='Sen');
+  const most = (k) => act.map(p=>[p, p.bills.filter(b=>b.role===k && b.r.x.ga===ga).length]).sort((a,b)=>b[1]-a[1])[0] || [null, 0];
   const [mc, mcn] = most('C'), [mo, mon] = most('O');
-  $('#view').innerHTML = `
-  <div class="phead"><div><div class="eyebrow">${SESSIONS.length>1?`${gaName(SESSIONS[0].ga)} to ${gaName(LATEST)}`:gaName(LATEST)} · built from the bills dataset</div><h1>Bill sponsors</h1>
+  $('#view').innerHTML = `${legBar('sponsors')}
+  <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Bill sponsors</h1>
     <p>Every legislator named as a sponsor on a substantive bill in the bills dataset, with what they introduced, what they signed onto and what became law. Open a legislator for their full record.</p></div>
     <button class="btn primary" id="sn-dl">Download sponsor table (CSV)</button></div>
   <div class="kpis">
-    <div class="kpi"><span class="l">Legislators</span><span class="v">${SPON.length}</span><span class="s">${reps.length} House, ${sens.length} Senate, including members who left or joined mid-term</span></div>
-    <div class="kpi"><span class="l">Most bills as primary sponsor</span><span class="v" style="font-size:18px;padding-block:5px">${spLink(mc)}</span><span class="s">${fmt(mcn)} bills</span></div>
-    <div class="kpi"><span class="l">Most co-sponsorships</span><span class="v" style="font-size:18px;padding-block:5px">${spLink(mo)}</span><span class="s">${fmt(mon)} bills</span></div>
-    <div class="kpi"><span class="l">Sponsorship links</span><span class="v">${fmt(SPON.reduce((a,p)=>a+p.bills.length,0))}</span><span class="s">legislator–bill pairs</span></div>
+    <div class="kpi"><span class="l">Legislators</span><span class="v">${act.length}</span><span class="s">${reps.length} House, ${sens.length} Senate, including members who left or joined mid-term</span></div>
+    <div class="kpi"><span class="l">Most bills as primary sponsor</span><span class="v" style="font-size:18px;padding-block:5px">${mc?spLink(mc):'—'}</span><span class="s">${fmt(mcn)} bills</span></div>
+    <div class="kpi"><span class="l">Most co-sponsorships</span><span class="v" style="font-size:18px;padding-block:5px">${mo?spLink(mo):'—'}</span><span class="s">${fmt(mon)} bills</span></div>
+    <div class="kpi"><span class="l">Sponsorship links</span><span class="v">${fmt(act.reduce((a,p)=>a+p.bills.filter(b=>b.r.x.ga===ga).length,0))}</span><span class="s">legislator–bill pairs</span></div>
   </div>
   <div class="fbar">
     <input type="search" id="sn-q" placeholder="Find a legislator" value="${esc(SN.q)}" aria-label="Find a legislator">
@@ -1484,6 +1512,7 @@ function renderSponsors(){
       <p class="muted" style="margin:0;font-size:12.5px">Names are parsed from the ILGA sponsor field in the bills file. Spelling variants of the same legislator are merged.</p></div>
   </div>
   <div class="tscroll"><table class="dt" id="sn-t" style="min-width:0"><thead><tr>${[['name','Legislator'],['C','Primary sponsor'],['law','Bills that became law']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${k!=='name'?'text-align:right;width:180px':''}">${l} <span class="muted">${SN.sort===k?(SN.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
+  bindLegBar();
   $$('[data-nc]').forEach(b=>b.addEventListener('click', ()=>{ NET.ch=b.dataset.nc; NET.find=null; $$('[data-nc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); drawNetwork(); }));
   $('#net-min').addEventListener('change', e=>{ NET.min = e.target.value==='auto' ? 'auto' : +e.target.value; drawNetwork(); });
   $('#net-col')?.addEventListener('change', e=>{ NET.color = e.target.value; drawNetwork(); });
@@ -1500,7 +1529,7 @@ function renderSponsors(){
 }
 function snRows(){
   const t = parseQuery(SN.q);
-  const rows = SPON.filter(p=>(SN.ch==='all'||p.ch===SN.ch) && t.every(w=>p.title.toLowerCase().includes(w))).map(p=>[p, sponsorStats(p, SN.major, SN.sub)]).filter(([,s])=>SN.major==null || s.C>0);
+  const ga = legGA(), rows = SPON.filter(p=>inGA(p, ga) && (SN.ch==='all'||p.ch===SN.ch) && t.every(w=>p.title.toLowerCase().includes(w))).map(p=>[p, sponsorStats(p, SN.major, SN.sub, ga)]).filter(([,s])=>SN.major==null || s.C>0);
   const key = ([p,s]) => SN.sort==='name' ? p.name.split(' ').slice(-1)[0].replace(/,.*/,'') : s[SN.sort];
   return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (x>y?1:x<y?-1:0)*SN.dir || a[0].name.localeCompare(b[0].name); });
 }
@@ -1508,7 +1537,7 @@ function snUpdate(){
   const rows = snRows();
   // one chart per chamber; they follow the topic filters but not the chamber buttons or name search, which narrow the table
   drawNetwork();
-  const tops = Object.fromEntries(['Sen','Rep'].map(ch=>[ch, SPON.filter(p=>p.ch===ch).map(p=>[p, sponsorStats(p, SN.major, SN.sub)]).filter(([,s])=>s.law>0).sort((a,b)=>b[1].law-a[1].law || b[1].C-a[1].C || a[0].name.localeCompare(b[0].name)).slice(0,10)]));
+  const tops = Object.fromEntries(['Sen','Rep'].map(ch=>[ch, SPON.filter(p=>p.ch===ch).map(p=>[p, sponsorStats(p, SN.major, SN.sub, legGA())]).filter(([,s])=>s.law>0).sort((a,b)=>b[1].law-a[1].law || b[1].C-a[1].C || a[0].name.localeCompare(b[0].name)).slice(0,10)]));
   const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.law))));   // same scale in both charts
   for (const ch of ['Sen','Rep']){
     $('#sn-ct-'+ch).textContent = `${ch==='Sen'?'Senators':'Representatives'}${snTopic()?' · '+snTopic():''}`;
@@ -1691,23 +1720,26 @@ const PNOUN = {Democratic:'Democrats', Republican:'Republicans', Independent:'In
 const billParty = r => chiefOf(r)?.party || null;
 const isBipartisan = r => { const c = chiefOf(r); if (!c?.party) return false; return (r.sp||[]).some(([i,ro])=>ro!=='C' && SPON[i].party && SPON[i].party!==c.party); };
 function renderParties(){
-  if (!LEGS.length){ $('#view').innerHTML = `<div class="phead"><div><h1>Parties</h1><p>Party comparisons appear once the legislator list is published. Run <b>Fetch legislators</b> in the control panel, then Check data and Publish.</p></div></div>`; return; }
-  const ga = LATEST, inCh = r => PT.ch==='all' || chiefOf(r)?.ch===PT.ch;
+  if (!LEGS.length){ $('#view').innerHTML = `${legBar('parties')}<div class="phead"><div><h1>Parties</h1><p>Party comparisons appear once the legislator list is published. Run <b>Fetch legislators</b> in the control panel, then Check data and Publish.</p></div></div>`; return; }
+  const ga = legGA(), inCh = r => PT.ch==='all' || chiefOf(r)?.ch===PT.ch;
+  const allB = billsOf(ga).filter(r=>isBillT(r) && inCh(r)), known = allB.filter(r=>billParty(r)).length;
   const B = billsOf(ga).filter(r=>isBillT(r) && billParty(r) && inCh(r)), by = pt => B.filter(r=>billParty(r)===pt);
-  const seats = LEGSEAT(), seat = (ch, pt) => seats.filter(l=>l.ch===ch && l.party===pt).length;
+  // seats: the current member list for the latest session; for earlier ones, the legislators who sponsored bills in it
+  const seats = ga===LATEST ? LEGSEAT() : SPON.filter(p=>p.party && inGA(p, ga)), seat = (ch, pt) => seats.filter(l=>l.ch===ch && l.party===pt).length;
   const st = Object.fromEntries(PARTIES.map(pt=>{ const b = by(pt); return [pt, {n:b.length, out:b.filter(r=>r.x.stage>=2).length, law:b.filter(r=>r.x.stage>=5).length, bi:b.filter(isBipartisan).length}]; }));
   const lawAll = B.filter(r=>r.x.stage>=5), biAll = B.filter(isBipartisan);
   const chip = pt => `<i class="dot" style="background:var(${PCSS[pt]})"></i>`;
-  $('#view').innerHTML = `
+  $('#view').innerHTML = `${legBar('parties')}
   <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset and the General Assembly's member lists</div><h1>Parties</h1>
     <p>Democrats and Republicans in the ${gaName(ga)}: seats, what each party's members introduce and pass, and how often bills draw sponsors from across the aisle. A bill's party is its primary sponsor's party.</p></div>
     <button class="btn primary" id="pt-dl">Download party comparison (CSV)</button></div>
   <div class="kpis">
-    <div class="kpi"><span class="l">Seats</span><span class="v" style="font-size:19px;line-height:1.3;padding-block:2px"><span style="white-space:nowrap">House ${seat('Rep','Democratic')}–${seat('Rep','Republican')}</span><br><span style="white-space:nowrap">Senate ${seat('Sen','Democratic')}–${seat('Sen','Republican')}</span></span><span class="s">Democrats–Republicans, current members</span></div>
+    <div class="kpi"><span class="l">Seats</span><span class="v" style="font-size:19px;line-height:1.3;padding-block:2px"><span style="white-space:nowrap">House ${seat('Rep','Democratic')}–${seat('Rep','Republican')}</span><br><span style="white-space:nowrap">Senate ${seat('Sen','Democratic')}–${seat('Sen','Republican')}</span></span><span class="s">Democrats–Republicans, ${ga===LATEST?'current members':'legislators who sponsored bills'}</span></div>
     <div class="kpi"><span class="l">Bills introduced</span><span class="v">${pct(st.Democratic.n/Math.max(1,B.length),0)} D</span><span class="s">${fmt(st.Democratic.n)} by Democrats, ${fmt(st.Republican.n)} by Republicans</span></div>
     <div class="kpi"><span class="l">Laws</span><span class="v">${pct(st.Democratic.law/Math.max(1,lawAll.length),0)} D</span><span class="s">${fmt(st.Democratic.law)} by Democrats, ${fmt(st.Republican.law)} by Republicans</span></div>
     <div class="kpi"><span class="l">Bipartisan bills</span><span class="v">${pct(biAll.length/Math.max(1,B.length),0)}</span><span class="s">${fmt(biAll.length)} bills with a sponsor from each party</span></div>
   </div>
+  ${known < allB.length*0.97 ? `<p class="muted" style="font-size:12.5px;margin:-6px 0 12px">The party is known for ${pct(known/Math.max(1,allB.length),0)} of this session's bills; the rest have a primary sponsor who isn't in the published member list. Add them to <code>content/legislators/members.csv</code> to include them.</p>` : ''}
   <div class="fbar"><div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['Rep','House bills'],['Sen','Senate bills']].map(([k,l])=>`<button data-pc="${k}" aria-pressed="${PT.ch===k}">${l}</button>`).join('')}</div>
     <span class="muted" style="font-size:12.5px">By the chamber of the primary sponsor</span></div>
   <div class="grid2">
@@ -1753,6 +1785,7 @@ function renderParties(){
   for (const pt of PARTIES){
     hbars($('#pt-x-'+pt[0]), xrows[pt].map(([p,n,k])=>({label:p.title, value:k/n, color:PCSS[pt], tip:`<div class="r"><span>Bipartisan bills</span><b class="num">${fmt(k)} of ${fmt(n)}</b></div><div class="muted">Click for their page</div>`, onclick:()=>nav('sponsor-'+p.slug)})), {labelW:190, rowH:22, valFmt:v=>pct(v,0), max:xmax});
   }
+  bindLegBar();
   $$('[data-pc]').forEach(b=>b.addEventListener('click', ()=>{ PT.ch=b.dataset.pc; renderParties(); }));
   $$('[data-pa]').forEach(b=>b.addEventListener('click', ()=>{ PT.agenda=b.dataset.pa; renderParties(); }));
   $('#pt-dl').addEventListener('click', ()=>save(`illinois-${ga}-parties-by-topic.csv`, toCSV(['general_assembly','chamber','major_topic','major_topic_label',...PARTIES.flatMap(pt=>[`${pt.toLowerCase()}_bills`,`${pt.toLowerCase()}_share`,`${pt.toLowerCase()}_laws`]),'bipartisan_bills'],
@@ -1795,7 +1828,7 @@ function divBars(el, items, colors, ends, {rowH=21}={}){
    A bill counts for a committee when it was assigned (or re-assigned) to it, and as approved when the committee reported it
    out ("Do Pass…", "Recommends Be Adopted…"). The chamber is the bill's chamber of origin until it arrives in the other one.
    House Rules and Senate Assignments, which route bills to committees, are left out. Committee pages: #committee-104-house-executive */
-const CM = { ga:null, ch:'all', q:'', major:null, sub:null, sort:'n', dir:-1 };
+const CM = { ch:'all', q:'', major:null, sub:null, sort:'n', dir:-1 };
 const CMP = { slug:null, out:'all', major:null, page:0 };
 const CMDATA = {}, CMKEY = new Map();
 const cmName = n => n.replace(/\s+Committee$/,'').replace(/\s*-\s*/g,' - ').replace(/\s+/g,' ').trim();
@@ -1830,12 +1863,12 @@ const cmStats = (c, major=null, sub=null) => { const bs = c.bills.filter(b=>(maj
   return {n:bs.length, ok:bs.filter(b=>b.ok).length, law:bs.filter(b=>b.r.x.stage>=5).length, rate:bs.length?bs.filter(b=>b.ok).length/bs.length:0, top:tc?tc[0]:null}; };
 
 function renderCommittees(){
-  const ga = CM.ga ??= LATEST;
-  if (!CMDATA[ga]){ $('#view').innerHTML = '<div class="loading">Reading committee assignments from the bill histories…</div>';
+  const ga = legGA();
+  if (!CMDATA[ga]){ $('#view').innerHTML = legBar('committees') + '<div class="loading">Reading committee assignments from the bill histories…</div>';
     const me = CUR; withLoading(ensureCm(ga)).then(()=>{ if (CUR===me) renderCommittees(); }); return; }
   const all = CMDATA[ga], B = billsOf(ga).filter(isBillT), assigned = new Set(all.flatMap(c=>c.bills.map(b=>b.r))), okd = new Set(all.flatMap(c=>c.bills.filter(b=>b.ok).map(b=>b.r)));
   const busiest = all.slice().sort((a,b)=>b.bills.length-a.bills.length)[0];
-  $('#view').innerHTML = `
+  $('#view').innerHTML = `${legBar('committees')}
   <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Committees</h1>
     <p>Standing committees of the House and Senate: how many substantive bills each was assigned, how many it approved and how many became law. Read from each bill's ILGA action history. The House Rules Committee and Senate Assignments, which send bills to committees, are left out. Open a committee for its bills.</p></div>
     <button class="btn primary" id="cm-dl">Download committee table (CSV)</button></div>
@@ -1861,6 +1894,7 @@ function renderCommittees(){
         return `<div class="orgcard cmcard"><div style="min-width:0"><a class="oc-name" href="#committee-${c.key}">${esc(c.name)}</a>
           <div class="oc-meta num">${pl(st.n,'bill')} · ${pct(st.rate,0)} approved${st.law?` · ${fmt(st.law)} became law`:''}</div></div></div>`; }).join('')}</section></div>`; }).join('')}
   <div class="tscroll"><table class="dt" id="cm-t" style="min-width:640px"><thead><tr>${[['name','Committee'],['ch','Chamber'],['n','Bills assigned'],['ok','Approved'],['rate','Approval rate'],['law','Became law'],['top','Main topic']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${['n','ok','rate','law'].includes(k)?'text-align:right':''}">${l} <span class="muted">${CM.sort===k?(CM.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
+  bindLegBar();
   let deb; $('#cm-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ CM.q=e.target.value; cmUpdate(); },120); });
   $$('[data-cc]').forEach(b=>b.addEventListener('click', ()=>{ CM.ch=b.dataset.cc; $$('[data-cc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); cmUpdate(); }));
   $('#cm-m').addEventListener('change', e=>{ CM.major=e.target.value===''?null:+e.target.value; CM.sub=null; renderCommittees(); });
@@ -1873,14 +1907,14 @@ function renderCommittees(){
 const cmTopic = () => CM.sub!=null ? CB.subs[CM.sub] : CM.major!=null ? CB.majors[CM.major] : null;
 function cmRows(){
   const t = CM.q.toLowerCase().split(/\s+/).filter(Boolean);
-  const rows = CMDATA[CM.ga].filter(c=>(CM.ch==='all'||c.ch===CM.ch) && t.every(w=>c.name.toLowerCase().includes(w))).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0);
+  const rows = CMDATA[legGA()].filter(c=>(CM.ch==='all'||c.ch===CM.ch) && t.every(w=>c.name.toLowerCase().includes(w))).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0);
   const key = ([c,s]) => CM.sort==='name' ? c.name : CM.sort==='ch' ? c.ch+c.name : CM.sort==='top' ? (s.top!=null?CB.majors[s.top]:'~') : s[CM.sort];
   return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (x>y?1:x<y?-1:0)*CM.dir || b[1].n-a[1].n || a[0].name.localeCompare(b[0].name); });
 }
 function cmUpdate(){
   const rows = cmRows();
   // one chart per chamber, on a shared scale; they follow the topic filters but not the chamber buttons or the search
-  const tops = Object.fromEntries(['Senate','House'].map(ch=>[ch, CMDATA[CM.ga].filter(c=>c.ch===ch).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0).sort((a,b)=>b[1].n-a[1].n).slice(0,12)]));
+  const tops = Object.fromEntries(['Senate','House'].map(ch=>[ch, CMDATA[legGA()].filter(c=>c.ch===ch).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0).sort((a,b)=>b[1].n-a[1].n).slice(0,12)]));
   const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.n))));
   for (const ch of ['Senate','House']){
     $('#cm-ct-'+ch).textContent = `${ch} committees${cmTopic()?' · '+cmTopic():''}`;
@@ -1970,9 +2004,18 @@ function parseRoute(t){
   return null;
 }
 const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees'})[rt.view] || rt.view;
-function navHTML(side){ const cur = tabOf(ROUTE), groups = ['Datasets','Explore']; let g = 0;
-  return TABS.map(t=> t ? `<button role="tab" data-v="${t[0]}" aria-selected="${t[0]===cur}">${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>` : (side?`<div class="lbl">${groups[g++]||''}</div>`:'<span class="sep"></span>')).join(''); }
-function drawNav(){ $('nav.tabs').innerHTML = navHTML(false); $$('[data-v]').forEach(b=>b.addEventListener('click', ()=>nav(b.dataset.v))); }
+const sectionOf = rt => { const t = tabOf(rt); return LEGTABS.some(([k])=>k===t) ? 'legislature' : t; };
+function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
+  const btn = t => `<button role="tab" data-v="${t[0]}" aria-selected="${key(t)===cur}">${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>`;
+  const here = TABS.find(t=>t && key(t)===cur);
+  // phones: one button showing the current section, opening the full menu grouped as on desktop
+  const groups = [], labels = ['', 'Datasets', 'Explore']; let g = 0; groups[0] = [];
+  for (const t of TABS){ if (!t){ groups[++g] = []; continue; } groups[g].push(t); }
+  return `<div class="tabs-wide">${TABS.map(t=> t ? btn(t) : '<span class="sep"></span>').join('')}</div>
+    <button class="menu-btn" aria-expanded="false" aria-controls="menu-panel"><span class="burger" aria-hidden="true"></span>${here?`${here[2]?`<i class="dot ${here[2]}"></i>`:''}${here[1]}`:'Menu'}<span class="muted" style="margin-left:auto;font-weight:400">Menu</span></button>
+    <div class="menu-panel" id="menu-panel" hidden>${groups.map((ts,i)=>`${labels[i]?`<div class="menu-lbl">${labels[i]}</div>`:''}${ts.map(btn).join('')}`).join('')}</div>`; }
+function drawNav(){ const n = $('nav.tabs'); n.innerHTML = navHTML(); $$('[data-v]', n).forEach(b=>b.addEventListener('click', ()=>nav(b.dataset.v)));
+  const mb = $('.menu-btn', n), mp = $('#menu-panel'); mb.addEventListener('click', ()=>{ const open = mp.hidden; mp.hidden = !open; mb.setAttribute('aria-expanded', open); }); }
 /* nav(token): go to a tab or record page, remembering where we came from */
 function nav(token, {record=true, keep=false}={}){
   if (!parseRoute(token)) token = 'bills';
@@ -1996,8 +2039,7 @@ function needsFor(rt){
     case 'bill': { const r = recordFor(rt)?.rec; return {details:r?[r.x.ga]:[], links:all}; }
     case 'search': return {details: SR.gas==='latest' ? [LATEST] : all, links:all};
     case 'topics': case 'sponsors': case 'sponsor': return {details:[], links:all};
-    case 'committees': return {details:[], links:[CM.ga ?? LATEST]};
-    case 'parties': return {details:[], links:[LATEST]};
+    case 'committees': case 'parties': return {details:[], links:[BL.ga ?? LATEST]};
     case 'committee': return {details:[], links:[rt.ga]};
     default: return {details:[], links:[]};
   }
