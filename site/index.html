@@ -675,7 +675,7 @@ function renderBills(){
     return; }
   if (V==='activity') return renderActivity(all, header);
   $('#view').innerHTML = header + `
-  <div class="funnel" aria-label="Substantive bills by furthest stage reached">${STAGES.map((s,i)=>{ const link = i===0?'bills-introduced':i===1?'bills-committee':i===4?'bills':null, on = (i===0&&V==='intro')||(i===1&&V==='committee')||(i===4&&V==='law');
+  <div class="funnel" aria-label="Substantive bills by furthest stage reached">${STAGES.map((s,i)=>[s,i]).filter(([,i])=>i!==2 && i!==3).map(([s,i])=>{ const link = i===0?'bills-introduced':i===1?'bills-committee':i===4?'bills':null, on = (i===0&&V==='intro')||(i===1&&V==='committee')||(i===4&&V==='law');
     const inner = `<span class="fs">${s}</span><span class="fn num">${fmt(funnel[i])}</span><span class="fp">${i?pct(funnel[i]/Math.max(1,funnel[0]),1)+' of bills':'substantive bills'}</span><i class="fbar-in" style="width:${(funnel[i]/Math.max(1,funnel[0])*100).toFixed(1)}%"></i>`;
     return link ? `<a class="fstep ${on?'on':''}" href="#${link}">${inner}</a>` : `<div class="fstep">${inner}</div>`; }).join('<span class="farrow" aria-hidden="true">›</span>')}</div>
   <p class="muted" style="font-size:12px;margin:-6px 0 14px">${BL.major!=null?`Bills on ${esc(BL.sub!=null?CB.subs[BL.sub]:CB.majors[BL.major])} only. `:''}Furthest stage each bill reached, read from its ILGA action history. "Out of committee" includes bills sent straight to the floor by Senate Assignments.</p>
