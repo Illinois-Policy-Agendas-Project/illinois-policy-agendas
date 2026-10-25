@@ -225,6 +225,9 @@ table.cmp tbody tr{cursor:pointer} table.cmp tbody tr:hover td{background:var(--
 .org-logo.mono{background:var(--t-tt);border-color:transparent;color:var(--ink);font-weight:700;letter-spacing:.02em;font-family:var(--f-ui)}
 .org-logo.mono.lg{font-size:24px} .org-logo.mono.xs{font-size:8.5px;letter-spacing:0}
 .rh-org{display:inline-flex;align-items:center;gap:7px}
+/* organization rows in the topic table: names wrap inside their own column instead of running into the cells */
+table.heat th.rh:has(.rh-org){max-width:none;min-width:250px;width:250px;white-space:normal;overflow:visible}
+table.heat .rh-org{display:flex;line-height:1.25} table.heat .rh-org .org-logo{width:48px;flex:none} table.heat .rh-org .muted{white-space:nowrap}
 @media (max-width:560px){ .org-logo.lg{width:60px;height:60px;padding:6px} .org-logo.mono.lg{font-size:18px} }
 .vtabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px;overflow-x:auto}
 .vtab{padding:10px 14px;text-decoration:none;color:var(--ink-2);border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap;display:inline-flex;gap:8px;align-items:baseline;font-size:15px}
