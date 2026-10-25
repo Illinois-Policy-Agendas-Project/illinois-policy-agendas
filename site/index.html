@@ -1557,11 +1557,6 @@ function renderCommittees(){
     <div class="kpi"><span class="l">Approved by a committee</span><span class="v">${fmt(okd.size)}</span><span class="s">${pct(okd.size/Math.max(1,assigned.size))} of bills sent to one</span></div>
     <div class="kpi"><span class="l">Most bills assigned</span><span class="v" style="font-size:18px;padding-block:5px">${busiest?cmLink(busiest):'—'}</span><span class="s">${busiest?`${busiest.ch} · ${pl(busiest.bills.length,'bill')}`:''}</span></div>
   </div>
-  ${['Senate','House'].map(ch=>{ const cs = all.filter(c=>c.ch===ch).sort((a,b)=>a.name.localeCompare(b.name));
-    return `<div class="panel" style="margin-bottom:16px"><div class="chead"><h3>${ch} committees</h3><span class="muted" style="font-size:12px">${cs.length} committees · click one for its bills</span></div>
-      <section class="orglist cmlist" aria-label="${ch} committees">${cs.map(c=>{ const st = cmStats(c);
-        return `<div class="orgcard cmcard"><div style="min-width:0"><a class="oc-name" href="#committee-${c.key}">${esc(c.name)}</a>
-          <div class="oc-meta num">${pl(st.n,'bill')} · ${pct(st.rate,0)} approved${st.law?` · ${fmt(st.law)} became law`:''}</div></div></div>`; }).join('')}</section></div>`; }).join('')}
   <div class="fbar">
     <input type="search" id="cm-q" placeholder="Find a committee" value="${esc(CM.q)}" aria-label="Find a committee">
     <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['House','House'],['Senate','Senate']].map(([k,l])=>`<button data-cc="${k}" aria-pressed="${CM.ch===k}">${l}</button>`).join('')}</div>
@@ -1572,6 +1567,11 @@ function renderCommittees(){
     <div class="panel"><div class="chead"><h3 id="cm-ct-Senate"></h3><span class="muted" style="font-size:12px">Bills assigned · darker part approved</span></div><div id="cm-top-Senate"></div></div>
     <div class="panel"><div class="chead"><h3 id="cm-ct-House"></h3><span class="muted" style="font-size:12px">Bills assigned · darker part approved</span></div><div id="cm-top-House"></div></div>
   </div>
+  ${['Senate','House'].map(ch=>{ const cs = all.filter(c=>c.ch===ch).sort((a,b)=>a.name.localeCompare(b.name));
+    return `<div class="panel" style="margin-bottom:16px"><div class="chead"><h3>${ch} committees</h3><span class="muted" style="font-size:12px">${cs.length} committees · click one for its bills</span></div>
+      <section class="orglist cmlist" aria-label="${ch} committees">${cs.map(c=>{ const st = cmStats(c);
+        return `<div class="orgcard cmcard"><div style="min-width:0"><a class="oc-name" href="#committee-${c.key}">${esc(c.name)}</a>
+          <div class="oc-meta num">${pl(st.n,'bill')} · ${pct(st.rate,0)} approved${st.law?` · ${fmt(st.law)} became law`:''}</div></div></div>`; }).join('')}</section></div>`; }).join('')}
   <div class="tscroll"><table class="dt" id="cm-t" style="min-width:640px"><thead><tr>${[['name','Committee'],['ch','Chamber'],['n','Bills assigned'],['ok','Approved'],['rate','Approval rate'],['law','Became law'],['top','Main topic']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${['n','ok','rate','law'].includes(k)?'text-align:right':''}">${l} <span class="muted">${CM.sort===k?(CM.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
   let deb; $('#cm-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ CM.q=e.target.value; cmUpdate(); },120); });
   $$('[data-cc]').forEach(b=>b.addEventListener('click', ()=>{ CM.ch=b.dataset.cc; $$('[data-cc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); cmUpdate(); }));
