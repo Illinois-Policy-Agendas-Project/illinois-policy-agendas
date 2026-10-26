@@ -17,12 +17,13 @@ methods = """Records are coded by hand using the project's Illinois subtopic ind
 codebook = ""
 codebook_label = "Codebook"
 
-# Logos go in content/home/logos/. Use each organization's official logo with its permission.
-[[sponsors]]
-name = "Institute of Government and Public Affairs"
-role = "Sponsored by"
-url = "https://igpa.uillinois.edu"
-logo = "igpa.png"
+# Sponsor logos on the home page (none shown now: IGPA and UIC Political Science appear in the site footer).
+# To show one here, add a block like this; logos go in content/home/logos/. Use logos with each organization's permission.
+# [[sponsors]]
+# name = "Institute of Government and Public Affairs"
+# role = "Sponsored by"
+# url = "https://igpa.uillinois.edu"
+# logo = "igpa.png"
 
 # People. `photo` is optional (a file in content/home/photos/); without one, initials are shown.
 [[people]]
