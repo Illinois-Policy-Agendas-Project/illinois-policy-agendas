@@ -701,6 +701,14 @@ def build_home(cfg, rep):
         else:
             copies.append((f, f'site/codebook{f.suffix.lower()}'))
             h['codebook_url'] = f'data/site/codebook{f.suffix.lower()}'
+            if f.suffix.lower() == '.docx':  # a Word codebook also becomes the site's Codebook page
+                try:
+                    import codebook_doc
+                    h['codebook_doc'] = codebook_doc.parse(f)
+                    n = sum(len(m['subs']) for m in h['codebook_doc']['majors'])
+                    rep.note(ds, f'Codebook page built from {f.name}: {len(h["codebook_doc"]["majors"])} major topics, {n} subtopics.')
+                except Exception as e:  # noqa: BLE001
+                    rep.warn(ds, f'Could not read {f.name} for the Codebook page ({e}); the home page links to the file instead.')
     else:
         rep.note(ds, 'No codebook yet; the home page shows "Codebook (coming soon)". Add it under `codebook` in home.toml.')
     h.pop('visualization', None)
@@ -779,6 +787,9 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
         files['legislators'] = dump(d / 'legislators.json', legislators)
     files['governors'] = dump(d / 'governors.json', list(governors))
     if home:
+        doc = home.pop('codebook_doc', None)
+        if doc:
+            files['codebook_doc'] = dump(d / 'codebook_doc.json', doc)
         files['home'] = dump(d / 'home.json', home)
     files['tt'] = dump(d / 'thinktanks.json', {'cols': ['id', 'org', 'date', 'year', 'title', 'abstract', 'url', 'pdf', 'sub'], 'rows': tt})
     manifest = {

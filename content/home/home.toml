@@ -14,7 +14,7 @@ methods = """Records are coded by hand using the project's Illinois subtopic ind
 # Codebook link on the home page. Put the file in this folder (content/home/) and give its name,
 # e.g. "codebook.pdf" (PDF, Word, Excel or CSV), or give a full web address.
 # Leave it blank until it's ready; the home page then shows "Codebook (coming soon)".
-codebook = ""
+codebook = "codebook.docx"
 codebook_label = "Codebook"
 
 # Sponsor logos on the home page (none shown now: IGPA and UIC Political Science appear in the site footer).

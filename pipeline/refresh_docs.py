@@ -38,6 +38,11 @@ def main():
     man['title'] = cfg.get('title', man.get('title', ''))
     man['v']['orgs'] = B.dump(d / 'orgs.json', profiles or {})
     if home:
+        doc = home.pop('codebook_doc', None)
+        if doc:
+            man['v']['codebook_doc'] = B.dump(d / 'codebook_doc.json', doc)
+        else:
+            man['v'].pop('codebook_doc', None)
         man['v']['home'] = B.dump(d / 'home.json', home)
     if legislators:
         man['v']['legislators'] = B.dump(d / 'legislators.json', legislators)
