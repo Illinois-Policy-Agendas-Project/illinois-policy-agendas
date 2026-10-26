@@ -2,9 +2,9 @@
 <title>Illinois Policy Agendas Project</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&family=Figtree:wght@400;500;600;700&family=Literata:opsz,wght@7..72,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Oswald:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: masthead + tabs (home, three datasets, topics, the legislature (sponsors, parties, committees), search). Light-only by design ("Lakefront"). */
+/* Layout: masthead + tabs (home, three datasets, topics, the legislature (sponsors, parties, committees), search). Light-only. Styled after igpa.uillinois.edu (see the IGPA block at the end). */
 :root{--pd:hsl(214 65% 48%);--pr:hsl(357 62% 52%);--pi:hsl(275 40% 55%);
   color-scheme:light;
   --bg:#ffffff; --band:#eef5fc; --sunk:#f4f7fb; --surface:#ffffff;
@@ -369,6 +369,64 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 }
 @media (max-width: 560px){ h1{font-size:23px} .speech{font-size:16px} .bigsearch input{font-size:16px} }
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+/* ===== IGPA look (igpa.uillinois.edu): navy masthead and footer, Oswald headings, Lato text, square navy buttons, pale band behind page titles.
+   Dataset colors (bills blue, speeches orange, think tanks green) stay, so charts read the same. ===== */
+:root{
+  --navy:#13294b; --navy-2:#172554; --navy-3:#1d3c5d;
+  --bg:#ffffff; --band:#f0f3f8; --sunk:#f5f6f8; --surface:#ffffff;
+  --ink:#051932; --ink-2:#3d4a5c; --muted:#6b7280; --line:#e5e7eb; --line-2:#cbd2dc;
+  --accent:#24549f; --btn:#13294b; --btn-ink:#ffffff; --sel:#e7edf7;
+  --f-display:"Oswald","Arial Narrow",Arial,sans-serif; --f-ui:"Lato",Arial,sans-serif;
+  --r:2px;
+}
+body{font-size:15.5px;margin:0}
+.rec-head h1{text-transform:none;font-size:34px}
+body::before{background:var(--navy)}
+h1,h2{font-family:var(--f-display);font-weight:400;color:var(--navy-2);letter-spacing:.005em}
+h1{font-size:36px;line-height:1.15;text-transform:uppercase} h2{font-size:24px;line-height:1.2}
+h3{font-family:var(--f-ui);font-weight:700;color:var(--navy-2)}
+.eyebrow{font-weight:700;color:var(--ink-2)}
+/* masthead */
+header.mast{background:var(--navy);border-bottom:0;color:#fff}
+.mast .wrap{padding-block:16px 0}
+.brand b{font-family:var(--f-display);font-weight:400;font-size:24px;letter-spacing:.03em;text-transform:uppercase;color:#fff}
+.brand span{color:rgba(255,255,255,.72);font-size:12.5px} .upd{color:rgba(255,255,255,.72)}
+nav.tabs button{color:rgba(255,255,255,.82);font-size:15px;border-bottom-width:4px}
+nav.tabs button:hover{color:#fff}
+nav.tabs button[aria-selected="true"]{color:#fff;font-weight:700;border-bottom-color:#fff}
+nav.tabs .sep{background:rgba(255,255,255,.25)}
+/* pale band behind page titles, full width */
+main{overflow-x:clip}
+.phead,.home-hero,.rec-head{position:relative}
+.phead::before,.home-hero::before,.rec-head::before{content:"";position:absolute;z-index:-1;top:-26px;bottom:0;left:-100vw;right:-100vw;background:var(--band)}
+.phead{padding-bottom:22px;margin-bottom:22px} .rec-head{border-bottom:0}
+.legbar + .phead::before{top:-8px} .rec-head::before{top:-80px} .crumbs{position:relative}
+.home-hero{max-width:none;padding-bottom:30px;margin-bottom:24px} .home-hero > *{max-width:860px}
+.home-title{font-family:var(--f-display);font-weight:400;font-size:54px;line-height:1.05;text-transform:uppercase;color:var(--navy-2);letter-spacing:.005em}
+/* buttons and controls: square, navy */
+.btn{border-radius:var(--r);font-weight:700;font-size:13.5px}
+.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy);padding:9px 16px}
+.btn.primary:hover{background:var(--navy-3);border-color:var(--navy-3)}
+.btn.primary::after{content:"→";font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
+.vtab[aria-current="page"]{color:var(--navy-2);font-weight:700;border-bottom-color:var(--navy)}
+.chip{border-radius:3px}
+.panel{border-radius:var(--r)}
+/* statistics: large, bold, navy */
+.kpi{background:var(--sunk);border-left:3px solid var(--navy)}
+.kpi .v{font-weight:700;font-size:28px;color:var(--navy-2)}
+/* footer */
+footer.foot{background:var(--navy);color:rgba(255,255,255,.85);margin-top:24px;font-size:14px}
+footer.foot .wrap{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:28px;padding-block:36px 18px}
+footer.foot b.fname{font-family:var(--f-display);font-weight:400;font-size:22px;letter-spacing:.03em;text-transform:uppercase;color:#fff;display:block;margin-bottom:8px}
+footer.foot a{color:#fff;text-decoration:none} footer.foot a:hover{text-decoration:underline}
+footer.foot .fh{font-weight:700;color:#fff;margin-bottom:6px}
+footer.foot ul{list-style:none;margin:0;padding:0} footer.foot li{padding:7px 0;border-top:1px solid rgba(255,255,255,.18)}
+footer.foot .fcopy{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.18);padding-top:14px;font-size:12.5px;color:rgba(255,255,255,.7)}
+@media (max-width:760px){ footer.foot .wrap{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:560px){ h1{font-size:28px} .home-title{font-size:36px} .rec-head h1{font-size:26px}
+  nav.tabs .menu-btn{border-color:rgba(255,255,255,.35)} }
 </style>
 
 <header class="mast">
@@ -379,6 +437,13 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 </header>
 <div class="shell">
   <main class="wrap" id="view"><div class="loading">Loading 19,656 coded records…</div></main>
+  <footer class="foot"><div class="wrap">
+    <div><b class="fname">Illinois Policy Agendas Project</b>
+      <div>Sponsored by the <a href="https://igpa.uillinois.edu" target="_blank" rel="noopener">Institute of Government and Public Affairs</a>, University of Illinois System. Based in the Department of Political Science, University of Illinois Chicago.</div></div>
+    <div><div class="fh">Data</div><ul><li><a href="#bills">Bills</a></li><li><a href="#speeches">State of the State speeches</a></li><li><a href="#thinktanks">Think tank reports</a></li></ul></div>
+    <div><div class="fh">Explore</div><ul><li><a href="#topics">Topics</a></li><li><a href="#sponsors">Legislature</a></li><li><a href="#search">Search</a></li></ul></div>
+    <div class="fcopy">© <span id="fyear"></span> Illinois Policy Agendas Project (IPAP). Coded with the Illinois subtopic index, adapted from the Comparative Agendas Project. Legislative data and photos: Illinois General Assembly.</div>
+  </div></footer>
 </div>
 <div id="tip" hidden></div>
 <div class="toast" id="toast" hidden></div>
@@ -2057,6 +2122,7 @@ let lastW = innerWidth, rz; addEventListener('resize', ()=>{ if (Math.abs(innerW
 function labelTables(root){ for (const t of root.querySelectorAll('table.dt')){ const hs = [...t.querySelectorAll('thead th')].map(th=>th.textContent.replace(/[▲▼]/g,'').trim());
   for (const tr of t.querySelectorAll('tbody tr')) [...tr.children].forEach((td,i)=>{ if (td.tagName==='TD' && !td.hasAttribute('data-l') && td.colSpan===1) td.setAttribute('data-l', hs[i]||''); }); } }
 new MutationObserver(()=>labelTables(document)).observe(document.getElementById('view'), {childList:true, subtree:true});
+document.getElementById('fyear').textContent = new Date().getFullYear();
 let start = location.hash.slice(1); if (!parseRoute(start||'')) start='home';
 nav(start, {record:false});
 load().then(()=>nav(CUR, {record:false, keep:true})).catch(e=>{ $('#view').innerHTML = `<div class="loading">Could not load the data files (${esc(e.message)}). Reload the page to try again.</div>`; });
