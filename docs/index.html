@@ -502,7 +502,10 @@ const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function hl(text, terms, max){ let t = String(text ?? ''); if (max && t.length > max) t = t.slice(0,max).replace(/\s\S*$/,'') + '…'; const h = esc(t);
   return terms.length ? h.replace(new RegExp('(' + terms.map(x=>reEsc(esc(x))).join('|') + ')','gi'), '<mark>$1</mark>') : h; }
 const dsChip = ds => `<span class="chip dsb ${DS[ds].cls}"><i class="dot"></i>${DS[ds].short}</span>`;
-const subChip = s => s == null ? `<span class="code">—</span> <span class="muted">Not yet coded</span>` : `<span class="code">${s===NOPOL?'−555':s}</span> ${esc(subName(s))}`;
+/* a subtopic by name (its code shows on hover); withCode puts the code in front, for the coding details on record pages */
+const subChip = (s, withCode=false) => s == null ? `<span class="muted">Not yet coded</span>`
+  : withCode ? `<span class="code">${s===NOPOL?'−555':s}</span> ${esc(subName(s))}` : `<span title="Subtopic ${s===NOPOL?'−555':s}">${esc(subName(s))}</span>`;
+const majChip = m => m == null ? '<span class="muted">—</span>' : `<span title="Major topic ${m}">${esc(majorName(m))}</span>`;
 const majorOptions = (sel, label='All topics') => `<option value="">${label}</option>` + MAJORS().map(m=>`<option value="${m}" ${sel===m?'selected':''}>${m} · ${esc(CB.majors[m])}</option>`).join('');
 const subOptions = (m, sel) => m==null ? '' : `<option value="">All subtopics in ${m}</option>` + subsOf(m).map(s=>`<option value="${s}" ${sel===s?'selected':''}>${s} · ${esc(CB.subs[s])}</option>`).join('');
 
@@ -984,7 +987,7 @@ function renderSpeeches(){
         <span class="muted num" style="font-size:12px">${fmt(ss.length)} sentences · ${M==null?`${fmt(n)} on policy`:`${fmt(n)} on ${esc(CB.majors[M].split(/,| and /)[0])}`}</span></a>`; }).join('')}</div></div>
   <div class="panel"><div class="chead"><h3>Topic share of each address</h3><span class="muted" style="font-size:12px">Share of the year's policy sentences. Click a cell to open that address with the topic marked.</span></div>
     <div class="hscroll"><table class="heat"><thead><tr class="gov"><th></th>${spans.map((s,i)=>`<th colspan="${s.n}">${esc(govLabel(s.g, years[spans.slice(0,i).reduce((a,x)=>a+x.n,0)]))}</th>`).join('')}</tr><tr><th></th>${years.map(y=>`<th>'${String(y).slice(2)}</th>`).join('')}</tr></thead>
-    <tbody>${MAJORS().map(m=>`<tr><th class="rh" title="${esc(CB.majors[m])}"><span class="code">${m}</span> ${esc(CB.majors[m])}</th>${years.map(y=>{ const v=share(m,y); return `<td data-m="${m}" data-y="${y}" style="${heatBg(v,mx)}">${v>=0.005?Math.round(v*100):v>0?'<1':'·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+    <tbody>${MAJORS().map(m=>`<tr><th class="rh" title="Major topic ${m}: ${esc(CB.majors[m])}">${esc(CB.majors[m])}</th>${years.map(y=>{ const v=share(m,y); return `<td data-m="${m}" data-y="${y}" style="${heatBg(v,mx)}">${v>=0.005?Math.round(v*100):v>0?'<1':'·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="muted" style="font-size:12px">Values are percentages. Darker cells mean a larger share.</div></div>`;
   $$('table.heat td').forEach(td=>{ const m=+td.dataset.m, y=+td.dataset.y;
     bindTip(td, ()=>`<div class="t">${y} · ${esc(govOf(y))}</div><div>${esc(CB.majors[m])}</div><div class="r"><span>Share of policy sentences</span><b class="num">${pct(share(m,y))}</b></div><div class="muted">${fmt(cell.get(m+':'+y)||0)} of ${fmt(tot.get(y)||0)} sentences</div>`);
@@ -1271,7 +1274,7 @@ function relGroup(title, ds, rows, onAll){
 const newest = rows => rows.slice().sort((a,b)=>(b.date||String(b.year||0)).localeCompare(a.date||String(a.year||0)) || b.id-a.id);
 function codingSection(r, el){
   if (r.sub==null){ el.innerHTML = `<p class="ink2" style="margin:0">This record has not been coded yet.</p>`; return; }
-  el.innerHTML = `<div class="coding"><div><span class="eyebrow">Subtopic</span><div>${subChip(r.sub)}</div></div>
+  el.innerHTML = `<div class="coding"><div><span class="eyebrow">Subtopic</span><div>${subChip(r.sub, true)}</div></div>
     ${r.sub!==NOPOL?`<div><span class="eyebrow">Major topic</span><div><span class="code">${r.major}</span> ${esc(majorName(r.major))}</div></div>`:''}</div>
     ${r.sub!==NOPOL?`<button class="btn" id="cd-go">Explore this topic →</button>`:'<p class="muted" style="margin:0;font-size:13px">−555 marks items without policy content, such as memorials or ceremonial remarks.</p>'}`;
   $('#cd-go', el)?.addEventListener('click', ()=>{ Object.assign(TP,{major:r.major, sub:r.sub, ds:'all', page:0}); nav('topics'); });
@@ -1281,7 +1284,7 @@ function crossSection(r, el, skipDs){
   if (!isPol(r)){ el.innerHTML = `<p class="muted" style="margin:0">Related records are matched on subtopic, and this record has none.</p>`; return; }
   const same = ds => newest(byDs(ds).filter(o=>o.sub===r.sub && o!==r));
   const toSearch = ds => ()=>{ Object.assign(TP,{major:r.major, sub:r.sub, ds, page:0}); nav('topics'); };
-  el.innerHTML = `<p class="ink2" style="margin:0 0 4px;font-size:13.5px">Other records coded <span class="code">${r.sub}</span> ${esc(subName(r.sub))}</p><div class="rels">` +
+  el.innerHTML = `<p class="ink2" style="margin:0 0 4px;font-size:13.5px">Other records coded ${subChip(r.sub)}</p><div class="rels">` +
     DSK.filter(k=>k!==skipDs).map(k=>relGroup(k==='bills'?'Substantive bills':k==='sots'?'Speech sentences':'Think tank reports', k, same(k), toSearch(k))).join('') + `</div>`;
 }
 
@@ -1686,7 +1689,7 @@ SECTIONS.sponsor.push(
       const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r)).map(b=>b.r); const subs = [...count(mine, r=>r.sub)].sort((a,b)=>b[1]-a[1]).slice(0,3);
       if (!subs.length){ el.innerHTML = '<p class="muted" style="margin:0;font-size:13px">No policy-coded bills to match on.</p>'; return; }
       el.innerHTML = `<p class="ink2" style="margin:0;font-size:13px">How often governors and think tanks address the subtopics this legislator introduces most.</p>` + subs.map(([s,n])=>{ const sp = byDs('sots').filter(r=>r.sub===s).length, tt = byDs('tt').filter(r=>r.sub===s).length;
-        return `<button class="subrow" data-s="${s}"><span><span class="code">${s}</span> ${esc(CB.subs[s])}</span><span class="muted num" style="font-size:12px">${fmt(n)} of their bills · ${fmt(sp)} speech sentences · ${fmt(tt)} reports</span></button>`; }).join('');
+        return `<button class="subrow" data-s="${s}"><span>${subChip(s)}</span><span class="muted num" style="font-size:12px">${fmt(n)} of their bills · ${fmt(sp)} speech sentences · ${fmt(tt)} reports</span></button>`; }).join('');
       $$('.subrow', el).forEach(b=>b.addEventListener('click', ()=>{ const s=+b.dataset.s; Object.assign(TP,{major:Math.floor(s/100), sub:s, ds:'all', page:0}); nav('topics'); })); } }
 );
 
@@ -1744,7 +1747,7 @@ SECTIONS.org.push(
       const bar = (v, cls) => `<div class="cbar"><i class="${cls}" style="width:${(v/mx*100).toFixed(1)}%"></i><span>${pct(v,0)}</span></div>`;
       el.innerHTML = `<p class="ink2" style="margin:0;font-size:13.5px">Share of each source's policy items in a major topic: this organization's ${fmt(me.n)} coded reports, all think tanks, governors' State of the State sentences, and bills. Click a topic to list those reports.</p>
         <div class="hscroll"><table class="cmp"><thead><tr><th>Major topic</th><th class="ds-tt"><i class="dot"></i> This organization</th><th>All think tanks</th><th class="ds-sots"><i class="dot"></i> Governors</th><th class="ds-bills"><i class="dot"></i> Bills</th></tr></thead>
-        <tbody>${top.map(m=>`<tr data-m="${m}" class="${OG.major===m?'on':''}"><td><span class="code">${m}</span> ${esc(CB.majors[m])}</td><td>${bar(me.get(m),'ds-tt')}</td><td>${bar(tt.get(m),'muted-b')}</td><td>${bar(sp.get(m),'ds-sots')}</td><td>${bar(bl.get(m),'ds-bills')}</td></tr>`).join('')}</tbody></table></div>`;
+        <tbody>${top.map(m=>`<tr data-m="${m}" class="${OG.major===m?'on':''}"><td>${majChip(m)}</td><td>${bar(me.get(m),'ds-tt')}</td><td>${bar(tt.get(m),'muted-b')}</td><td>${bar(sp.get(m),'ds-sots')}</td><td>${bar(bl.get(m),'ds-bills')}</td></tr>`).join('')}</tbody></table></div>`;
       $$('tr[data-m]', el).forEach(tr=>tr.addEventListener('click', ()=>{ const m=+tr.dataset.m; OG.major = OG.major===m?null:m; OG.page=0; renderRecord(); $('#sec-reports').scrollIntoView({behavior:'smooth'}); })); } },
   { id:'reports', title:'Reports', render(o, el){
       el.innerHTML = `<div class="fbar" style="margin:0"><input type="search" id="og-q" placeholder="Search their titles and abstracts" value="${esc(OG.q)}" aria-label="Search reports">
@@ -1766,7 +1769,7 @@ SECTIONS.org.push(
       const P = ORGPROF[o.name] || {}, web = orgWebsite(o);
       el.innerHTML = factList([['Organization', esc(P.official_name || o.name)], P.founded && ['Founded', P.founded], P.based && ['Based in', esc(P.based)], web && ['Website', `<a href="${esc(web.url)}" target="_blank" rel="noopener">${esc(web.host)} ↗</a>`],
         ['Reports', fmt(o.reports.length)], ['First report', dated[0]||'—'], ['Latest report', dated[dated.length-1]||'—'],
-        top && ['Main topic', `<span class="code">${top[0]}</span> ${esc(CB.majors[top[0]])}`], ['With a PDF', fmt(o.reports.filter(r=>r.x.pdf).length)]]); } },
+        top && ['Main topic', majChip(top[0])], ['With a PDF', fmt(o.reports.filter(r=>r.x.pdf).length)]]); } },
   { id:'similar', title:'Closest agendas', side:true, render(o, el){
       const me = majorShares(o.reports);
       const rows = orgs().filter(x=>x!==o).map(x=>[x, cosine(me, majorShares(x.reports))]).sort((a,b)=>b[1]-a[1]);
@@ -1776,7 +1779,7 @@ SECTIONS.org.push(
       const subs = [...count(o.reports.filter(isPol), r=>r.sub)].sort((a,b)=>b[1]-a[1]).slice(0,4);
       el.innerHTML = `<p class="ink2" style="margin:0;font-size:13px">How often bills and governors take up this organization's most frequent subtopics.</p>` + subs.map(([s,n])=>{
         const b = byDs('bills').filter(r=>r.sub===s).length, sp = byDs('sots').filter(r=>r.sub===s).length;
-        return `<button class="subrow" data-s="${s}"><span><span class="code">${s}</span> ${esc(CB.subs[s])}</span><span class="muted num" style="font-size:12px">${pl(n,'report')} · ${pl(b,'bill')} · ${pl(sp,'speech sentence')}</span></button>`; }).join('');
+        return `<button class="subrow" data-s="${s}"><span>${subChip(s)}</span><span class="muted num" style="font-size:12px">${pl(n,'report')} · ${pl(b,'bill')} · ${pl(sp,'speech sentence')}</span></button>`; }).join('');
       $$('.subrow', el).forEach(btn=>btn.addEventListener('click', ()=>{ const s=+btn.dataset.s; Object.assign(TP,{major:Math.floor(s/100), sub:s, ds:'all', page:0}); nav('topics'); })); } }
 );
 
@@ -2000,7 +2003,7 @@ function cmUpdate(){
   }
   $('#cm-t tbody').innerHTML = rows.map(([c,s])=>`<tr class="row" data-h="#committee-${c.key}"><td>${cmLink(c)}</td><td>${c.ch}</td>
     <td class="num" style="text-align:right">${fmt(s.n)}</td><td class="num" style="text-align:right">${fmt(s.ok)}</td><td class="num" style="text-align:right">${pct(s.rate,0)}</td>
-    <td class="num" style="text-align:right">${s.law?fmt(s.law):'<span class="muted">·</span>'}</td><td>${s.top!=null?`<span class="code">${s.top}</span> ${esc(CB.majors[s.top])}`:'<span class="muted">—</span>'}</td></tr>`).join('')
+    <td class="num" style="text-align:right">${s.law?fmt(s.law):'<span class="muted">·</span>'}</td><td>${majChip(s.top)}</td></tr>`).join('')
     || '<tr><td colspan="7" class="muted" style="padding:24px">No committees match.</td></tr>';
   $$('#cm-t tr.row').forEach(tr=>tr.addEventListener('click', e=>{ if (!e.target.closest('a')) nav(tr.dataset.h.slice(1)); }));
 }
@@ -2052,7 +2055,7 @@ SECTIONS.committee.push(
       draw(); } },
   { id:'facts', title:'At a glance', side:true, render(c, el){ const s = cmStats(c);
       el.innerHTML = factList([['Chamber', c.ch], ['Session', `${gaName(c.ga)} (${esc(gaYears(c.ga))})`], ['Bills assigned', fmt(s.n)], ['Approved', `${fmt(s.ok)} (${pct(s.rate,0)})`], ['Became law', fmt(s.law)],
-        s.top!=null && ['Main topic', `<span class="code">${s.top}</span> ${esc(CB.majors[s.top])}`]]); } },
+        s.top!=null && ['Main topic', majChip(s.top)]]); } },
   { id:'sponsors', title:'Whose bills it hears', side:true, render(c, el){
       const by = new Map(); for (const b of c.bills){ const p = chiefOf(b.r); if (!p) continue; const o = by.get(p.i) || {p, n:0, ok:0}; o.n++; o.ok += b.ok; by.set(p.i, o); }
       const top = [...by.values()].sort((a,b)=>b.n-a.n || b.ok-a.ok).slice(0,8);
