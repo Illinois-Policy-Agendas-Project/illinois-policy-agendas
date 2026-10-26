@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the Illinois Policy Agendas website tools.
+"""Start the Illinois Policy Agendas Project (IPAP) website tools.
 
 This file lives in Dropbox (IAP/Website), next to the project's data. Each time it runs it:
   1. gets the latest site code from GitHub into ~/illinois-policy-agendas (outside Dropbox),

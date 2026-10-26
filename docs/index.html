@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Illinois Policy Agendas</title>
+<title>Illinois Policy Agendas Project</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&family=Figtree:wght@400;500;600;700&family=Literata:opsz,wght@7..72,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -373,7 +373,7 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 
 <header class="mast">
   <div class="wrap">
-    <div class="brand"><a href="#home" class="brand-link"><b>Illinois Policy Agendas</b></a><span>Bills, speeches and think tank reports, coded by policy topic with the Illinois subtopic index (adapted from the Comparative Agendas Project) <span class="upd" id="updated"></span></span></div>
+    <div class="brand"><a href="#home" class="brand-link"><b>Illinois Policy Agendas Project</b></a><span>Bills, speeches and think tank reports, coded by policy topic with the Illinois subtopic index (adapted from the Comparative Agendas Project) <span class="upd" id="updated"></span></span></div>
     <nav class="tabs" role="tablist" aria-label="Sections"></nav>
   </div>
 </header>
@@ -642,7 +642,7 @@ function renderHome(){
   $('#view').innerHTML = `
   <section class="home-hero">
     <div class="eyebrow">${esc(H.tagline || 'Illinois policy attention, coded by topic')}</div>
-    <h1 class="home-title">${esc(H.title || 'Illinois Policy Agendas')}</h1>
+    <h1 class="home-title">${esc(H.title || 'Illinois Policy Agendas Project')}</h1>
     <p class="home-lede">${fillCounts(H.overview || '')}</p>
     <div class="home-cta"><a class="btn primary" href="#topics">Explore by topic</a><a class="btn" href="#bills">Browse bills</a><a class="btn" href="#search">Search everything</a>${cbLink('btn')}</div>
   </section>
@@ -768,8 +768,8 @@ function renderBills(){
   $('#b-cmte')?.addEventListener('change', e=>{ BL.cmte=e.target.value; BL.page=0; renderBills(); });
   $('#b-status')?.addEventListener('change', e=>{ BL.status=e.target.value; go2(); });
   $('#b-ga')?.addEventListener('change', async e=>{ BL.ga=+e.target.value; BL.page=0; BL.cmte=''; await withLoading(need({details:[BL.ga], links:[BL.ga]})); renderBills(); });
-  $('#b-all').addEventListener('click', ()=>save(`illinois-bills-${BL.ga}th-ga.csv`, csvFor(all)));
-  $('#b-dl').addEventListener('click', ()=>{ const rows=billFilter(); save(`illinois-bills-${BL.ga}th-ga-${V==='intro'?'':V+'-'}${rows.length}-rows.csv`, csvFor(rows)); });
+  $('#b-all').addEventListener('click', ()=>save(`ipap-bills-${BL.ga}th-ga.csv`, csvFor(all)));
+  $('#b-dl').addEventListener('click', ()=>{ const rows=billFilter(); save(`ipap-bills-${BL.ga}th-ga-${V==='intro'?'':V+'-'}${rows.length}-rows.csv`, csvFor(rows)); });
   billsUpdate();
 }
 
@@ -836,7 +836,7 @@ function renderActivity(all, header){
   $('#a-r').addEventListener('change', e=>{ ACT.routine=e.target.checked; if (!ACT.routine && ['routine','sponsor'].includes(ACT.kind)) ACT.kind=''; ACT.shown=120; draw(); });
   $('#a-more').addEventListener('click', ()=>{ ACT.shown += 200; draw(); });
   $('#b-ga')?.addEventListener('change', async e=>{ BL.ga=+e.target.value; await withLoading(need({details:[BL.ga], links:[BL.ga]})); renderBills(); });
-  $('#b-all').addEventListener('click', ()=>save(`illinois-bills-${BL.ga}th-ga.csv`, csvFor(all)));
+  $('#b-all').addEventListener('click', ()=>save(`ipap-bills-${BL.ga}th-ga.csv`, csvFor(all)));
   draw();
 }
 
@@ -917,7 +917,7 @@ function renderSpeeches(){
     bindTip(td, ()=>`<div class="t">${y} · ${esc(govOf(y))}</div><div>${esc(CB.majors[m])}</div><div class="r"><span>Share of policy sentences</span><b class="num">${pct(share(m,y))}</b></div><div class="muted">${fmt(cell.get(m+':'+y)||0)} of ${fmt(tot.get(y)||0)} sentences</div>`);
     td.addEventListener('click', ()=>{ SP.major=m; nav('speech-'+y); }); });
   $('#s-major').addEventListener('change', e=>{ SP.major=e.target.value==='all'?'all':+e.target.value; renderSpeeches(); });
-  $('#s-all').addEventListener('click', ()=>save('illinois-state-of-the-state-2005-2025.csv', csvFor(all)));
+  $('#s-all').addEventListener('click', ()=>save('ipap-state-of-the-state-2005-2025.csv', csvFor(all)));
 }
 
 /* =================== THINK TANKS =================== */
@@ -965,8 +965,8 @@ function renderThinkTanks(){
   $('#t-m').addEventListener('change', e=>{ TT.major=e.target.value===''?null:+e.target.value; upd(); });
   const yr=()=>{ const a=+$('#t-y0').value||1991, b=+$('#t-y1').value||2026; TT.y0=Math.min(a,b); TT.y1=Math.max(a,b); upd(); };
   $('#t-y0').addEventListener('change', yr); $('#t-y1').addEventListener('change', yr);
-  $('#t-all').addEventListener('click', ()=>save('illinois-think-tank-reports.csv', csvFor(all)));
-  $('#t-dl').addEventListener('click', ()=>{ const rows=ttFilter(); save(`illinois-think-tank-reports-${rows.length}-filtered.csv`, csvFor(rows)); });
+  $('#t-all').addEventListener('click', ()=>save('ipap-think-tank-reports.csv', csvFor(all)));
+  $('#t-dl').addEventListener('click', ()=>{ const rows=ttFilter(); save(`ipap-think-tank-reports-${rows.length}-filtered.csv`, csvFor(rows)); });
   ttUpdate();
 }
 function ttUpdate(){
@@ -1034,7 +1034,7 @@ function renderTopics(){
     return {label:DS[k].short, cls:DS[k].cls, color:'--s-'+k, pts:xs.filter(y=>(tot.get(y)||0)>=(k==='tt'?8:20)).map(y=>[y,(hit.get(y)||0)/tot.get(y),hit.get(y)||0,tot.get(y)])}; }));
   $$('.subtab tbody tr').forEach(tr=>tr.addEventListener('click', ()=>{ pickSub(+tr.dataset.s); scrollTo({top:0}); }));
   $$('.seg button').forEach(b=>b.addEventListener('click', ()=>{ TP.ds=b.dataset.d; TP.page=0; $$('.seg button').forEach(x=>x.setAttribute('aria-pressed', x===b)); topicList(inF); }));
-  $('#tp-dl').addEventListener('click', ()=>save(`illinois-topic-${sub??m}-${slug(sub==null?CB.majors[m]:CB.subs[sub])}.csv`, csvFor(DSK.flatMap(k=>inF[k]))));
+  $('#tp-dl').addEventListener('click', ()=>save(`ipap-topic-${sub??m}-${slug(sub==null?CB.majors[m]:CB.subs[sub])}.csv`, csvFor(DSK.flatMap(k=>inF[k]))));
   topSponsors(inF.bills);
   topicList(inF);
 }
@@ -1109,7 +1109,7 @@ function srUpdate(){
     tip: DSK.map(d=>tipRow(DS[d].cls, DS[d].short, fmt(rows.filter(r=>r.ds===d&&r.major===k).length))).join(''), onclick:()=>{ SR.major = SR.major===k?null:k; $('#sr-m').value=SR.major??''; SR.page=0; srUpdate(); }}));
   if (items.length) hbars($('#sr-tp'), items, {labelW:190, rowH:24}); else $('#sr-tp').innerHTML = '<p class="muted">No coded matches.</p>';
   $('#sr-sort').value = SR.sort; $('#sr-sort').addEventListener('change', e=>{ SR.sort=e.target.value; SR.page=0; srUpdate(); });
-  $('#sr-dl').addEventListener('click', ()=>save(`illinois-search-${slug(SR.q)||'results'}.csv`, csvFor(rows)));
+  $('#sr-dl').addEventListener('click', ()=>save(`ipap-search-${slug(SR.q)||'results'}.csv`, csvFor(rows)));
   const dk = r => r.date || String(r.year||0);
   rows.sort((a,b)=> SR.sort==='new' ? dk(b).localeCompare(dk(a)) || a.id-b.id : dk(a).localeCompare(dk(b)) || a.id-b.id);
   const PS=20, pages=Math.ceil(rows.length/PS); SR.page=Math.min(SR.page,Math.max(0,pages-1));
@@ -1155,7 +1155,7 @@ const HEADS = {
       chips:'', actions:`${s.year>yrs[0]?`<a class="btn" href="#speech-${s.year-1}">← ${s.year-1}</a>`:''}${s.year<yrs[yrs.length-1]?`<a class="btn" href="#speech-${s.year+1}">${s.year+1} →</a>`:''}` }; }
 };
 const recRows = (kind, rec) => kind==='committee' ? newest(rec.bills.map(b=>b.r)) : kind==='org' ? newest(rec.reports) : kind==='speech' ? rec.sent : kind==='sponsor' ? newest(rec.bills.map(b=>b.r)) : [rec];
-const recFile = (kind, rec) => kind==='committee' ? `illinois-${rec.ga}-${rec.slug}-committee-bills.csv` : kind==='org' ? `illinois-${rec.slug}-reports.csv` : kind==='sponsor' ? `illinois-${rec.slug}-bills.csv` : kind==='speech' ? `illinois-state-of-the-state-${rec.year}.csv` : kind==='bill' ? `illinois-${rec.x.ga}-${rec.x.bill.replace(' ','').toLowerCase()}.csv` : `illinois-report-${rec.id}-${slug(rec.title)}.csv`;
+const recFile = (kind, rec) => kind==='committee' ? `ipap-${rec.ga}-${rec.slug}-committee-bills.csv` : kind==='org' ? `ipap-${rec.slug}-reports.csv` : kind==='sponsor' ? `ipap-${rec.slug}-bills.csv` : kind==='speech' ? `ipap-state-of-the-state-${rec.year}.csv` : kind==='bill' ? `ipap-${rec.x.ga}-${rec.x.bill.replace(' ','').toLowerCase()}.csv` : `ipap-report-${rec.id}-${slug(rec.title)}.csv`;
 
 function renderRecord(){
   const found = recordFor(ROUTE);
@@ -1523,7 +1523,7 @@ function renderSponsors(){
   $('#sn-s')?.addEventListener('change', e=>{ SN.sub=e.target.value===''?null:+e.target.value; snUpdate(); });
   $$('#sn-t th').forEach(th=>th.addEventListener('click', ()=>{ const k=th.dataset.k; SN.dir = SN.sort===k ? -SN.dir : (k==='name'?1:-1); SN.sort=k; renderSponsors(); }));
   $('#sn-dl').addEventListener('click', ()=>{ const rows = snRows();
-    save(`illinois-bill-sponsors${snTopic()?'-'+slug(snTopic()):''}.csv`, toCSV(['legislator','chamber','bills_as_primary_sponsor','bills_became_law','topic'],
+    save(`ipap-bill-sponsors${snTopic()?'-'+slug(snTopic()):''}.csv`, toCSV(['legislator','chamber','bills_as_primary_sponsor','bills_became_law','topic'],
       rows.map(([p,s])=>[p.title, chamberName(p.ch), s.C, s.law, snTopic() || 'all topics']))); });
   snUpdate();
 }
@@ -1586,7 +1586,7 @@ SECTIONS.sponsor.push(
         <div class="tscroll"><table class="dt" style="min-width:640px"><thead><tr><th>Bill</th><th>Description</th><th>Role</th><th>Topic</th><th>Latest action</th></tr></thead><tbody id="sg-tb"></tbody></table></div><div class="pager" id="sg-pg" style="margin-top:4px"></div>`;
       const draw = ()=>{ const rows = newest(p.bills.filter(b=>(SPG.role==='all'||b.role===SPG.role||(SPG.role==='ST'&&(b.role==='S'||b.role==='T'))) && (SPG.major==null||b.r.major===SPG.major) && (!SPG.law||b.r.x.stage>=5)).map(b=>Object.assign(Object.create(b.r),{_role:b.role})));
         $('#sg-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> bills`; $('#sg-dl').disabled = !rows.length;
-        $('#sg-dl').onclick = ()=>save(`illinois-${p.slug}-bills.csv`, csvFor(rows.map(r=>Object.getPrototypeOf(r))));
+        $('#sg-dl').onclick = ()=>save(`ipap-${p.slug}-bills.csv`, csvFor(rows.map(r=>Object.getPrototypeOf(r))));
         const PS=25, pages=Math.ceil(rows.length/PS); SPG.page=Math.min(SPG.page,Math.max(0,pages-1));
         $('#sg-tb').innerHTML = rows.slice(SPG.page*PS, SPG.page*PS+PS).map(r=>{ const x=r.x, ch=chiefOf(r);
           return `<tr class="row" data-h="${href(r)}"><td><a class="mono" href="${href(r)}" style="white-space:nowrap">${esc(x.bill)}</a><div class="muted num" style="font-size:12px">${x.intro}</div></td>
@@ -1681,7 +1681,7 @@ SECTIONS.org.push(
       const draw = ()=>{ const t = parseQuery(OG.q);
         const rows = newest(o.reports.filter(r=>(OG.major==null || r.major===OG.major) && t.every(w=>r.hay.includes(w))));
         $('#og-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> reports`; $('#og-dl').disabled = !rows.length;
-        $('#og-dl').onclick = ()=>save(`illinois-${o.slug}-reports.csv`, csvFor(rows));
+        $('#og-dl').onclick = ()=>save(`ipap-${o.slug}-reports.csv`, csvFor(rows));
         const PS=10, pages=Math.ceil(rows.length/PS); OG.page=Math.min(OG.page, Math.max(0,pages-1));
         $('#og-res').innerHTML = rows.slice(OG.page*PS, OG.page*PS+PS).map(r=>card(r,t)).join('') || '<p class="muted">No reports match.</p>';
         pager($('#og-pg'), OG.page, pages, p=>{ OG.page=p; draw(); $('#sec-reports').scrollIntoView({block:'start'}); }); };
@@ -1788,7 +1788,7 @@ function renderParties(){
   bindLegBar();
   $$('[data-pc]').forEach(b=>b.addEventListener('click', ()=>{ PT.ch=b.dataset.pc; renderParties(); }));
   $$('[data-pa]').forEach(b=>b.addEventListener('click', ()=>{ PT.agenda=b.dataset.pa; renderParties(); }));
-  $('#pt-dl').addEventListener('click', ()=>save(`illinois-${ga}-parties-by-topic.csv`, toCSV(['general_assembly','chamber','major_topic','major_topic_label',...PARTIES.flatMap(pt=>[`${pt.toLowerCase()}_bills`,`${pt.toLowerCase()}_share`,`${pt.toLowerCase()}_laws`]),'bipartisan_bills'],
+  $('#pt-dl').addEventListener('click', ()=>save(`ipap-${ga}-parties-by-topic.csv`, toCSV(['general_assembly','chamber','major_topic','major_topic_label',...PARTIES.flatMap(pt=>[`${pt.toLowerCase()}_bills`,`${pt.toLowerCase()}_share`,`${pt.toLowerCase()}_laws`]),'bipartisan_bills'],
     majors.map(m=>[ga, PT.ch==='all'?'both':chamberName(PT.ch), m, CB.majors[m], ...PARTIES.flatMap(pt=>{ const b = by(pt).filter(r=>r.major===m); return [b.length, (b.length/Math.max(1,by(pt).filter(isPol).length)).toFixed(4), b.filter(r=>r.x.stage>=5).length]; }), B.filter(r=>r.major===m && isBipartisan(r)).length]))));
 }
 /* two bars per row (one per party), sharing one scale */
@@ -1900,7 +1900,7 @@ function renderCommittees(){
   $('#cm-m').addEventListener('change', e=>{ CM.major=e.target.value===''?null:+e.target.value; CM.sub=null; renderCommittees(); });
   $('#cm-s')?.addEventListener('change', e=>{ CM.sub=e.target.value===''?null:+e.target.value; cmUpdate(); });
   $$('#cm-t th').forEach(th=>th.addEventListener('click', ()=>{ const k=th.dataset.k; CM.dir = CM.sort===k ? -CM.dir : (k==='name'||k==='ch'||k==='top' ? 1 : -1); CM.sort=k; renderCommittees(); }));
-  $('#cm-dl').addEventListener('click', ()=>save(`illinois-${ga}-committees.csv`, toCSV(['general_assembly','chamber','committee','bills_assigned','approved','approval_rate','became_law','main_topic'],
+  $('#cm-dl').addEventListener('click', ()=>save(`ipap-${ga}-committees.csv`, toCSV(['general_assembly','chamber','committee','bills_assigned','approved','approval_rate','became_law','main_topic'],
     cmRows().map(([c,s])=>[ga, c.ch, c.name, s.n, s.ok, s.rate.toFixed(3), s.law, s.top!=null?CB.majors[s.top]:'']))));
   cmUpdate();
 }
@@ -1965,7 +1965,7 @@ SECTIONS.committee.push(
       const draw = ()=>{ const list = c.bills.filter(b=>(CMP.out==='all'||(CMP.out==='ok'&&b.ok)||(CMP.out==='no'&&!b.ok)||(CMP.out==='law'&&b.r.x.stage>=5)) && (CMP.major==null||b.r.major===CMP.major));
         const rows = list.slice().sort((a,b)=>(b.r.x.last_date||'').localeCompare(a.r.x.last_date||''));
         $('#cg-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> bills`; $('#cg-dl').disabled = !rows.length;
-        $('#cg-dl').onclick = ()=>save(`illinois-${c.ga}-${c.slug}-committee-bills.csv`, csvFor(rows.map(b=>b.r)));
+        $('#cg-dl').onclick = ()=>save(`ipap-${c.ga}-${c.slug}-committee-bills.csv`, csvFor(rows.map(b=>b.r)));
         const PS=40, pages=Math.ceil(rows.length/PS); CMP.page=Math.min(CMP.page,Math.max(0,pages-1));
         $('#cg-tb').innerHTML = rows.slice(CMP.page*PS, CMP.page*PS+PS).map(({r,ok})=>{ const x=r.x, ch=chiefOf(r);
           return `<tr class="row" data-h="${href(r)}"><td><a class="mono" href="${href(r)}" style="white-space:nowrap">${esc(x.bill)}</a><div class="muted num" style="font-size:12px">${x.intro||''}</div></td>

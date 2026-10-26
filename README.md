@@ -1,6 +1,6 @@
-# Illinois Policy Agendas website
+# Illinois Policy Agendas Project (IPAP) website
 
-The public website for the Illinois Policy Agendas Project: substantive bills, State of the State speeches
+The public website for the Illinois Policy Agendas Project (IPAP): substantive bills, State of the State speeches
 and think tank reports in Illinois, coded by Comparative Agendas Project subtopic. GitHub Pages serves the site
 from `docs/`.
 

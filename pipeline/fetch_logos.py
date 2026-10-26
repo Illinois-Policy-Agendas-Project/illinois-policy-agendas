@@ -20,7 +20,7 @@ import webget  # downloads, with fixes for missing certificates
 from urllib.parse import urljoin, urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
-UA = 'Mozilla/5.0 (IllinoisPolicyAgendas logo collector; research website)'
+UA = 'Mozilla/5.0 (Illinois Policy Agendas Project (IPAP) logo collector; research website)'
 TYPES = {'image/svg+xml': '.svg', 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/x-icon': '.ico', 'image/vnd.microsoft.icon': '.ico'}
 
 

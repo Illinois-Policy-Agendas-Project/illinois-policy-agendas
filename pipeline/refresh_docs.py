@@ -35,6 +35,7 @@ def main():
         (d / dest).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, d / dest)
     man = json.loads((d / 'manifest.json').read_text(encoding='utf-8'))
+    man['title'] = cfg.get('title', man.get('title', ''))
     man['v']['orgs'] = B.dump(d / 'orgs.json', profiles or {})
     if home:
         man['v']['home'] = B.dump(d / 'home.json', home)

@@ -43,7 +43,7 @@ def status():
             'job': {k: JOB[k] for k in ('name', 'running', 'code')}, 'log': JOB['log'][-400:]}
 
 
-PAGE = r'''<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Update website</title>
+PAGE = r'''<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Update the IPAP website</title>
 <style>
 :root{--ink:#1b2330;--ink2:#4b5566;--muted:#7b8494;--line:#e4e9f0;--sunk:#f4f7fb;--accent:#2c67ad;--btn:#dcebfb;--btnink:#1d4f8a;--ok:#e2f5ec;--bad:#fde8e6}
 body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:#fff;max-width:880px;margin:0 auto;padding:28px 16px}
@@ -62,7 +62,7 @@ select,input{font:inherit;padding:7px 9px;border:1px solid #cfd7e2;border-radius
 pre{background:#0f1720;color:#dbe4ee;border-radius:8px;padding:12px;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;max-height:320px;overflow:auto;white-space:pre-wrap;margin-top:16px}
 @media (max-width:640px){.step{grid-template-columns:28px 1fr}.step .act{grid-column:2}}
 </style>
-<h1>Update the Illinois Policy Agendas website</h1>
+<h1>Update the IPAP website</h1>
 <p class="muted">Coders save into the <code>inputs</code> folder in Dropbox. Then check, look, and publish. The site's code updates itself from GitHub each time this panel opens.</p>
 <div class="status" id="status">Loading…</div>
 <p class="muted" id="version" style="font-size:12.5px;margin:-12px 0 16px"></p>

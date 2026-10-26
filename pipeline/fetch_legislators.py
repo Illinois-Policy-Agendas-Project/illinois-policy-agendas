@@ -23,7 +23,7 @@ import webget  # downloads, with fixes for missing certificates
 from urllib.parse import urljoin
 
 ROOT = Path(__file__).resolve().parent.parent
-UA = 'Mozilla/5.0 (IllinoisPolicyAgendas member collector; research website)'
+UA = 'Mozilla/5.0 (Illinois Policy Agendas Project (IPAP) member collector; research website)'
 LISTS = {'House': 'https://ilga.gov/House/Members', 'Senate': 'https://ilga.gov/Senate/Members'}
 COLS = ['chamber', 'district', 'name', 'party', 'url', 'photo', 'source']
 PARTY = {'d': 'Democratic', 'r': 'Republican', 'i': 'Independent', 'democrat': 'Democratic', 'democratic': 'Democratic', 'republican': 'Republican', 'independent': 'Independent'}

@@ -123,7 +123,7 @@ def to_github(site, cfg, built, log):
     if subprocess.run(['git', 'diff', '--cached', '--quiet'], cwd=ROOT).returncode == 0:
         log('GitHub already has this version of the site; nothing to push.')
         return 'github'
-    git('-c', 'user.name=Illinois Policy Agendas', '-c', 'user.email=noreply@users.noreply.github.com', 'commit', '-q', '-m', f'Publish site (data built {built})')
+    git('-c', 'user.name=Illinois Policy Agendas Project', '-c', 'user.email=noreply@users.noreply.github.com', 'commit', '-q', '-m', f'Publish site (data built {built})')
     log('Bringing in any changes made elsewhere…')
     git('pull', '--rebase', '--autostash', 'origin', branch)
     log('Pushing to GitHub…')
