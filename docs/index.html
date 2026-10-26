@@ -372,6 +372,7 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 
 
 /* codebook page */
+.sublink{color:inherit;text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:2px} .sublink:hover{color:var(--accent);text-decoration-color:currentColor}
 .cb-top{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.25fr) minmax(0,.8fr);gap:14px;margin-bottom:16px;align-items:start}
 .cb-p{margin:0;font-size:13.5px;line-height:1.55;color:var(--ink-2)} .cb-p + .cb-p{margin-top:8px}
 .cb-more summary{cursor:pointer;color:var(--accent);font-size:13.5px;font-weight:700;margin-top:6px} .cb-more[open] summary{margin-bottom:8px}
@@ -528,9 +529,14 @@ function hl(text, terms, max){ let t = String(text ?? ''); if (max && t.length >
   return terms.length ? h.replace(new RegExp('(' + terms.map(x=>reEsc(esc(x))).join('|') + ')','gi'), '<mark>$1</mark>') : h; }
 const dsChip = ds => `<span class="chip dsb ${DS[ds].cls}"><i class="dot"></i>${DS[ds].short}</span>`;
 /* a subtopic by name (its code shows on hover); withCode puts the code in front, for the coding details on record pages */
-const subChip = (s, withCode=false) => s == null ? `<span class="muted">Not yet coded</span>`
-  : withCode ? `<span class="code">${s===NOPOL?'−555':s}</span> ${esc(subName(s))}` : `<span title="Subtopic ${s===NOPOL?'−555':s}">${esc(subName(s))}</span>`;
-const majChip = m => m == null ? '<span class="muted">—</span>' : `<span title="Major topic ${m}">${esc(majorName(m))}</span>`;
+/* every topic label links to its codebook entry (#codebook-602, #codebook-m6); link=false inside buttons */
+const cbHref = s => `#codebook-${s}`, cbmHref = m => `#codebook-m${m}`;
+const subChip = (s, withCode=false, link=true) => { if (s == null) return `<span class="muted">Not yet coded</span>`;
+  const code = s===NOPOL ? '−555' : s, name = esc(subName(s)), go = link && s !== NOPOL;
+  const lab = go ? `<a class="sublink" href="${cbHref(s)}" title="Subtopic ${code}: open in the codebook">${name}</a>` : `<span title="Subtopic ${code}">${name}</span>`;
+  return withCode ? `<span class="code">${code}</span> ${lab}` : lab; };
+const majChip = (m, link=true) => m == null ? '<span class="muted">—</span>' : m === NOPOL || !link ? `<span title="Major topic ${m}">${esc(majorName(m))}</span>`
+  : `<a class="sublink" href="${cbmHref(m)}" title="Major topic ${m}: open in the codebook">${esc(majorName(m))}</a>`;
 const majorOptions = (sel, label='All topics') => `<option value="">${label}</option>` + MAJORS().map(m=>`<option value="${m}" ${sel===m?'selected':''}>${m} · ${esc(CB.majors[m])}</option>`).join('');
 const subOptions = (m, sel) => m==null ? '' : `<option value="">All subtopics in ${m}</option>` + subsOf(m).map(s=>`<option value="${s}" ${sel===s?'selected':''}>${s} · ${esc(CB.subs[s])}</option>`).join('');
 
@@ -1012,7 +1018,7 @@ function renderSpeeches(){
         <span class="muted num" style="font-size:12px">${fmt(ss.length)} sentences · ${M==null?`${fmt(n)} on policy`:`${fmt(n)} on ${esc(CB.majors[M].split(/,| and /)[0])}`}</span></a>`; }).join('')}</div></div>
   <div class="panel"><div class="chead"><h3>Topic share of each address</h3><span class="muted" style="font-size:12px">Share of the year's policy sentences. Click a cell to open that address with the topic marked.</span></div>
     <div class="hscroll"><table class="heat"><thead><tr class="gov"><th></th>${spans.map((s,i)=>`<th colspan="${s.n}">${esc(govLabel(s.g, years[spans.slice(0,i).reduce((a,x)=>a+x.n,0)]))}</th>`).join('')}</tr><tr><th></th>${years.map(y=>`<th>'${String(y).slice(2)}</th>`).join('')}</tr></thead>
-    <tbody>${MAJORS().map(m=>`<tr><th class="rh" title="Major topic ${m}: ${esc(CB.majors[m])}">${esc(CB.majors[m])}</th>${years.map(y=>{ const v=share(m,y); return `<td data-m="${m}" data-y="${y}" style="${heatBg(v,mx)}">${v>=0.005?Math.round(v*100):v>0?'<1':'·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+    <tbody>${MAJORS().map(m=>`<tr><th class="rh">${majChip(m)}</th>${years.map(y=>{ const v=share(m,y); return `<td data-m="${m}" data-y="${y}" style="${heatBg(v,mx)}">${v>=0.005?Math.round(v*100):v>0?'<1':'·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="muted" style="font-size:12px">Values are percentages. Darker cells mean a larger share.</div></div>`;
   $$('table.heat td').forEach(td=>{ const m=+td.dataset.m, y=+td.dataset.y;
     bindTip(td, ()=>`<div class="t">${y} · ${esc(govOf(y))}</div><div>${esc(CB.majors[m])}</div><div class="r"><span>Share of policy sentences</span><b class="num">${pct(share(m,y))}</b></div><div class="muted">${fmt(cell.get(m+':'+y)||0)} of ${fmt(tot.get(y)||0)} sentences</div>`);
@@ -1110,7 +1116,7 @@ function renderTopics(){
     <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
       <div class="panel"><div class="chead"><div>
           <div class="eyebrow">${sub==null ? `Major topic ${m}` : `Subtopic ${sub} · <button class="linkbtn" id="tp-up" style="font-size:inherit;letter-spacing:inherit;text-transform:inherit">${m} ${esc(CB.majors[m])}</button>`}</div>
-          <h2>${esc(sub==null ? CB.majors[m] : CB.subs[sub])}</h2></div>
+          <h2>${esc(sub==null ? CB.majors[m] : CB.subs[sub])}</h2><a class="sublink" style="font-size:13px" href="${sub==null ? cbmHref(m) : cbHref(sub)}">Codebook entry →</a></div>
         <button class="btn primary" id="tp-dl" ${total?'':'disabled'}>Download ${fmt(total)} records</button></div>
         <div class="kpis" style="grid-template-columns:repeat(3,minmax(0,1fr));margin:0">${DSK.map(k=>`<div class="kpi ${DS[k].cls}" style="background:var(--ct)"><span class="l" style="display:flex;gap:6px;align-items:center"><i class="dot"></i>${DS[k].name}</span>
           <span class="v">${pct(inF[k].length/base[k].length)}</span><span class="s">${fmt(inF[k].length)} of ${fmt(base[k].length)} policy items${sub!=null && inM[k].length ? ` · ${pct(inF[k].length/inM[k].length,0)} of its ${esc(CB.majors[m].split(/,| and /)[0])} items` : ''}</span></div>`).join('')}</div></div>
@@ -1300,7 +1306,7 @@ const newest = rows => rows.slice().sort((a,b)=>(b.date||String(b.year||0)).loca
 function codingSection(r, el){
   if (r.sub==null){ el.innerHTML = `<p class="ink2" style="margin:0">This record has not been coded yet.</p>`; return; }
   el.innerHTML = `<div class="coding"><div><span class="eyebrow">Subtopic</span><div>${subChip(r.sub, true)}</div></div>
-    ${r.sub!==NOPOL?`<div><span class="eyebrow">Major topic</span><div><span class="code">${r.major}</span> ${esc(majorName(r.major))}</div></div>`:''}</div>
+    ${r.sub!==NOPOL?`<div><span class="eyebrow">Major topic</span><div><span class="code">${r.major}</span> ${majChip(r.major)}</div></div>`:''}</div>
     ${r.sub!==NOPOL?`<button class="btn" id="cd-go">Explore this topic →</button>`:'<p class="muted" style="margin:0;font-size:13px">−555 marks items without policy content, such as memorials or ceremonial remarks.</p>'}`;
   $('#cd-go', el)?.addEventListener('click', ()=>{ Object.assign(TP,{major:r.major, sub:r.sub, ds:'all', page:0}); nav('topics'); });
 }
@@ -1714,7 +1720,7 @@ SECTIONS.sponsor.push(
       const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r)).map(b=>b.r); const subs = [...count(mine, r=>r.sub)].sort((a,b)=>b[1]-a[1]).slice(0,3);
       if (!subs.length){ el.innerHTML = '<p class="muted" style="margin:0;font-size:13px">No policy-coded bills to match on.</p>'; return; }
       el.innerHTML = `<p class="ink2" style="margin:0;font-size:13px">How often governors and think tanks address the subtopics this legislator introduces most.</p>` + subs.map(([s,n])=>{ const sp = byDs('sots').filter(r=>r.sub===s).length, tt = byDs('tt').filter(r=>r.sub===s).length;
-        return `<button class="subrow" data-s="${s}"><span>${subChip(s)}</span><span class="muted num" style="font-size:12px">${fmt(n)} of their bills · ${fmt(sp)} speech sentences · ${fmt(tt)} reports</span></button>`; }).join('');
+        return `<button class="subrow" data-s="${s}"><span>${subChip(s, false, false)}</span><span class="muted num" style="font-size:12px">${fmt(n)} of their bills · ${fmt(sp)} speech sentences · ${fmt(tt)} reports</span></button>`; }).join('');
       $$('.subrow', el).forEach(b=>b.addEventListener('click', ()=>{ const s=+b.dataset.s; Object.assign(TP,{major:Math.floor(s/100), sub:s, ds:'all', page:0}); nav('topics'); })); } }
 );
 
@@ -1804,7 +1810,7 @@ SECTIONS.org.push(
       const subs = [...count(o.reports.filter(isPol), r=>r.sub)].sort((a,b)=>b[1]-a[1]).slice(0,4);
       el.innerHTML = `<p class="ink2" style="margin:0;font-size:13px">How often bills and governors take up this organization's most frequent subtopics.</p>` + subs.map(([s,n])=>{
         const b = byDs('bills').filter(r=>r.sub===s).length, sp = byDs('sots').filter(r=>r.sub===s).length;
-        return `<button class="subrow" data-s="${s}"><span>${subChip(s)}</span><span class="muted num" style="font-size:12px">${pl(n,'report')} · ${pl(b,'bill')} · ${pl(sp,'speech sentence')}</span></button>`; }).join('');
+        return `<button class="subrow" data-s="${s}"><span>${subChip(s, false, false)}</span><span class="muted num" style="font-size:12px">${pl(n,'report')} · ${pl(b,'bill')} · ${pl(sp,'speech sentence')}</span></button>`; }).join('');
       $$('.subrow', el).forEach(btn=>btn.addEventListener('click', ()=>{ const s=+btn.dataset.s; Object.assign(TP,{major:Math.floor(s/100), sub:s, ds:'all', page:0}); nav('topics'); })); } }
 );
 
@@ -1859,6 +1865,8 @@ async function renderCodebook(){
   const jump = el => { if (!el) return; if (el.hidden){ CBK.q=''; $('#cb-q').value=''; filter(); }
     const y = el.getBoundingClientRect().top + scrollY - ($('.cb-bar').offsetHeight + 12); scrollTo({top:y, behavior:'smooth'});
     el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); };
+  const target = ROUTE.code != null ? $('#cb-'+ROUTE.code) : ROUTE.major != null ? $('#cbm-'+ROUTE.major) : null;
+  if (target) setTimeout(()=>jump(target), 80);   // after nav() has scrolled to the top
   CBJUMP = jump; if (renderCodebook.bound) return; renderCodebook.bound = true;   // one listener on #view, which outlives this page
   $('#view').addEventListener('click', e=>{ const a = e.target.closest('a.cbj, a.cbt'); if (!a || !$('#cb-list')) return;
     if (a.classList.contains('cbj')){ e.preventDefault(); e.stopPropagation(); CBJUMP(a.dataset.cb ? $('#cb-'+a.dataset.cb) : $('#cbm-'+a.dataset.cbm)); }
@@ -2156,6 +2164,7 @@ function parseRoute(t){
   if ((m = /^sponsor-([a-z0-9-]+)$/.exec(t))) return {view:'sponsor', key:m[1]};
   if ((m = /^org-([a-z0-9-]+)$/.exec(t))) return {view:'org', key:m[1]};
   if ((m = /^committee-(\d+)-([a-z0-9-]+)$/.exec(t))) return {view:'committee', ga:+m[1], key:`${m[1]}-${m[2]}`};
+  if ((m = /^codebook-(m?)(\d+)$/.exec(t))) return m[1] ? {view:'codebook', major:+m[2]} : {view:'codebook', code:+m[2]};
   if ((m = /^speech-(\d{4})(?:-s(\d+))?$/.exec(t))) return {view:'speech', year:+m[1], sid:m[2]?+m[2]:null};
   return null;
 }
