@@ -486,8 +486,10 @@ def build_bills(cfg, valid, rep):
         elif cdir:
             rep.note(ds, f'No coding folder at {sess["codes"]} yet; using codes from the bill file only.')
 
-        # a bad code in the bill file only matters if no coding file has replaced it
-        bad_codes = [b for b in bad_codes if bills.get(f'{ga}-{b.split(":")[0].replace(" ", "")}', {}).get('source') != 'codes']
+        apply_reviews(ga, bills, valid, rep, ds)
+
+        # a bad code in the bill file only matters if no coding file or review has replaced it
+        bad_codes = [b for b in bad_codes if bills.get(f'{ga}-{b.split(":")[0].replace(" ", "")}', {}).get('source') not in ('codes', 'qc')]
         if bad_codes:
             rep.error(ds, f'{pl(len(bad_codes), "bill")} in the bill file {"has a code" if len(bad_codes) == 1 else "have codes"} not in the codebook. {"It shows" if len(bad_codes) == 1 else "They show"} as "Not yet coded" until fixed, or until a coding file gives {"it" if len(bad_codes) == 1 else "them"} a code.', bad_codes)
 
@@ -583,6 +585,51 @@ def bill_stage(steps, last_action, last_date, origin=None):
         law_date = last_date
     veto = any(re.search(r'Vetoed|Total Veto|Amendatory Veto', t) for t in texts)
     return stage, cmte, pa, law_date, veto
+
+
+def apply_reviews(ga, bills, valid, rep, ds):
+    """Codes changed in "Check law codes" (inputs/qc/<ga>/review_*.csv, one file per reviewer; see qc.py). The most recent
+    decision on each bill wins over every other code; reviewers who disagree are reported."""
+    files = sorted((DATA / 'inputs' / 'qc' / str(ga)).glob('review_*.csv'))
+    if not files:
+        return
+    rows = []
+    for f in files:
+        try:
+            rows += [r for r in read_table(f).fillna('').to_dict('records')]
+        except Exception as e:  # noqa: BLE001
+            rep.error(ds, f'Could not read review file {f.name}: {e}')
+    last, codes_by = {}, defaultdict(dict)
+    for r in rows:
+        b = str(r['bill'])
+        if b not in last or str(r['reviewed_at']) > str(last[b]['reviewed_at']):
+            last[b] = r
+        codes_by[b][str(r['reviewer'])] = to_code(r['code'])
+    recoded, unsure, bad, missing = 0, [], [], []
+    for b, r in last.items():
+        key = f'{ga}-{b.replace(" ", "")}'
+        if key not in bills:
+            missing.append(b)
+            continue
+        if r['decision'] == 'recode':
+            code = to_code(r['code'])
+            if code is None or (code != NOPOL and code not in valid):
+                bad.append(f'{b}: {r["code"]} ({r["reviewer"]})')
+                continue
+            bills[key]['sub'], bills[key]['source'] = code, 'qc'
+            recoded += 1
+        elif r['decision'] == 'unsure':
+            unsure.append(f'{b} ({r["reviewer"]}){": " + str(r["note"]) if r["note"] else ""}')
+    split = [f'{b}: ' + ', '.join(f'{who} {c}' for who, c in v.items()) for b, v in codes_by.items() if len(set(v.values())) > 1]
+    rep.note(ds, f'Law code review: {pl(len(last), "law")} reviewed by {pl(len({str(r["reviewer"]) for r in rows}), "reviewer")}; {pl(recoded, "code")} changed.')
+    if bad:
+        rep.error(ds, f'{pl(len(bad), "reviewed code is", "reviewed codes are")} not in the codebook.', bad)
+    if split:
+        rep.warn(ds, f'Reviewers chose different codes for {pl(len(split), "law")}. The site uses the most recent decision; settle these in Check law codes.', split)
+    if unsure:
+        rep.note(ds, f'{pl(len(unsure), "law is", "laws are")} flagged as unsure in Check law codes.', unsure)
+    if missing:
+        rep.warn(ds, f'{pl(len(missing), "reviewed bill is", "reviewed bills are")} no longer in the bill data.', missing)
 
 
 def update_from_ilga(sess, ga, bills, rep, ds):

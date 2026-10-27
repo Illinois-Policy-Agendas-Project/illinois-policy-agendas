@@ -3,6 +3,8 @@
 with buttons to check the data, preview the site, make coding worksheets and publish.
 Started by the "Update website" launcher; it stops when you close the terminal window."""
 import json, mimetypes, os, subprocess, sys, threading, tomllib, webbrowser
+
+import qc  # the "Check law codes" page
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
@@ -77,6 +79,8 @@ pre{background:#0f1720;color:#dbe4ee;border-radius:8px;padding:12px;font:12.5px/
     <div class="act row"><button id="logos">Fetch logos</button><a class="btn" href="/logos" target="_blank">Review logos</a></div></div>
   <div class="step"><span class="n">+</span><div><h2>Legislators</h2><p>Reads the House and Senate member lists on ilga.gov and saves each member's party, district and official photo into <code>content/legislators</code>. Run it at the start of each session or when members change, then review and publish.</p></div>
     <div class="act row"><button id="legs">Fetch legislators</button><a class="btn" href="/legislators" target="_blank">Review legislators</a></div></div>
+  <div class="step"><span class="n">+</span><div><h2>Check law codes</h2><p>Review the subtopic code of every bill that became law: one at a time, or a subtopic at a time. Mark each code correct, change it, or flag it as unsure. Each reviewer's decisions are saved in <code>inputs/qc</code>, and changed codes go on the site at the next <b>Check data</b> and <b>Publish</b>. Run <b>Check data</b> first so the list of laws is current.</p></div>
+    <div class="act row"><a class="btn" href="/qc" target="_blank">Check law codes</a></div></div>
   <div class="step"><span class="n">+</span><div><h2>Update bills from ILGA</h2><p>Downloads every House and Senate bill's current status from the General Assembly's public file repository (ftp.ilga.gov) into <code>inputs/actions</code>: dated actions, sponsors, short description and synopsis. <b>Check data</b> then brings the scraped bill file up to date with it (newer actions and stages, new laws, and bills introduced since the scrape) and builds the day-by-day replay. The first run takes about 40 minutes; later runs fetch only bills that changed. Run it before <b>Check data</b> each time you publish.</p></div>
     <div class="act row"><button id="acts">Update bills from ILGA</button></div></div>
   <div class="step"><span class="n">+</span><div><h2>Coding worksheet</h2><p>Makes a spreadsheet of every bill not yet coded in a session, in <code>inputs/worksheets</code>. Fill in <code>subtopic</code> and save it into that session's codes folder.</p></div>
@@ -132,6 +136,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, PAGE)
         if path == '/status':
             return self.send(200, json.dumps(status()), 'application/json')
+        if path == '/qc':
+            return self.send(200, qc.PAGE)
+        if path == '/qc/data':
+            live = [int(x['ga']) for x in CFG['bills']['sessions'] if x.get('status') != 'upcoming']
+            ga = int((parse_qs(urlparse(self.path).query).get('ga') or [max(live)])[0])
+            try:
+                body = {**qc.payload(OUT, DATA, ga), 'sessions': sorted(live, reverse=True)}
+            except Exception as e:  # noqa: BLE001 - shown on the page
+                body = {'error': f'Could not read the laws from the last check ({e}). Run "Check data" again.', 'sessions': sorted(live, reverse=True)}
+            return self.send(200, json.dumps(body), 'application/json')
         if path == '/report':
             f = OUT / 'report.html'
             return self.send(200, f.read_bytes()) if f.exists() else self.send(404, 'Run "Check data" first.')
@@ -166,6 +180,13 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get('Content-Length') or 0)
         body = json.loads(self.rfile.read(n) or b'{}')
         path = urlparse(self.path).path
+        if path == '/qc/save':
+            try:
+                cb = json.loads((OUT / 'site' / 'data' / 'codebook.json').read_text(encoding='utf-8'))
+                rows = qc.save(DATA, int(body['ga']), body.get('reviewer', ''), body.get('items', []), {int(k) for k in cb['subs']} | {-555})
+                return self.send(200, json.dumps({'ok': True, 'rows': rows}), 'application/json')
+            except Exception as e:  # noqa: BLE001 - shown to the reviewer
+                return self.send(200, json.dumps({'ok': False, 'message': f'Not saved: {e}'}), 'application/json')
         if path == '/run/build':
             ok = run('checking data', ['pipeline/build.py'])
         elif path == '/run/worksheet':

@@ -21,6 +21,21 @@ The project keeps its parts in two places:
 3. Save your file into the session's codes folder, e.g. `IAP/Website/inputs/codes/104/`. Give it any name. Each
    coder can keep their own file, and every `.xlsx` or `.csv` in the folder is read.
 
+### Checking the codes of enacted laws
+
+Open **Update website**, run **Check data**, then click **Check law codes**. Enter your name and work through every
+bill that became law:
+
+- **One at a time:** read the synopsis (every version, with the amendment that rewrote the bill marked) and the
+  codebook rule for the current code, then press **Enter** if the code is right, **C** to change it (type a code or
+  words and pick with the arrow keys), or **U** to flag it as unsure with a note. **←/→** move back and forward.
+- **By subtopic:** all laws under one code in a list. Change the ones that don't fit, then mark the rest correct with
+  one click. Usually the fastest way through.
+
+Decisions save as you go, one file per reviewer in `IAP/Website/inputs/qc/<session>/`, so several people can review
+at once. Changed codes override every other code at the next **Check data**; the report lists laws flagged as unsure
+and any laws reviewers coded differently. Then **Publish**.
+
 A code in a coding file overrides any code already in the scraped bill file. If two files give the same bill
 different codes, the check reports it and the bill stays "Not yet coded" until you agree.
 
