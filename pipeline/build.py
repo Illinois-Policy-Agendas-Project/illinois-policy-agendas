@@ -236,7 +236,10 @@ class SponsorParser:
                 return
             for j in range(i + 1, len(segs) + 1):
                 nm = '-'.join(segs[i:j]).strip()
-                rec(j, acc + [nm], score + (3 if nm in self.known else 0 if ' ' in nm else -5))
+                # a piece that starts with a bare word and a hyphen ("Murray-Kelly M. Cassidy") is the tail of a
+                # hyphenated surname glued to the next name, not a name of its own
+                bare = '-' in nm and ' ' not in nm.split('-')[0]
+                rec(j, acc + [nm], score + (3 if nm in self.known else 0 if ' ' in nm else -5) - (2 if bare and ' ' in nm else 0))
         rec(0, [], 0)
         return best[1]
 
@@ -276,18 +279,68 @@ class SponsorParser:
         return res
 
 
-def canonical_names(raw_triples):
+def name_parts(n):
+    """(first, middle initials, last, suffix) of "Daniel J. Ugaste" / "Napoleon Harris, III" / "Emanuel "Chris" Welch"."""
+    n = re.sub(r'"[^"]*"', ' ', n)
+    suf = ''
+    m = re.search(r',?\s+(Jr\.?|Sr\.?|II|III|IV)$', n)
+    if m:
+        suf, n = m.group(1).rstrip('.'), n[:m.start()]
+    t = n.replace(',', ' ').split()
+    if len(t) < 2:
+        return None
+    return t[0].lower(), [x[0].lower() for x in t[1:-1]], t[-1].lower(), suf
+
+
+def same_person(a, b):
+    """Spellings of one legislator: same last name; one first name starts the other (Dan, Daniel); middle initials and
+    suffixes don't conflict."""
+    pa, pb = name_parts(a), name_parts(b)
+    if not pa or not pb or pa[2] != pb[2]:
+        return False
+    if not (pa[0].startswith(pb[0]) or pb[0].startswith(pa[0])):
+        return False
+    if pa[1] and pb[1] and pa[1] != pb[1]:
+        return False
+    return not (pa[3] and pb[3] and pa[3] != pb[3])
+
+
+def canonical_names(raw_triples, preferred=()):
+    """One spelling per legislator. preferred: (chamber, name) pairs from the member list, used when they match."""
     names = {(ch, n) for ch, n, _ in raw_triples}
+    pref = defaultdict(list)
+    for ch, n in preferred:
+        pref[ch].append(n)
+    by_ch = defaultdict(list)
+    for ch, n in names:
+        by_ch[ch].append(n)
+    cache = {}
 
     def canon(ch, n):
+        if (ch, n) in cache:
+            return cache[(ch, n)]
+        out = n
         n2 = re.sub(r'\b([A-Z])(?=\s)', r'\1.', n)
         if (ch, n2) in names:
-            n = n2
+            out = n2
         for suf in (', Jr.', ', Sr.', ', II', ', III'):
-            if (ch, n + suf) in names:
-                return n + suf
-        hy = [m for c, m in names if c == ch and m.startswith(n + '-')]
-        return hy[0] if len(hy) == 1 else n
+            if (ch, out + suf) in names:
+                out = out + suf
+                break
+        else:
+            hy = [m for m in by_ch[ch] if m.startswith(out + '-')]
+            if len(hy) == 1:
+                out = hy[0]
+        # the member list's spelling when exactly one member matches; otherwise the longest spelling in the bills
+        match = [m for m in pref[ch] if same_person(out, m)]
+        if len(match) == 1:
+            out = match[0]
+        else:
+            alts = [m for m in by_ch[ch] if same_person(out, m)]
+            if alts and len({tuple(name_parts(m)[2:3]) for m in alts}) == 1 and all(same_person(x, y) for x in alts for y in alts):
+                out = max(alts, key=lambda m: (len(m), m))
+        cache[(ch, n)] = out
+        return out
     return canon
 
 
@@ -450,7 +503,12 @@ def build_bills(cfg, valid, rep):
     for s in sessions:
         for key, b in s['bills'].items():
             raw[key] = sp.parse(b['sponsors_raw'])
-    canon = canonical_names([t for l in raw.values() for t in l])
+    members = []
+    leg = ROOT / cfg.get('legislators', {}).get('file', '')
+    if cfg.get('legislators', {}).get('file') and leg.exists():
+        with leg.open(newline='', encoding='utf-8') as f:
+            members = [({'House': 'Rep', 'Senate': 'Sen'}.get(r['chamber'], ''), r['name']) for r in csv.DictReader(f)]
+    canon = canonical_names([t for l in raw.values() for t in l], members)
     people, links = {}, {}
     for key, lst in raw.items():
         out, seen = [], set()
