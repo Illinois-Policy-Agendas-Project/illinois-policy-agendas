@@ -467,6 +467,13 @@ footer.foot .fcopy{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.18);p
 @media (max-width:560px){ h1{font-size:28px} .home-title{font-size:36px} .rec-head h1{font-size:26px}
   nav.tabs .menu-btn{border-color:rgba(255,255,255,.35)} }
 
+.sankey .sk-l{fill-opacity:.32;transition:fill-opacity .12s} .sankey .sk-l:hover,.sankey .sk-l.on{fill-opacity:.62}
+.sankey .sk-t{font-size:12px;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.rp-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px} .rp-play{min-width:104px;justify-content:center}
+.rp-play::after{content:none!important} .rp-date{flex:1 1 220px;font-size:15px} .rp-date b{font-family:var(--f-display);font-weight:400;font-size:22px;color:var(--navy-2)}
+#rp-r{width:100%;accent-color:var(--navy);margin:0} .rp-wk{cursor:pointer;margin-top:2px} .rp-wk svg{display:block}
+.rp-cv{margin-top:6px} .rp-cv canvas{display:block;touch-action:pan-y}
+.rp-list{list-style:none;margin:0;padding:0;display:grid;gap:6px} .rp-list li{font-size:14px;line-height:1.45}
 /* ===== phones (after the IGPA block so these win) ===== */
 .tp-pick{display:none} .more-btn{margin:10px auto 0;display:flex;justify-content:center;width:100%}
 .mclamp.clamped{max-height:340px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
@@ -546,7 +553,7 @@ const DS = {
 const DSK = ['bills','sots','tt'], NOPOL = -555;
 /* top menu: [route, label, dot class, section]. Sponsors, Parties and Committees share the Legislature section and its sub-tabs. */
 const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['codebook','Codebook'],['sponsors','Legislature',null,'legislature'],['search','Search']];
-const LEGTABS = [['sponsors','Sponsors'],['parties','Parties'],['committees','Committees']];
+const LEGTABS = [['sponsors','Sponsors'],['parties','Parties'],['committees','Committees'],['replay','Day by day']];
 const TABLABEL = {sponsors:'Sponsors', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
@@ -643,7 +650,7 @@ const byDs = ds => BYDS[ds];
 /* ---------- tooltip ---------- */
 const tip = $('#tip');
 function showTip(e, html){ tip.innerHTML = html; tip.hidden = false; const w=tip.offsetWidth, h=tip.offsetHeight; let x=e.clientX+14, y=e.clientY+14;
-  if (x+w > innerWidth-8) x = e.clientX-w-14; if (y+h > innerHeight-8) y = e.clientY-h-14; tip.style.left=x+'px'; tip.style.top=y+'px'; }
+  if (x+w > innerWidth-8) x = e.clientX-w-14; if (y+h > innerHeight-8) y = e.clientY-h-14; x = Math.max(8, Math.min(x, innerWidth-w-8)); y = Math.max(8, y); tip.style.left=x+'px'; tip.style.top=y+'px'; }
 function hideTip(){ tip.hidden = true; }
 const tipRow = (cls, label, val) => `<div class="r"><span><i class="dot ${cls}"></i>${esc(label)}</span><b class="num">${val}</b></div>`;
 function bindTip(el, html){ el.addEventListener('pointermove', e=>showTip(e, html())); el.addEventListener('pointerleave', hideTip); }
@@ -1661,6 +1668,10 @@ function renderSponsors(){
     <div class="panel"><div class="chead"><h3 id="sn-ct-Sen"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Sen"></div></div>
     <div class="panel"><div class="chead"><h3 id="sn-ct-Rep"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Rep"></div></div>
   </div>
+  <div class="panel" style="margin-bottom:16px"><div class="chead"><h3 id="sk-t">Where bills go</h3>
+      <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['House','House bills'],['Senate','Senate bills']].map(([k,l])=>`<button data-sk="${k}" aria-pressed="${SK.ch===k}">${l}</button>`).join('')}</div></div>
+    <div id="sk"></div>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">Each ribbon is a group of bills, from the primary sponsor's party, through the bill's policy topic, to the furthest stage it reached. Hover for counts; click a topic to narrow the page to it. Follows the topic menus above.</p></div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h3 id="net-t">Co-sponsorship network</h3><span class="muted" style="font-size:12px" id="net-sub"></span></div>
     <div class="fbar" style="margin:4px 0 8px">
       <div class="seg" role="group" aria-label="Chamber">${[['Sen','Senate'],['Rep','House']].map(([k,l])=>`<button data-nc="${k}" aria-pressed="${NET.ch===k}">${l}</button>`).join('')}</div>
@@ -1678,6 +1689,7 @@ function renderSponsors(){
   </div>
   <div class="tscroll"><table class="dt" id="sn-t" style="min-width:0" data-mcap="20"><thead><tr>${[['name','Legislator'],['C','Primary sponsor'],['law','Bills that became law']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${k!=='name'?'text-align:right;width:180px':''}">${l} <span class="muted">${SN.sort===k?(SN.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
   bindLegBar();
+  $$('[data-sk]').forEach(b=>b.addEventListener('click', ()=>{ SK.ch=b.dataset.sk; $$('[data-sk]').forEach(x=>x.setAttribute('aria-pressed', x===b)); drawSponsorSankey(); }));
   $$('[data-nc]').forEach(b=>b.addEventListener('click', ()=>{ NET.ch=b.dataset.nc; NET.find=null; $$('[data-nc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); drawNetwork(); }));
   $('#net-min').addEventListener('change', e=>{ NET.min = e.target.value==='auto' ? 'auto' : +e.target.value; drawNetwork(); });
   $('#net-col')?.addEventListener('change', e=>{ NET.color = e.target.value; drawNetwork(); });
@@ -1701,7 +1713,7 @@ function snRows(){
 function snUpdate(){
   const rows = snRows();
   // one chart per chamber; they follow the topic filters but not the chamber buttons or name search, which narrow the table
-  drawNetwork();
+  drawNetwork(); drawSponsorSankey();
   const tops = Object.fromEntries(['Sen','Rep'].map(ch=>[ch, SPON.filter(p=>p.ch===ch).map(p=>[p, sponsorStats(p, SN.major, SN.sub, legGA())]).filter(([,s])=>s.law>0).sort((a,b)=>b[1].law-a[1].law || b[1].C-a[1].C || a[0].name.localeCompare(b[0].name)).slice(0,10)]));
   const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.law))));   // same scale in both charts
   for (const ch of ['Sen','Rep']){
@@ -1714,6 +1726,33 @@ function snUpdate(){
     <td class="num" style="text-align:right">${s.C?fmt(s.C):'<span class="muted">·</span>'}</td><td class="num" style="text-align:right">${s.law?fmt(s.law):'<span class="muted">·</span>'}</td></tr>`).join('')
     || `<tr><td colspan="3" class="muted" style="padding:20px">No legislators ${snTopic()?'introduced a bill on this topic':'match'}.</td></tr>`;
   $$('#sn-t tr.row').forEach(tr=>tr.addEventListener('click', e=>{ if (!e.target.closest('a')) nav(tr.dataset.h.slice(1)); }));
+}
+
+/* party of the primary sponsor → topic → furthest stage, for the session's House and Senate bills */
+const SK = { ch:'all' };
+const PARTY_ORDER = ['Democratic','Republican','Independent','Party not listed'];
+function topicNodes(rows, major, col, n=8){
+  // the largest topics get their own node and the rest share one; within a major topic the nodes are its subtopics
+  const key = major==null ? (r=>isPol(r) ? r.major : 'other') : (r=>r.sub ?? 'other');
+  const c = [...count(rows, key)].filter(([k])=>k!=='other').sort((a,b)=>b[1]-a[1]), keep = new Set(c.slice(0,n).map(([k])=>k));
+  const nodes = c.slice(0,n).map(([k],j)=>major==null ? {id:'m'+k, label:CB.majors[k]||('Topic '+k), code:k, color:shade(k,0,1), col, major:k}
+                                                      : {id:'s'+k, label:CB.subs[k]||('Subtopic '+k), code:k, color:shade(major, j, Math.min(n, c.length)), col, sub:k});
+  if (rows.some(r=>!keep.has(key(r)))) nodes.push({id:'other', label: major==null ? 'Other topics' : 'Other subtopics', color:'hsl(215 12% 70%)', col, click:false});
+  return {nodes, of: r => keep.has(key(r)) ? (major==null ? 'm'+key(r) : 's'+key(r)) : 'other'};
+}
+function drawSponsorSankey(){
+  const el = $('#sk'); if (!el) return;
+  const ga = legGA(), rows = byDs('bills').filter(r=>r.x.ga===ga && isBillHBSB(r) && (SK.ch==='all' || r.x.chamber===SK.ch) && (SN.major==null || r.major===SN.major) && (SN.sub==null || r.sub===SN.sub));
+  $('#sk-t').textContent = `Where bills go${snTopic()?' · '+snTopic():''}`;
+  if (!rows.length){ el.innerHTML = '<p class="muted" style="margin:0">No bills on this topic.</p>'; return; }
+  const party = r => chiefOf(r)?.party || 'Party not listed';
+  const parties = PARTY_ORDER.filter(pt=>rows.some(r=>party(r)===pt)).map(pt=>({id:'p'+pt, label:pt==='Party not listed'?pt:pt+' sponsor', color:PCSS[pt]||'hsl(215 12% 70%)', col:0, click:false}));
+  const tp = topicNodes(rows, SN.major, 1);
+  const flows = new Map(), add = (a,b) => { const k = a+'|'+b; flows.set(k, (flows.get(k)||0)+1); };
+  for (const r of rows){ const t = tp.of(r); add('p'+party(r), t); add(t, 'st'+(r.x.stage||1)); }
+  const links = [...flows].map(([k,v])=>{ const [s,t] = k.split('|'); return {s, t, v}; });
+  sankey(el, [...parties, ...tp.nodes, ...outcomeNodes(2)], links, {height: PHONE() ? 440 : 400, heads:['Primary sponsor', SN.major==null?'Topic':'Subtopic', 'Furthest stage'],
+    onNode: n=>{ if (n.major!=null){ SN.major=n.major; SN.sub=null; } else if (n.sub!=null) SN.sub=n.sub; else return; renderSponsors(); $('#sk').scrollIntoView({block:'center'}); }});
 }
 
 /* ---- sponsor page ---- */
@@ -1742,6 +1781,15 @@ SECTIONS.sponsor.push(
         segs: subSegs(mine, m, 1/mine.length, (c,n)=>`<div class="r"><span>Their bills</span><b class="num">${pct(n/mine.length)} (${fmt(n)})</b></div>`),
         tip:`<div class="r"><span>Their bills</span><b class="num">${pct(v/mine.length)} (${fmt(v)})</b></div><div class="r"><span>${chamberName(p.ch)} average</span><b class="num">${pct((cp.get(m)||0)/peers.length)}</b></div>`,
         onclick:()=>{ SPG.major = SPG.major===m?null:m; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }})), {labelW:230, rowH:23, valFmt:v=>pct(v,0)}); } },
+  { id:'flow', title:'Where their bills went', render(p, el){
+      const mine = p.bills.filter(b=>b.role==='C' && isBillHBSB(b.r)).map(b=>b.r);
+      if (mine.length < 2){ el.innerHTML = '<p class="muted" style="margin:0">Too few bills as primary sponsor to chart.</p>'; return; }
+      const tp = topicNodes(mine, null, 0, 6), flows = new Map();
+      for (const r of mine){ const k = tp.of(r)+'|st'+(r.x.stage||1); flows.set(k, (flows.get(k)||0)+1); }
+      el.innerHTML = `<p class="ink2" style="margin:0 0 8px;font-size:13.5px">The ${fmt(mine.length)} House and Senate bills they filed as primary sponsor, by topic and the furthest stage each reached. Click a topic to list those bills below.</p><div id="sg-sk"></div>`;
+      sankey($('#sg-sk'), [...tp.nodes, ...outcomeNodes(1)], [...flows].map(([k,v])=>{ const [s,t] = k.split('|'); return {s, t, v}; }),
+        {height: Math.max(200, Math.min(340, 60 + mine.length*3)), heads:['Topic','Furthest stage'],
+         onNode: n=>{ SPG.major = n.major; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }}); } },
   { id:'bills', title:'Bills', render(p, el){
       const counts = {all:p.bills.length}; for (const b of p.bills) counts[b.role]=(counts[b.role]||0)+1;
       el.innerHTML = `<div class="fbar" style="margin:0">
@@ -2045,6 +2093,52 @@ function divBars(el, items, colors, ends, {rowH=21}={}){
   $$('.hb', el).forEach(g=>{ const d=items[+g.dataset.i]; bindTip(g, ()=>`<div class="t"><span class="mono">${d.code}</span> ${esc(d.label)}</div><div class="r"><span>Democratic minus Republican share</span><b class="num">${d.value>=0?'+':''}${(d.value*100).toFixed(1)} points</b></div>`); });
 }
 
+/* Sankey: flows between columns of nodes.
+   nodes [{id, label, col, color, code}] in top-to-bottom order within each column; links [{s, t, v}] by node id.
+   Ribbons take the color of the node they leave. Hover a node or ribbon for counts; onNode(node) makes nodes clickable. */
+function sankey(el, nodes, links, {height=360, heads=[], unit='bills', onNode}={}){
+  for (const n of nodes) n.id = String(n.id); for (const l of links){ l.s = String(l.s); l.t = String(l.t); }
+  const W=cw(el), nar = W < 520, cols = Math.max(...nodes.map(n=>n.col))+1, nw = 12, top = heads.length ? 22 : 4, pad = nar ? 5 : 7;
+  const byId = new Map(nodes.map(n=>[n.id, Object.assign(n, {inV:0, outV:0, ins:[], outs:[]})]));
+  links = links.filter(l=>l.v>0 && byId.has(l.s) && byId.has(l.t));
+  for (const l of links){ byId.get(l.s).outV += l.v; byId.get(l.t).inV += l.v; byId.get(l.s).outs.push(l); byId.get(l.t).ins.push(l); }
+  for (const n of nodes) n.v = Math.max(n.inV, n.outV);
+  const live = nodes.filter(n=>n.v>0), colN = c => live.filter(n=>n.col===c);
+  const H = height, ih = H - top - 2;
+  const k = Math.min(...[...Array(cols)].map((_,c)=>{ const ns = colN(c); return ns.length ? (ih - pad*(ns.length-1)) / ns.reduce((a,n)=>a+n.v,0) : Infinity; }));
+  const X = c => cols===1 ? 0 : c*(W-nw)/(cols-1);
+  for (let c=0; c<cols; c++){ let y = top; for (const n of colN(c)){ n.x = X(c); n.y = y; n.h = Math.max(1, n.v*k); y += n.h + pad; } }
+  // stack ribbons on each node in the order of the nodes at their other end, so they don't cross needlessly
+  for (const n of live){ let y = n.y; for (const l of n.outs.sort((a,b)=>byId.get(a.t).y-byId.get(b.t).y)){ l.sy = y; y += l.v*k; }
+                         y = n.y; for (const l of n.ins.sort((a,b)=>byId.get(a.s).y-byId.get(b.s).y)){ l.ty = y; y += l.v*k; } }
+  const col = n => cssColor(n.color || '--accent');
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Flow diagram">`;
+  heads.forEach((h,c)=>{ const last = c===cols-1 && cols>1; s += `<text x="${last?W:X(c)}" y="12" text-anchor="${last?'end':'start'}" style="font-size:11.5px;font-weight:700;fill:var(--ink-2)">${esc(h)}</text>`; });
+  links.forEach((l,i)=>{ const a = byId.get(l.s), b = byId.get(l.t), x0 = a.x+nw, x1 = b.x, xm = (x0+x1)/2, w = l.v*k;
+    s += `<path class="sk-l" data-i="${i}" d="M${x0},${l.sy}C${xm},${l.sy} ${xm},${l.ty} ${x1},${l.ty}L${x1},${l.ty+w}C${xm},${l.ty+w} ${xm},${l.sy+w} ${x0},${l.sy+w}Z" style="fill:${col(a)}"/>`; });
+  const gap = cols>1 ? (W-nw)/(cols-1) - nw - 12 : W, chars = Math.max(8, Math.floor(gap/6.6) - 6);
+  live.forEach(n=>{ const last = n.col===cols-1 && cols>1, lab = n.label.length>chars ? n.label.slice(0,chars-1)+'…' : n.label;
+    s += `<g class="sk-n" data-id="${esc(String(n.id))}" style="cursor:${onNode?'pointer':'default'}"><rect x="${n.x}" y="${n.y}" width="${nw}" height="${n.h}" rx="2" style="fill:${col(n)}"/>`;
+    if (n.h >= 9 && !(last && nar)) s += `<text x="${last ? n.x-6 : n.x+nw+6}" y="${n.y+n.h/2+4}" text-anchor="${last?'end':'start'}" class="sk-t">${esc(lab)} <tspan style="fill:var(--muted)">${fmt(n.v)}</tspan></text>`;
+    s += `</g>`; });
+  s += `</svg>`;
+  if (nar && cols > 1) s += `<div class="legend" style="margin-top:6px">${live.filter(n=>n.col===cols-1).map(n=>`<span><i class="dot" style="background:${col(n)};border-radius:2px"></i>${esc(n.label)} <span class="muted num">${fmt(n.v)}</span></span>`).join('')}</div>`;
+  el.innerHTML = s; el.classList.add('chart', 'sankey');
+  const paths = $$('.sk-l', el), lit = on => paths.forEach(p=>p.classList.toggle('on', on(links[+p.dataset.i])));
+  const share = (v, of) => of ? ` <span class="muted">(${pct(v/of,0)})</span>` : '';
+  paths.forEach(p=>{ const l = links[+p.dataset.i], a = byId.get(l.s), b = byId.get(l.t);
+    p.addEventListener('pointermove', e=>{ lit(x=>x===l); showTip(e, `<div class="t">${esc(a.label)} → ${esc(b.label)}</div><div class="r"><span>${unit[0].toUpperCase()+unit.slice(1)}</span><b class="num">${fmt(l.v)}</b></div><div class="muted">${pct(l.v/a.v,0)} of ${esc(a.label)} · ${pct(l.v/b.v,0)} of ${esc(b.label)}</div>`); });
+    p.addEventListener('pointerleave', ()=>{ lit(()=>false); hideTip(); }); });
+  $$('.sk-n', el).forEach(g=>{ const n = byId.get(g.dataset.id);
+    const rows = (ls, end) => ls.slice().sort((a,b)=>b.v-a.v).slice(0,6).map(l=>`<div class="r"><span>${end==='t'?'→ ':'← '}${esc(byId.get(l[end]).label)}</span><b class="num">${fmt(l.v)}${share(l.v, n.v)}</b></div>`).join('');
+    g.addEventListener('pointermove', e=>{ lit(l=>l.s===n.id || l.t===n.id); showTip(e, `<div class="t">${n.code!=null?`<span class="mono">${n.code}</span> `:''}${esc(n.label)}</div><div class="r"><span>${unit[0].toUpperCase()+unit.slice(1)}</span><b class="num">${fmt(n.v)}</b></div>${rows(n.outs,'t')}${n.outs.length?'':rows(n.ins,'s')}${onNode&&n.click!==false?'<div class="muted">Click to select</div>':''}`); });
+    g.addEventListener('pointerleave', ()=>{ lit(()=>false); hideTip(); });
+    if (onNode && n.click!==false) g.addEventListener('click', ()=>{ hideTip(); onNode(n); }); });
+}
+/* furthest stage as a Sankey outcome column: became law at the top, never out of committee at the bottom */
+const OUTCOMES = [[5,'Became law','--navy'],[4,'Passed both chambers','hsl(212 58% 46%)'],[3,'Passed one chamber','hsl(212 52% 62%)'],[2,'Out of committee','hsl(212 45% 76%)'],[1,'Not out of committee','hsl(215 14% 80%)']];
+const outcomeNodes = col => OUTCOMES.map(([st,label,color])=>({id:'st'+st, label, color, col, click:false}));
+
 /* =================== COMMITTEES ===================
    Built in the browser from each bill's ILGA action history (bills/<ga>/actions.json), so it needs no extra data files.
    A bill counts for a committee when it was assigned (or re-assigned) to it, and as approved when the committee reported it
@@ -2211,7 +2305,146 @@ SECTIONS.committee.push(
 );
 
 /* =================== shell & routing =================== */
-const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch};
+/* =================== SESSION REPLAY ===================
+   Every House and Senate bill is a dot that moves between stage bands on the day ILGA recorded the action.
+   Data: bills/<ga>/timeline.json from the build (made from the dated actions that "Fetch bill actions" downloads):
+   {start, days, n:[actions per day], ev:{key:[day, stage, day, stage, ...]}}; stage 1-5 as in STAGES, 6 = vetoed. */
+const RP = { ga:null, t:0, playing:false, speed:7, color:'topic', ch:'all', major:null };
+const RP_BANDS = [[1,'In committee'],[2,'Out of committee'],[3,'Passed one chamber'],[4,'Passed both chambers'],[5,'Became law'],[6,'Vetoed']];
+const TL = {};
+let rpRun = 0;
+const rpDate = (tl, d) => { const x = new Date(tl.start+'T12:00:00'); x.setDate(x.getDate()+d); return x; };
+const rpIso = x => x.toISOString().slice(0,10);
+async function renderReplay(){
+  const ga = legGA(), me = ++rpRun;
+  $('#view').innerHTML = `${legBar('replay')}
+  <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from ILGA's dated bill actions</div><h1>The session, day by day</h1>
+    <p>Each dot is a House or Senate bill. Press play to watch bills move through the legislature on the days the General Assembly recorded each step, from introduction to committee, floor votes and the governor's desk. Hover a dot for the bill; click to open it.</p></div></div>
+  <div id="rp-body"><p class="muted">Loading…</p></div>`;
+  bindLegBar();
+  if (!(MAN.v||{})['timeline-'+ga]){ $('#rp-body').innerHTML = `<div class="panel"><p style="margin:0">The day-by-day replay for the ${gaName(ga)} isn't available yet. It appears once the bill action dates have been downloaded (<b>Fetch bill actions</b> in the Update website panel) and the site is published.</p></div>`; return; }
+  try { TL[ga] = TL[ga] || await get(`bills/${ga}/timeline`); } catch { $('#rp-body').innerHTML = '<p class="muted">Could not load the replay data.</p>'; return; }
+  if (me !== rpRun) return;
+  const tl = TL[ga]; if (RP.ga !== ga){ RP.ga = ga; RP.t = 0; RP.playing = false; }
+  $('#rp-body').innerHTML = `
+  <div class="panel rp">
+    <div class="rp-top">
+      <button class="btn primary rp-play" id="rp-play" aria-label="Play"></button>
+      <div class="rp-date"><b id="rp-d"></b><span class="muted" id="rp-dn"></span></div>
+      <div class="seg" role="group" aria-label="Speed">${[[2,'Slow'],[7,'Normal'],[30,'Fast']].map(([v,l])=>`<button data-sp="${v}" aria-pressed="${RP.speed===v}">${l}</button>`).join('')}</div>
+    </div>
+    <input type="range" id="rp-r" min="0" max="${tl.days-1}" step="1" value="${Math.floor(RP.t)}" aria-label="Day of the session">
+    <div id="rp-wk" class="rp-wk"></div>
+    <div class="fbar" style="margin:10px 0 6px">
+      <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['House','House bills'],['Senate','Senate bills']].map(([k,l])=>`<button data-rc="${k}" aria-pressed="${RP.ch===k}">${l}</button>`).join('')}</div>
+      <select id="rp-m" aria-label="Topic">${majorOptions(RP.major,'All topics')}</select>
+      <label class="ink2" for="rp-c" style="font-size:13px">Color by</label><select id="rp-c"><option value="topic" ${RP.color==='topic'?'selected':''}>Topic</option>${LEGS.length?`<option value="party" ${RP.color==='party'?'selected':''}>Sponsor's party</option>`:''}<option value="chamber" ${RP.color==='chamber'?'selected':''}>Chamber</option></select>
+    </div>
+    <div id="rp-cv" class="rp-cv"><canvas></canvas></div>
+    <div class="legend" id="rp-leg" style="margin-top:8px"></div>
+  </div>
+  <div class="panel"><div class="chead"><h3 id="rp-today-t">On this day</h3></div><div id="rp-today"></div></div>
+  <p class="muted" style="font-size:12px">Stages follow the same rules as the rest of the site: a bill is out of committee once a committee approves it or it is placed on the calendar, passes a chamber on a third-reading vote, and becomes law when it receives a Public Act number. Dates are from the General Assembly's Bill Status files; actions on the same day are shown together.</p>`;
+  bindReplay(tl);
+}
+function bindReplay(tl){
+  const keys = Object.keys(tl.ev).filter(k=>BILLKEY.has(k)), recs = keys.map(k=>BILLKEY.get(k)), N = keys.length;
+  const ev = keys.map(k=>tl.ev[k]), days = tl.days;
+  // how many bills sit in each band on each day, to size the bands once for the whole session
+  const diff = RP_BANDS.map(()=>new Int32Array(days+1));
+  ev.forEach(e=>{ for (let j=0; j<e.length; j+=2){ const b = e[j+1]-1, from = e[j], to = j+2<e.length ? e[j+2] : days; diff[b][from]++; diff[b][to]--; } });
+  const peak = diff.map(a=>{ let s=0, m=0; for (let d=0; d<days; d++){ s+=a[d]; if (s>m) m=s; } return m; });
+  // events by day, for the "on this day" list
+  const byDay = new Map(); ev.forEach((e,i)=>{ for (let j=0; j<e.length; j+=2){ const d=e[j]; if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push([i, e[j+1]]); } });
+  const intro = ev.map(e=>e.length ? e[0] : days);
+  const box = $('#rp-cv'), cv = $('canvas', box), ctx = cv.getContext('2d'), dpr = Math.min(2, devicePixelRatio||1);
+  const W = cw(box), nar = W < 560, lw = nar ? 0 : 168, pw = W - lw - 4, cell = Math.max(3, Math.min(6, pw/190)), per = Math.max(1, Math.floor(pw/cell)), sz = Math.max(2, cell*0.8);
+  const bands = []; let y = 0;
+  RP_BANDS.forEach(([st,label],b)=>{ if (!peak[b] && st===6) return; const top = y + (nar ? 18 : 0), rows = Math.max(1, Math.ceil(peak[b]/per)); bands[b] = {st, label, top, rows, h: rows*cell}; y = top + Math.max(rows*cell, nar ? 0 : 44) + (nar ? 10 : 14); });
+  const H = Math.ceil(y);
+  cv.width = W*dpr; cv.height = H*dpr; cv.style.width = W+'px'; cv.style.height = H+'px'; ctx.setTransform(dpr,0,0,dpr,0,0);
+  const X = new Float32Array(N), Y = new Float32Array(N), TX = new Float32Array(N), TY = new Float32Array(N), A = new Float32Array(N), TA = new Float32Array(N), cur = new Int8Array(N);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let colorOf, order, rank, groups, bandIdx = [], shown = -1;
+  const PC = {Democratic:'--pd', Republican:'--pr', Independent:'--pi'};
+  function recolor(){
+    const key = RP.color==='party' ? (r=>chiefOf(r)?.party || 'zz') : RP.color==='chamber' ? (r=>r.x.chamber) : (r=>isPol(r) ? r.major : 99);
+    const css = v => RP.color==='party' ? (PC[v] ? getComputedStyle(document.documentElement).getPropertyValue(PC[v]).trim() : '#b8c0cc')
+                   : RP.color==='chamber' ? (v==='House' ? '#2f6db5' : '#c0573e') : (v===99 ? '#b8c0cc' : shade(v,0,1));
+    const k = recs.map(key); colorOf = k.map(css);
+    // dots of one color sit together in each band; within a color, oldest bills first
+    rank = new Int32Array(N); order = [...Array(N).keys()].sort((a,b)=>(k[a]<k[b]?-1:k[a]>k[b]?1:0) || intro[a]-intro[b] || (keys[a]<keys[b]?-1:1)); order.forEach((i,j)=>rank[i]=j);
+    groups = new Map(); for (let i=0; i<N; i++){ const c = colorOf[i]; if (!groups.has(c)) groups.set(c, []); groups.get(c).push(i); }
+    const seen = new Map(); k.forEach((v,i)=>seen.set(v, (seen.get(v)||0)+1));
+    const lab = v => RP.color==='party' ? (v==='zz' ? 'Party not listed' : v) : RP.color==='chamber' ? v+' bills' : (v===99 ? 'No policy content or not coded' : CB.majors[v]);
+    $('#rp-leg').innerHTML = [...seen].sort((a,b)=>RP.color==='topic' ? b[1]-a[1] : String(a[0]).localeCompare(String(b[0]))).map(([v])=>`<span><i class="dot" style="background:${css(v)};border-radius:2px"></i>${esc(lab(v))}</span>`).join('');
+  }
+  const match = i => (RP.ch==='all' || recs[i].x.chamber===RP.ch) && (RP.major==null || recs[i].major===RP.major);
+  function place(day){
+    for (let i=0; i<N; i++){ const e = ev[i]; let st = 0; for (let j=0; j<e.length && e[j]<=day; j+=2) st = e[j+1]; cur[i] = st; }
+    bandIdx = RP_BANDS.map(()=>[]);
+    for (const i of order) if (cur[i]) bandIdx[cur[i]-1].push(i);
+    bandIdx.forEach((list,b)=>{ const bd = bands[b]; if (!bd) return; list.forEach((i,j)=>{ TX[i] = lw + Math.floor(j/bd.rows)*cell; TY[i] = bd.top + (j%bd.rows)*cell; }); });   // down each column first, so a band grows left to right like a bar
+    for (let i=0; i<N; i++){ TA[i] = cur[i] ? (match(i) ? 1 : .13) : 0; if (cur[i] && A[i]===0){ X[i]=TX[i]; Y[i]=TY[i]; } }
+  }
+  function today(day){
+    const d = rpDate(tl, day), list = byDay.get(day) || [];
+    $('#rp-d').textContent = d.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+    $('#rp-dn').textContent = ` · day ${fmt(day+1)} of ${fmt(days)} · ${pl(tl.n[day]||0, 'action')} recorded`;
+    $('#rp-r').value = day; drawWeeks(day);
+    const cnt = st => list.filter(([i,s])=>s===st && match(i)).length;
+    const big = list.filter(([i,s])=>s>=4 && match(i)).sort((a,b)=>b[1]-a[1]);
+    const word = {5:'Became law', 4:'Passed both chambers', 6:'Vetoed'};
+    $('#rp-today-t').textContent = `On ${d.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`;
+    const summary = [[1,'introduced'],[2,'out of committee'],[3,'passed a chamber']].map(([s,w])=>[cnt(s),w]).filter(([n])=>n).map(([n,w])=>`<b class="num">${fmt(n)}</b> ${w}`).join(' · ');
+    $('#rp-today').innerHTML = (summary ? `<p class="ink2" style="margin:0 0 8px">${summary}</p>` : '') +
+      (big.length ? `<ul class="rp-list">${big.slice(0,12).map(([i,s])=>{ const r = recs[i], ch = chiefOf(r); return `<li><span class="stage s${Math.min(s,5)}">${word[s]}</span> <a href="${href(r)}" class="mono">${esc(r.x.bill)}</a> <a href="${href(r)}" class="rl">${esc(r.x.short)}</a>${ch?` <span class="muted">· ${spLink(ch)}</span>`:''}</li>`; }).join('')}</ul>${big.length>12?`<p class="muted" style="margin:6px 0 0;font-size:12.5px">and ${fmt(big.length-12)} more</p>`:''}` : '')
+      || '<p class="muted" style="margin:0">No bill changed stage on this day.</p>';
+  }
+  const weeks = Math.ceil(days/7), wk = new Array(weeks).fill(0); tl.n.forEach((v,d)=>wk[Math.floor(d/7)] += v);
+  function drawWeeks(day){
+    const el = $('#rp-wk'), w = cw(el), h = 46, mx = Math.max(1, ...wk), bw = w/weeks;
+    el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Actions per week">${wk.map((v,i)=>`<rect x="${i*bw}" y="${h-2-(h-6)*v/mx}" width="${Math.max(1,bw-1)}" height="${(h-6)*v/mx}" style="fill:${i===Math.floor(day/7)?'var(--navy)':'var(--h2)'}"/>`).join('')}<line x1="${(day+.5)/days*w}" x2="${(day+.5)/days*w}" y1="0" y2="${h}" style="stroke:var(--navy);stroke-width:1.5"/></svg>`;
+  }
+  $('#rp-wk').addEventListener('click', e=>{ const b = e.currentTarget.getBoundingClientRect(); RP.t = Math.max(0, Math.min(days-1, Math.floor((e.clientX-b.left)/b.width*days))); });
+  $('#rp-wk').title = 'Actions recorded each week. Click to jump there.';
+  function frame(){
+    if (!document.contains(cv)) return;     // left the page
+    const now = performance.now(), dt = Math.min(.1, (now-(frame.last||now))/1000); frame.last = now;
+    if (RP.playing){ RP.t += dt*RP.speed; if (RP.t >= days-1){ RP.t = days-1; setPlay(false); } }
+    const day = Math.floor(RP.t); if (day !== shown){ shown = day; place(day); today(day); }
+    const k = reduce ? 1 : .16;
+    ctx.clearRect(0,0,W,H);
+    bands.forEach((bd,b)=>{ if (!bd) return; const n = bandIdx[b].filter(match).length;
+      ctx.fillStyle = '#f3f5f8'; ctx.fillRect(lw, bd.top, pw+2, bd.h);
+      ctx.fillStyle = '#13294b'; ctx.font = `600 ${nar?12:13}px Lato, sans-serif`; ctx.textBaseline = 'alphabetic';
+      if (nar){ ctx.fillText(bd.label, 0, bd.top-5); ctx.fillStyle='#5b6676'; ctx.font = '12px Lato, sans-serif'; ctx.textAlign='right'; ctx.fillText(fmt(n), W, bd.top-5); ctx.textAlign='left'; }
+      else { ctx.fillText(bd.label, 0, bd.top+14); ctx.fillStyle='#5b6676'; ctx.font = '600 20px Oswald, sans-serif'; ctx.fillText(fmt(n), 0, bd.top+38); } });
+    for (const [c, list] of groups){ ctx.fillStyle = c;
+      for (const i of list){ X[i] += (TX[i]-X[i])*k; Y[i] += (TY[i]-Y[i])*k; A[i] += (TA[i]-A[i])*(reduce?1:.2); if (A[i] < .02) continue;
+        ctx.globalAlpha = A[i]; ctx.fillRect(X[i], Y[i], sz, sz); } }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  }
+  const setPlay = on => { RP.playing = on; const b = $('#rp-play'); if (!b) return; b.innerHTML = on ? '❚❚ Pause' : (RP.t >= days-1 ? '↺ Replay' : '▶ Play'); b.setAttribute('aria-label', on ? 'Pause' : 'Play'); };
+  $('#rp-play').addEventListener('click', ()=>{ if (!RP.playing && RP.t >= days-1) RP.t = 0; setPlay(!RP.playing); });
+  $('#rp-r').addEventListener('input', e=>{ RP.t = +e.target.value; });
+  $$('[data-sp]').forEach(b=>b.addEventListener('click', ()=>{ RP.speed = +b.dataset.sp; $$('[data-sp]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }));
+  const refilter = () => { shown = -1; };
+  $$('[data-rc]').forEach(b=>b.addEventListener('click', ()=>{ RP.ch = b.dataset.rc; $$('[data-rc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); refilter(); }));
+  $('#rp-m').addEventListener('change', e=>{ RP.major = e.target.value==='' ? null : +e.target.value; refilter(); });
+  $('#rp-c').addEventListener('change', e=>{ RP.color = e.target.value; recolor(); refilter(); });
+  // hover and click: find the dot under the pointer from its band, row and column
+  const hit = e => { const b = cv.getBoundingClientRect(), x = e.clientX-b.left-lw, y = e.clientY-b.top; if (x < 0) return null;
+    for (let j=0; j<bands.length; j++){ const bd = bands[j]; if (!bd || y < bd.top || y >= bd.top+bd.h) continue; const idx = Math.floor(x/cell)*bd.rows + Math.floor((y-bd.top)/cell); return bandIdx[j][idx] ?? null; } return null; };
+  cv.addEventListener('pointermove', e=>{ const i = hit(e); if (i==null){ cv.style.cursor=''; return hideTip(); } cv.style.cursor='pointer'; const r = recs[i], ch = chiefOf(r);
+    showTip(e, `<div class="t"><span class="mono">${esc(r.x.bill)}</span> ${esc(r.x.short)}</div>${ch?`<div class="r"><span>Primary sponsor</span><b>${esc(ch.title)}</b></div>`:''}<div class="r"><span>Topic</span><b>${esc(r.sub!=null&&r.sub!==NOPOL?subName(r.sub):'No policy content')}</b></div><div class="r"><span>On this day</span><b>${esc(RP_BANDS[cur[i]-1][1])}</b></div><div class="muted">Click to open the bill</div>`); });
+  cv.addEventListener('pointerleave', hideTip);
+  cv.addEventListener('click', e=>{ const i = hit(e); if (i!=null){ hideTip(); RP.playing = false; nav(href(recs[i]).slice(1)); } });
+  recolor(); setPlay(RP.playing); requestAnimationFrame(frame);
+}
+
+const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch};
 let CUR = null, ROUTE = {view:'bills'}; const STACK = [];
 function parseRoute(t){
   if (RENDER[t]) return {view:t};
@@ -2262,7 +2495,7 @@ function needsFor(rt){
     case 'bill': { const r = recordFor(rt)?.rec; return {details:r?[r.x.ga]:[], links:all}; }
     case 'search': return {details: SR.gas==='latest' ? [LATEST] : all, links:all};
     case 'topics': case 'sponsors': case 'sponsor': return {details:[], links:all};
-    case 'committees': case 'parties': return {details:[], links:[BL.ga ?? LATEST]};
+    case 'committees': case 'parties': case 'replay': return {details:[], links:[BL.ga ?? LATEST]};
     case 'committee': return {details:[], links:[rt.ga]};
     default: return {details:[], links:[]};
   }

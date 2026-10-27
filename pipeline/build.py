@@ -440,7 +440,7 @@ def build_bills(cfg, valid, rep):
         coded = sum(1 for b in bills.values() if b['sub'] not in (None,))
         rep.stats[ds] = {'records': n, 'coded': coded, 'uncoded': n - coded}
         all_sponsor_strings += [b['sponsors_raw'] for b in bills.values() if b['sponsors_raw']]
-        sessions.append({'ga': ga, 'years': sess.get('years', ''), 'bills': bills})
+        sessions.append({'ga': ga, 'years': sess.get('years', ''), 'bills': bills, 'dated': load_dated_actions(sess, ga, bills, rep, ds)})
 
     # sponsors across all sessions
     sp = SponsorParser(all_sponsor_strings)
@@ -523,6 +523,74 @@ def bill_stage(steps, last_action, last_date, origin=None):
         law_date = last_date
     veto = any(re.search(r'Vetoed|Total Veto|Amendatory Veto', t) for t in texts)
     return stage, cmte, pa, law_date, veto
+
+
+def load_dated_actions(sess, ga, bills, rep, ds):
+    """{bill key: [(date, chamber, action)]} from the session's bill_actions.csv (made by fetch_actions.py), or None."""
+    if not sess.get('actions'):
+        return None
+    path = DATA / sess['actions'] / 'bill_actions.csv'
+    if not path.exists():
+        rep.note(ds, f'No dated actions yet ({show(path)}), so the site leaves out the day-by-day session replay. Click "Fetch bill actions" to download them.')
+        return None
+    out = defaultdict(list)
+    try:
+        with path.open(newline='', encoding='utf-8') as f:
+            for r in csv.DictReader(f):
+                key = f"{ga}-{r['bill'].replace(' ', '')}"
+                if key in bills and r['date']:
+                    out[key].append((r['date'], r['chamber'], r['action']))
+    except Exception as e:  # noqa: BLE001 - the replay is optional; never block publishing over it
+        rep.warn(ds, f'Could not read {show(path)}: {e}. The session replay is left out.')
+        return None
+    fetched = dt.datetime.fromtimestamp(path.stat().st_mtime).strftime('%Y-%m-%d')
+    rep.note(ds, f'Dated actions for {len(out):,} of {len(bills):,} bills, downloaded {fetched}.')
+    if len(out) < 0.9 * len(bills):
+        rep.warn(ds, f'Only {len(out):,} of {len(bills):,} bills have dated actions. Run "Fetch bill actions" again to fill in the rest.')
+    return dict(out)
+
+
+VETO = re.compile(r'Vetoed|Total Veto|Amendatory Veto')
+
+
+def stage_after(text, stage):
+    """The furthest stage once this action has happened; the same rules as bill_stage."""
+    if STAGE_LAW.match(text):
+        return 5
+    if STAGE_BOTH.search(text):
+        return max(stage, 4)
+    if STAGE_CHAMBER.search(text):
+        return max(stage, 3)
+    if STAGE_CMTE.match(text) or re.match(r'^(Second Reading|Placed on Calendar (Order of )?(2nd|3rd) Reading)', text):
+        return max(stage, 2)
+    return stage
+
+
+def timeline(dated):
+    """Each bill's moves between stages, by day, for the session replay.
+    start: the first day; n: actions taken on each day; ev: {key: [day, stage, day, stage, ...]} where stage is
+    1 introduced, 2 out of committee, 3 passed one chamber, 4 passed both chambers, 5 became law, 6 vetoed."""
+    start = min(a[0] for acts in dated.values() for a in acts)
+    d0 = dt.date.fromisoformat(start)
+    day = lambda d: (dt.date.fromisoformat(d) - d0).days
+    n, ev = defaultdict(int), {}
+    for key, acts in dated.items():
+        out, stage = [], 0
+        for d, _, text in sorted(acts, key=lambda a: a[0]):   # stable: keeps ILGA's order within a day
+            n[day(d)] += 1
+            if stage == 6:                                     # vetoed: only an override or accepted veto makes it law
+                new = 5 if STAGE_LAW.match(text) else 6
+            else:
+                new = 6 if stage < 5 and VETO.search(text) else stage_after(text, max(stage, 1))
+            if new != stage:
+                if out and out[-2] == day(d):
+                    out[-1] = new                              # several moves in one day: keep where it ended up
+                else:
+                    out += [day(d), new]
+                stage = new
+        ev[key] = out
+    last = max(n)
+    return {'start': start, 'days': last + 1, 'n': [n.get(i, 0) for i in range(last + 1)], 'ev': ev}
 
 
 # ------------------------------------------------------------------ speeches and reports
@@ -777,6 +845,8 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
         files[f'details-{ga}'] = dump(d / 'bills' / str(ga) / 'details.json', {k: b['synopsis'] for k, b in s['bills'].items()})
         files[f'actions-{ga}'] = dump(d / 'bills' / str(ga) / 'actions.json', {k: parse_actions(b['actions_raw'], b['last_action']) for k, b in s['bills'].items()})
         files[f'sponsors-{ga}'] = dump(d / 'bills' / str(ga) / 'sponsors.json', {k: links.get(k, []) for k in s['bills']})
+        if s.get('dated'):
+            files[f'timeline-{ga}'] = dump(d / 'bills' / str(ga) / 'timeline.json', timeline(s['dated']))
     files['people'] = dump(d / 'people.json', {'people': people})
     files['sots'] = dump(d / 'sots.json', {'cols': ['id', 'governor', 'year', 'text', 'sub'], 'rows': sots})
     for src, dest in logo_copies:

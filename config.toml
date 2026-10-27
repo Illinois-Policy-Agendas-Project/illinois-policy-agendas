@@ -25,11 +25,15 @@ columns = { year = "year", governor = "governor_name", party = "party" }
 #            unless a codes file gives a different code.
 #   codes:   folder of coding files. Every .xlsx / .csv in it is read. Each needs a `bill` column
 #            (e.g. "HB 1234") and a `subtopic` column. Codes here override the details file.
+#   actions: folder for the dated action history of every bill, written by "Fetch bill actions"
+#            (pipeline/fetch_actions.py) from the General Assembly's public file repository. Used for the
+#            day-by-day session replay; the site works without it.
 [[bills.sessions]]
 ga = 104
 years = "2025-2026"
 details = "../Bills/Live data/igbills_2025_2026_complete.xlsx"
 codes = "inputs/codes/104"
+actions = "inputs/actions/104"
 
 # Placeholder for the next General Assembly. While the bill file below doesn't exist, the site lists the
 # session as "not started" and the check passes. Once the scraper saves the file there, it goes live by itself;
@@ -41,6 +45,7 @@ starts = "January 2027"
 status = "upcoming"
 details = "../Bills/Live data/igbills_2027_2028_complete.xlsx"
 codes = "inputs/codes/105"
+actions = "inputs/actions/105"
 
 # Which measures count as "substantive bills" (everything else is left out of the site).
 [bills]

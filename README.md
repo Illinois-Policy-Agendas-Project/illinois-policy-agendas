@@ -71,6 +71,12 @@ Commit and push, and the site updates. Lab computers pick up the change the next
   `content/legislators/members.csv` and `content/legislators/photos/`. Check them with **Review legislators**, then publish.
   Run it at the start of each General Assembly. Sponsor pages then show party, district and photo, and the
   co-sponsorship network can be colored by party.
+- **Dated bill actions (the day-by-day session replay):** click **Fetch bill actions** in the control panel (or run
+  `python pipeline/fetch_actions.py`). It downloads every House and Senate bill's Bill Status file from the General
+  Assembly's public file repository (ftp.ilga.gov, which ILGA asks automated tools to use instead of ilga.gov) and saves
+  the date of every action in `IAP/Website/inputs/actions/<session>/bill_actions.csv`. The first run takes about half an
+  hour; later runs download only bills that changed. Then **Check data** and **Publish** as usual. Without that file the
+  site still builds; the replay page just says it isn't available yet.
 - **Design and features:** `site/index.html`.
 
 ## Common data changes (edit `config.toml`)
