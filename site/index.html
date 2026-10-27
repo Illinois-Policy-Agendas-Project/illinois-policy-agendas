@@ -2021,8 +2021,10 @@ const isBipartisan = r => { const c = chiefOf(r); if (!c?.party) return false; r
 function renderParties(){
   if (!LEGS.length){ $('#view').innerHTML = `${legBar('parties')}<div class="phead"><div><h1>Parties</h1><p>Party comparisons appear once the legislator list is published. Run <b>Fetch legislators</b> in the control panel, then Check data and Publish.</p></div></div>`; return; }
   const ga = legGA(), inCh = r => PT.ch==='all' || chiefOf(r)?.ch===PT.ch;
-  const allB = billsOf(ga).filter(r=>isBillT(r) && inCh(r)), known = allB.filter(r=>billParty(r)).length;
-  const B = billsOf(ga).filter(r=>isBillT(r) && billParty(r) && inCh(r)), by = pt => B.filter(r=>billParty(r)===pt);
+  // placeholder bills (technical shells that never passed a chamber) are left out unless asked for, as on the Members pages
+  const shells = billsOf(ga).filter(r=>isBillT(r) && inCh(r) && isPlaceholder(r)).length;
+  const allB = billsOf(ga).filter(r=>isBillT(r) && inCh(r) && keepBill(r)), known = allB.filter(r=>billParty(r)).length;
+  const B = billsOf(ga).filter(r=>isBillT(r) && billParty(r) && inCh(r) && keepBill(r)), by = pt => B.filter(r=>billParty(r)===pt);
   // seats: the current member list for the latest session; for earlier ones, the legislators who sponsored bills in it
   const seats = ga===LATEST ? LEGSEAT() : SPON.filter(p=>p.party && inGA(p, ga)), seat = (ch, pt) => seats.filter(l=>l.ch===ch && l.party===pt).length;
   const st = Object.fromEntries(PARTIES.map(pt=>{ const b = by(pt); return [pt, {n:b.length, out:b.filter(r=>r.x.stage>=2).length, law:b.filter(r=>r.x.stage>=5).length, bi:b.filter(isBipartisan).length}]; }));
@@ -2040,7 +2042,7 @@ function renderParties(){
   </div>
   ${known < allB.length*0.97 ? `<p class="muted" style="font-size:12.5px;margin:-6px 0 12px">The party is known for ${pct(known/Math.max(1,allB.length),0)} of this session's bills; the rest have a primary sponsor who isn't in the published member list. Add them to <code>content/legislators/members.csv</code> to include them.</p>` : ''}
   <div class="fbar"><div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['Rep','House bills'],['Sen','Senate bills']].map(([k,l])=>`<button data-pc="${k}" aria-pressed="${PT.ch===k}">${l}</button>`).join('')}</div>
-    <span class="muted" style="font-size:12.5px">By the chamber of the primary sponsor</span></div>
+    <span class="muted" style="font-size:12.5px">By the chamber of the primary sponsor</span>${shellToggle('pt-sh', shells)}</div>
   <div class="grid2">
     <div class="panel"><div class="chead"><h3>From introduction to law</h3><span class="muted" style="font-size:12px">Share of each party's bills reaching each stage</span></div>
       <table class="pfun"><thead><tr><th></th><th>Introduced</th><th>Out of committee</th><th>Became law</th></tr></thead><tbody>${PARTIES.map(pt=>{ const s = st[pt], cell = (v,ref) => `<td><b class="num">${fmt(v)}</b><span class="muted num"> ${ref?pct(v/Math.max(1,ref),0):''}</span><i class="pbar" style="width:${(100*v/Math.max(1,s.n)).toFixed(1)}%;background:var(${PCSS[pt]})"></i></td>`;
@@ -2078,7 +2080,7 @@ function renderParties(){
   // legislators who draw cross-party sponsors (both charts on one scale)
   const xrows = {};
   for (const pt of PARTIES){
-    xrows[pt] = SPON.filter(p=>p.party===pt && (PT.ch==='all'||p.ch===PT.ch)).map(p=>{ const mine = p.bills.filter(b=>b.role==='C' && b.r.x.ga===ga && isBillT(b.r)).map(b=>b.r); return [p, mine.length, mine.filter(isBipartisan).length]; })
+    xrows[pt] = SPON.filter(p=>p.party===pt && (PT.ch==='all'||p.ch===PT.ch)).map(p=>{ const mine = p.bills.filter(b=>b.role==='C' && b.r.x.ga===ga && isBillT(b.r) && keepBill(b.r)).map(b=>b.r); return [p, mine.length, mine.filter(isBipartisan).length]; })
       .filter(([,n])=>n>=10).sort((a,b)=>b[2]/b[1]-a[2]/a[1] || b[2]-a[2]).slice(0,10); }
   const xmax = niceMax(Math.max(0.01, ...PARTIES.flatMap(pt=>xrows[pt].map(([,n,k])=>k/n))));
   for (const pt of PARTIES){
@@ -2087,6 +2089,7 @@ function renderParties(){
   bindLegBar();
   $$('[data-pc]').forEach(b=>b.addEventListener('click', ()=>{ PT.ch=b.dataset.pc; renderParties(); }));
   $$('[data-pa]').forEach(b=>b.addEventListener('click', ()=>{ PT.agenda=b.dataset.pa; renderParties(); }));
+  $('#pt-sh')?.addEventListener('change', e=>{ SK.shell = e.target.checked; renderParties(); });
   $('#pt-dl').addEventListener('click', ()=>save(`ipap-${ga}-parties-by-topic.csv`, toCSV(['general_assembly','chamber','major_topic','major_topic_label',...PARTIES.flatMap(pt=>[`${pt.toLowerCase()}_bills`,`${pt.toLowerCase()}_share`,`${pt.toLowerCase()}_laws`]),'bipartisan_bills'],
     majors.map(m=>[ga, PT.ch==='all'?'both':chamberName(PT.ch), m, CB.majors[m], ...PARTIES.flatMap(pt=>{ const b = by(pt).filter(r=>r.major===m); return [b.length, (b.length/Math.max(1,by(pt).filter(isPol).length)).toFixed(4), b.filter(r=>r.x.stage>=5).length]; }), B.filter(r=>r.major===m && isBipartisan(r)).length]))));
 }
