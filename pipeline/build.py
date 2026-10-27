@@ -847,6 +847,11 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
         files[f'sponsors-{ga}'] = dump(d / 'bills' / str(ga) / 'sponsors.json', {k: links.get(k, []) for k in s['bills']})
         if s.get('dated'):
             files[f'timeline-{ga}'] = dump(d / 'bills' / str(ga) / 'timeline.json', timeline(s['dated']))
+        elif (ROOT / 'docs' / 'data' / 'bills' / str(ga) / 'timeline.json').exists():
+            # no dated actions on this computer yet: keep the replay that is already published rather than dropping it
+            old = (ROOT / 'docs' / 'data' / 'bills' / str(ga) / 'timeline.json').read_text(encoding='utf-8')
+            files[f'timeline-{ga}'] = dump(d / 'bills' / str(ga) / 'timeline.json', json.loads(old))
+            rep.note(f'Bills, {ga}th GA', 'Kept the published day-by-day replay as it was. Click "Fetch bill actions" to bring it up to date.')
     files['people'] = dump(d / 'people.json', {'people': people})
     files['sots'] = dump(d / 'sots.json', {'cols': ['id', 'governor', 'year', 'text', 'sub'], 'rows': sots})
     for src, dest in logo_copies:
