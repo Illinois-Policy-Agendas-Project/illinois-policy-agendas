@@ -2345,7 +2345,7 @@ SECTIONS.committee.push(
    committees of each chamber and then to the governor. Data: bills/<ga>/timeline.json from the build (timeline() in
    build.py, from the dated actions that "Update bills from ILGA" downloads):
    {start, days, n:[actions per day], cm:[[chamber, committee]], ev:{key:[day, place, committee, ...]}}. */
-const RP = { ga:null, t:0, playing:false, speed:7, color:'topic', ch:'all', major:null };
+const RP = { ga:null, t:0, playing:false, speed:3, color:'topic', ch:'all', major:null };   // speed: days per second
 const TL = {};
 let rpRun = 0;
 const rpDate = (tl, d) => { const x = new Date(tl.start+'T12:00:00'); x.setDate(x.getDate()+d); return x; };
@@ -2366,7 +2366,7 @@ async function renderReplay(){
     <div class="rp-top">
       <button class="btn primary rp-play" id="rp-play" aria-label="Play"></button>
       <div class="rp-date"><b id="rp-d"></b><span class="muted" id="rp-dn"></span></div>
-      <div class="seg" role="group" aria-label="Speed">${[[2,'Slow'],[7,'Normal'],[30,'Fast']].map(([v,l])=>`<button data-sp="${v}" aria-pressed="${RP.speed===v}">${l}</button>`).join('')}</div>
+      <div class="seg" role="group" aria-label="Speed">${[[1,'Slow'],[3,'Normal'],[30,'Fast']].map(([v,l])=>`<button data-sp="${v}" aria-pressed="${RP.speed===v}">${l}</button>`).join('')}</div>
     </div>
     <input type="range" id="rp-r" min="0" max="${tl.days-1}" step="1" value="${Math.floor(RP.t)}" aria-label="Day of the session">
     <div id="rp-wk" class="rp-wk"></div>
@@ -2374,6 +2374,7 @@ async function renderReplay(){
       <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['House','House bills'],['Senate','Senate bills']].map(([k,l])=>`<button data-rc="${k}" aria-pressed="${RP.ch===k}">${l}</button>`).join('')}</div>
       <select id="rp-m" aria-label="Topic">${majorOptions(RP.major,'All topics')}</select>
       <label class="ink2" for="rp-c" style="font-size:13px">Color by</label><select id="rp-c"><option value="topic" ${RP.color==='topic'?'selected':''}>Topic</option>${LEGS.length?`<option value="party" ${RP.color==='party'?'selected':''}>Sponsor's party</option>`:''}<option value="chamber" ${RP.color==='chamber'?'selected':''}>Chamber</option></select>
+      ${shellToggle('rp-sh', Object.keys(tl.ev).filter(k=>BILLKEY.has(k) && isPlaceholder(BILLKEY.get(k))).length)}
     </div>
     <div id="rp-cv" class="rp-cv"><canvas></canvas></div>
     <div class="legend" id="rp-leg" style="margin-top:8px"></div>
@@ -2384,7 +2385,8 @@ async function renderReplay(){
 }
 function bindReplay(tl){
   if (!tl.cm){ $('#rp-body').innerHTML = '<div class="panel"><p style="margin:0">This replay was built by an older version of the site. Run <b>Check data</b> and <b>Publish</b> to rebuild it.</p></div>'; return; }
-  const keys = Object.keys(tl.ev).filter(k=>BILLKEY.has(k)), recs = keys.map(k=>BILLKEY.get(k)), N = keys.length, days = tl.days;
+  // placeholder bills (technical shells that never passed a chamber) are left out unless asked for; boxes are sized without them
+  const keys = Object.keys(tl.ev).filter(k=>BILLKEY.has(k) && keepBill(BILLKEY.get(k))), recs = keys.map(k=>BILLKEY.get(k)), N = keys.length, days = tl.days;
   const ev = keys.map(k=>tl.ev[k]);
   // a bill's place is a container: a reading in one chamber, one committee, or a step after both chambers
   const cid = (pl, cm) => (pl===2 || pl===6) ? 'c'+cm : 'p'+pl;
@@ -2510,6 +2512,7 @@ function bindReplay(tl){
   $$('[data-rc]').forEach(b=>b.addEventListener('click', ()=>{ RP.ch = b.dataset.rc; $$('[data-rc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); refilter(); }));
   $('#rp-m').addEventListener('change', e=>{ RP.major = e.target.value==='' ? null : +e.target.value; refilter(); });
   $('#rp-c').addEventListener('change', e=>{ RP.color = e.target.value; recolor(); refilter(); });
+  $('#rp-sh').addEventListener('change', e=>{ SK.shell = e.target.checked; renderReplay(); });
   // hover and click: find the container under the pointer, then the dot from its column and row
   const hit = e => { const b = cv.getBoundingClientRect(), x = e.clientX-b.left, y = e.clientY-b.top;
     for (const c of C.values()){ if (x < c.x || x >= c.x+c.w || y < c.y || y >= c.y+c.h) continue;
