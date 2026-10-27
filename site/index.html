@@ -1513,7 +1513,7 @@ const spLink = p => `<a class="spn" href="#sponsor-${p.slug}">${esc(p.title)}</a
 const chamberName = ch => ch==='Rep' ? 'House' : 'Senate';
 const isBillHBSB = r => r.x.type==='HB' || r.x.type==='SB';
 function sponsorStats(p, major, sub=null, ga=null){
-  const bs = p.bills.filter(b=>(ga==null || b.r.x.ga===ga) && (major==null || b.r.major===major) && (sub==null || b.r.sub===sub)); const n = k => bs.filter(b=>b.role===k).length;
+  const bs = p.bills.filter(b=>keepBill(b.r) && (ga==null || b.r.x.ga===ga) && (major==null || b.r.major===major) && (sub==null || b.r.sub===sub)); const n = k => bs.filter(b=>b.role===k).length;
   const chief = bs.filter(b=>b.role==='C'), cb = chief.filter(b=>isBillHBSB(b.r));
   const tc = [...count(chief.filter(b=>isPol(b.r)), b=>b.r.major)].sort((a,b)=>b[1]-a[1])[0];
   return {all:bs.length, C:n('C'), H:n('H'), O:n('O'), S:n('S'), T:n('T'), law:cb.filter(b=>b.r.x.stage>=5).length, bills:cb.length, top:tc?tc[0]:null};
@@ -1530,7 +1530,7 @@ function netData(ch, major, sub, ga=null){
   const ties = new Map(), signs = new Map(), lead = new Map();   // signs: "co>lead" -> n
   const seen = new Set();
   for (const p of people) for (const {r} of p.bills){ if (seen.has(r)) continue; seen.add(r);
-    if (!isBillHBSB(r) || (ga!=null && r.x.ga!==ga) || (major!=null && r.major!==major) || (sub!=null && r.sub!==sub)) continue;
+    if (!isBillHBSB(r) || !keepBill(r) || (ga!=null && r.x.ga!==ga) || (major!=null && r.major!==major) || (sub!=null && r.sub!==sub)) continue;
     const here = (r.sp||[]).filter(([i])=>mine.has(i)); if (here.length < 1) continue;
     const L = here.find(([,ro])=>ro==='C') || here.find(([,ro])=>ro==='S'); if (!L) continue;
     lead.set(L[0], (lead.get(L[0])||0) + 1);
@@ -1647,7 +1647,7 @@ const snTopic = () => SN.sub!=null ? CB.subs[SN.sub] : SN.major!=null ? CB.major
 const inGA = (p, ga) => p.bills.some(b=>b.r.x.ga===ga);
 function renderSponsors(){
   const ga = legGA(), act = SPON.filter(p=>inGA(p, ga)), reps = act.filter(p=>p.ch==='Rep'), sens = act.filter(p=>p.ch==='Sen');
-  const most = (k) => act.map(p=>[p, p.bills.filter(b=>b.role===k && b.r.x.ga===ga).length]).sort((a,b)=>b[1]-a[1])[0] || [null, 0];
+  const most = (k) => act.map(p=>[p, p.bills.filter(b=>b.role===k && b.r.x.ga===ga && keepBill(b.r)).length]).sort((a,b)=>b[1]-a[1])[0] || [null, 0];
   const [mc, mcn] = most('C'), [mo, mon] = most('O');
   $('#view').innerHTML = `${legBar('sponsors')}
   <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Bill sponsors</h1>
@@ -1657,12 +1657,13 @@ function renderSponsors(){
     <div class="kpi"><span class="l">Legislators</span><span class="v">${act.length}</span><span class="s">${reps.length} House, ${sens.length} Senate, including members who left or joined mid-term</span></div>
     <div class="kpi"><span class="l">Most bills as primary sponsor</span><span class="v" style="font-size:18px;padding-block:5px">${mc?spLink(mc):'—'}</span><span class="s">${fmt(mcn)} bills</span></div>
     <div class="kpi"><span class="l">Most co-sponsorships</span><span class="v" style="font-size:18px;padding-block:5px">${mo?spLink(mo):'—'}</span><span class="s">${fmt(mon)} bills</span></div>
-    <div class="kpi"><span class="l">Sponsorship links</span><span class="v">${fmt(act.reduce((a,p)=>a+p.bills.filter(b=>b.r.x.ga===ga).length,0))}</span><span class="s">legislator–bill pairs</span></div>
+    <div class="kpi"><span class="l">Sponsorship links</span><span class="v">${fmt(act.reduce((a,p)=>a+p.bills.filter(b=>b.r.x.ga===ga && keepBill(b.r)).length,0))}</span><span class="s">legislator–bill pairs</span></div>
   </div>
   <div class="fbar">
     <input type="search" id="sn-q" placeholder="Find a legislator" value="${esc(SN.q)}" aria-label="Find a legislator">
     <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['Rep','House'],['Sen','Senate']].map(([k,l])=>`<button data-ch="${k}" aria-pressed="${SN.ch===k}">${l}</button>`).join('')}</div>
     <select id="sn-m" aria-label="Major topic">${majorOptions(SN.major,'Bills on any topic')}</select>
+    ${shellToggle('sn-sh', byDs('bills').filter(r=>r.x.ga===ga && isPlaceholder(r)).length)}
     ${SN.major!=null?`<select id="sn-s" aria-label="Subtopic">${subOptions(SN.major, SN.sub)}</select>`:''}
   </div>
   <div class="grid2">
@@ -1691,6 +1692,7 @@ function renderSponsors(){
   <div class="tscroll"><table class="dt" id="sn-t" style="min-width:0" data-mcap="20"><thead><tr>${[['name','Legislator'],['C','Primary sponsor'],['law','Bills that became law']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${k!=='name'?'text-align:right;width:180px':''}">${l} <span class="muted">${SN.sort===k?(SN.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
   bindLegBar();
   $('#sk-p').addEventListener('change', e=>{ SK.slug = e.target.value; drawSponsorSankey(); });
+  $('#sn-sh').addEventListener('change', e=>{ SK.shell = e.target.checked; renderSponsors(); });
   $$('[data-nc]').forEach(b=>b.addEventListener('click', ()=>{ NET.ch=b.dataset.nc; NET.find=null; $$('[data-nc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); drawNetwork(); }));
   $('#net-min').addEventListener('change', e=>{ NET.min = e.target.value==='auto' ? 'auto' : +e.target.value; drawNetwork(); });
   $('#net-col')?.addEventListener('change', e=>{ NET.color = e.target.value; drawNetwork(); });
@@ -1743,6 +1745,8 @@ function topicNodes(rows, major, col, n=8){
 }
 const STOP = 'hsl(215 14% 78%)';
 const isPlaceholder = r => /-TECH$/i.test((r.x.short||'').trim()) && (r.x.stage||1) < 3;
+const keepBill = r => SK.shell || !isPlaceholder(r);   // legislator counts leave out placeholder bills unless asked
+const shellToggle = (id, n) => `<label class="check" style="font-size:13px" title="Technical shell bills (short titles ending in -TECH) that never passed a chamber"><input type="checkbox" id="${id}" ${SK.shell?'checked':''}>Include placeholder bills${n?` <span class="muted num">${fmt(n)}</span>`:''}</label>`;
 const shellNote = (n, id) => n ? `<label class="check" style="font-size:12.5px"><input type="checkbox" id="${id}" ${SK.shell?'checked':''}>Include ${pl(n, 'placeholder bill')}</label>` : '';
 function memberSankey(el, rows, {major=null, onNode, height}={}){
   const tp = topicNodes(rows, major, 0, 7), color = new Map(tp.nodes.map(n=>[n.id, n]));
@@ -1776,17 +1780,16 @@ function drawSponsorSankey(){
   const [p, mine] = who.find(([q])=>q.slug===SK.slug), shells = allOf(p).filter(isPlaceholder).length;
   $('#sk-t').innerHTML = `Where ${esc(p.title)}'s bills went${snTopic()?' · '+esc(snTopic()):''}`;
   memberSankey(el, mine, {major: SN.major, onNode: n=>{ if (n.major!=null){ SN.major=n.major; SN.sub=null; } else if (n.sub!=null) SN.sub=n.sub; else return; renderSponsors(); $('#sk').scrollIntoView({block:'center'}); }});
-  $('#sk-note').innerHTML = `The ${pl(mine.length, 'House or Senate bill')} ${esc(p.title)} filed as primary sponsor in the ${gaName(ga)}${snTopic()?' on this topic':''}, followed from topic to how far each got. Each strand is one bill: hover to see it, click to open it. ${shells && !SK.shell ? `Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber). ` : ''}Pick another legislator above (number of bills in brackets), or <a href="#sponsor-${p.slug}">open their page</a>. ${shellNote(shells, 'sk-sh')}`;
-  $('#sk-sh')?.addEventListener('change', e=>{ SK.shell = e.target.checked; drawSponsorSankey(); });
+  $('#sk-note').innerHTML = `The ${pl(mine.length, 'House or Senate bill')} ${esc(p.title)} filed as primary sponsor in the ${gaName(ga)}${snTopic()?' on this topic':''}, followed from topic to how far each got. Each strand is one bill: hover to see it, click to open it. ${shells && !SK.shell ? `Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber). ` : ''}Pick another legislator above (number of bills in brackets), or <a href="#sponsor-${p.slug}">open their page</a>.`;
 }
 
 /* ---- sponsor page ---- */
 const SPG = { slug:null, role:'C', major:null, law:false, page:0 };
 SECTIONS.sponsor = [];
 SECTIONS.sponsor.push(
-  { id:'activity', title:'', render(p, el){ const s = sponsorStats(p);
+  { id:'activity', title:'', render(p, el){ const s = sponsorStats(p), shells = p.bills.filter(b=>b.role==='C' && isPlaceholder(b.r)).length;
       el.innerHTML = `<div class="kpis" style="margin:0">
-        <div class="kpi"><span class="l">Primary sponsor</span><span class="v">${fmt(s.C)}</span><span class="s">${fmt(s.bills)} of them bills (HB/SB)</span></div>
+        <div class="kpi"><span class="l">Primary sponsor</span><span class="v">${fmt(s.C)}</span><span class="s">${fmt(s.bills)} of them bills (HB/SB)${shells && !SK.shell ? `, not counting ${pl(shells, 'placeholder bill')}` : ''}</span></div>
         <div class="kpi"><span class="l">Bills that became law</span><span class="v">${fmt(s.law)}</span><span class="s">${s.bills?pct(s.law/s.bills)+' of their bills':'no bills as primary sponsor'}</span></div>
         <div class="kpi"><span class="l">Original co-sponsor</span><span class="v">${fmt(s.H)}</span><span class="s">co-sponsored at introduction</span></div>
         <div class="kpi"><span class="l">Co-sponsor</span><span class="v">${fmt(s.O)}</span><span class="s">${fmt(s.S+s.T)} more in the other chamber</span></div></div>`; } },
@@ -1797,9 +1800,9 @@ SECTIONS.sponsor.push(
       el.innerHTML = (a.length||b.length) ? `${a.length?`<div class="eyebrow" style="margin-bottom:4px">Co-sponsor their bills most</div>${rows(a)}`:''}${b.length?`<div class="eyebrow" style="margin:10px 0 4px">They co-sponsor bills by</div>${rows(b)}`:''}
         <p class="muted" style="margin:8px 0 0;font-size:12px">Within the ${chamberName(p.ch)}, counting shared bills. <a href="#sponsors">See the network</a>.</p>` : '<p class="muted" style="margin:0">No co-sponsorship ties in their chamber.</p>'; } },
   { id:'topics', title:'What they introduce', render(p, el){
-      const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r)).map(b=>b.r);
+      const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r) && keepBill(b.r)).map(b=>b.r);
       if (!mine.length){ el.innerHTML = '<p class="muted" style="margin:0">No policy-coded bills as primary sponsor.</p>'; return; }
-      const peers = byDs('bills').filter(r=>isPol(r) && chiefOf(r)?.ch===p.ch);
+      const peers = byDs('bills').filter(r=>isPol(r) && keepBill(r) && chiefOf(r)?.ch===p.ch);
       const c = count(mine, r=>r.major), cp = count(peers, r=>r.major);
       el.innerHTML = `<p class="ink2" style="margin:0;font-size:13.5px">Major topics of the ${fmt(mine.length)} policy bills they introduced. Hover for the ${chamberName(p.ch)} average. Click a topic to list those bills below.</p><div id="sg-tp"></div>`;
       hbars($('#sg-tp'), [...c].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([m,v])=>({label:CB.majors[m], code:m, value:v/mine.length, color:'--s-bills', on:SPG.major===m,
@@ -1814,13 +1817,15 @@ SECTIONS.sponsor.push(
       memberSankey($('#sg-sk'), mine, {height: Math.max(220, Math.min(360, 80 + mine.length*3)),
          onNode: n=>{ if (n.major==null) return; SPG.major = n.major; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }}); } },
   { id:'bills', title:'Bills', render(p, el){
-      const counts = {all:p.bills.length}; for (const b of p.bills) counts[b.role]=(counts[b.role]||0)+1;
+      const kept = p.bills.filter(b=>keepBill(b.r)), shells = p.bills.length - kept.length;
+      const counts = {all:kept.length}; for (const b of kept) counts[b.role]=(counts[b.role]||0)+1;
+      if (SPG.role!=='all' && !(SPG.role==='ST' ? (counts.S||0)+(counts.T||0) : counts[SPG.role])) SPG.role = 'all';   // e.g. every primary bill was a placeholder
       el.innerHTML = `<div class="fbar" style="margin:0">
           <div class="seg" role="group" aria-label="Role">${[['C','Primary sponsor'],['H','Original co-sponsor'],['O','Co-sponsor'],['ST','Other chamber'],['all','All']].map(([k,l])=>{ const n = k==='ST'?(counts.S||0)+(counts.T||0):counts[k]||0; return `<button data-r="${k}" aria-pressed="${SPG.role===k}" ${n?'':'disabled'}>${l} <span class="muted num">${fmt(n)}</span></button>`; }).join('')}</div>
-          <select id="sg-m" aria-label="Topic">${majorOptions(SPG.major)}</select><label class="check"><input type="checkbox" id="sg-l" ${SPG.law?'checked':''}>Became law</label></div>
+          <select id="sg-m" aria-label="Topic">${majorOptions(SPG.major)}</select><label class="check"><input type="checkbox" id="sg-l" ${SPG.law?'checked':''}>Became law</label>${shells?shellToggle('sg-sh2', shells):''}</div>
         <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="sg-n"></span><button class="btn primary" id="sg-dl">Download these bills</button></div></div>
         <div class="tscroll"><table class="dt" style="min-width:640px"><thead><tr><th>Bill</th><th>Description</th><th>Role</th><th>Topic</th><th>Latest action</th></tr></thead><tbody id="sg-tb"></tbody></table></div><div class="pager" id="sg-pg" style="margin-top:4px"></div>`;
-      const draw = ()=>{ const rows = newest(p.bills.filter(b=>(SPG.role==='all'||b.role===SPG.role||(SPG.role==='ST'&&(b.role==='S'||b.role==='T'))) && (SPG.major==null||b.r.major===SPG.major) && (!SPG.law||b.r.x.stage>=5)).map(b=>Object.assign(Object.create(b.r),{_role:b.role})));
+      const draw = ()=>{ const rows = newest(kept.filter(b=>(SPG.role==='all'||b.role===SPG.role||(SPG.role==='ST'&&(b.role==='S'||b.role==='T'))) && (SPG.major==null||b.r.major===SPG.major) && (!SPG.law||b.r.x.stage>=5)).map(b=>Object.assign(Object.create(b.r),{_role:b.role})));
         $('#sg-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> bills`; $('#sg-dl').disabled = !rows.length;
         $('#sg-dl').onclick = ()=>save(`ipap-${p.slug}-bills.csv`, csvFor(rows.map(r=>Object.getPrototypeOf(r))));
         const PS=25, pages=Math.ceil(rows.length/PS); SPG.page=Math.min(SPG.page,Math.max(0,pages-1));
@@ -1835,18 +1840,19 @@ SECTIONS.sponsor.push(
       $$('[data-r]', el).forEach(b=>b.addEventListener('click', ()=>{ SPG.role=b.dataset.r; SPG.page=0; $$('[data-r]', el).forEach(x=>x.setAttribute('aria-pressed', x===b)); draw(); }));
       $('#sg-m').addEventListener('change', e=>{ SPG.major=e.target.value===''?null:+e.target.value; SPG.page=0; draw(); });
       $('#sg-l').addEventListener('change', e=>{ SPG.law=e.target.checked; SPG.page=0; draw(); });
+      $('#sg-sh2')?.addEventListener('change', e=>{ SK.shell = e.target.checked; renderRecord(); });
       draw(); } },
   { id:'facts', title:'At a glance', side:true, render(p, el){ const ds = p.bills.map(b=>b.r.x.intro).sort();
       el.innerHTML = factList([['Chamber',chamberName(p.ch)],['Bills',fmt(p.bills.length)],['First listed',ds[0]||'—'],['Most recent',ds[ds.length-1]||'—']]); } },
   { id:'partners', title:'Frequent collaborators', side:true, render(p, el){
-      const tally = (pred) => { const m = new Map(); for (const b of p.bills) if (pred(b)) for (const [i,ro] of b.r.sp) if (i!==p.i && (b.role==='C' ? true : ro==='C')) m.set(i,(m.get(i)||0)+1); return [...m].sort((a,b)=>b[1]-a[1]).slice(0,6); };
+      const tally = (pred) => { const m = new Map(); for (const b of p.bills) if (pred(b) && keepBill(b.r)) for (const [i,ro] of b.r.sp) if (i!==p.i && (b.role==='C' ? true : ro==='C')) m.set(i,(m.get(i)||0)+1); return [...m].sort((a,b)=>b[1]-a[1]).slice(0,6); };
       const on = tally(b=>b.role==='C'), join = tally(b=>b.role!=='C');
       const list = (rows, unit) => rows.length ? rows.map(([i,n])=>`<div class="pr"><span>${spLink(SPON[i])}<span class="muted" style="font-size:12px"> · ${chamberName(SPON[i].ch)}</span></span><span class="muted num">${fmt(n)}</span></div>`).join('') : '<p class="muted" style="margin:0;font-size:13px">None</p>';
       el.innerHTML = `<div><div class="rel-h" style="margin-bottom:4px"><b>Sign onto their bills most</b></div>${list(on)}</div>
         <div><div class="rel-h" style="margin-bottom:4px"><b>Whose bills they join most</b></div>${list(join)}</div>
         <p class="muted" style="margin:0;font-size:12px">Counts of shared bills, any sponsor role.</p>`; } },
   { id:'related', title:'Mentioned in speeches and reports', side:true, render(p, el){
-      const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r)).map(b=>b.r); const subs = [...count(mine, r=>r.sub)].sort((a,b)=>b[1]-a[1]).slice(0,3);
+      const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r) && keepBill(b.r)).map(b=>b.r); const subs = [...count(mine, r=>r.sub)].sort((a,b)=>b[1]-a[1]).slice(0,3);
       if (!subs.length){ el.innerHTML = '<p class="muted" style="margin:0;font-size:13px">No policy-coded bills to match on.</p>'; return; }
       el.innerHTML = `<p class="ink2" style="margin:0;font-size:13px">How often governors and think tanks address the subtopics this legislator introduces most.</p>` + subs.map(([s,n])=>{ const sp = byDs('sots').filter(r=>r.sub===s).length, tt = byDs('tt').filter(r=>r.sub===s).length;
         return `<button class="subrow" data-s="${s}"><span>${subChip(s, false, false)}</span><span class="muted num" style="font-size:12px">${fmt(n)} of their bills · ${fmt(sp)} speech sentences · ${fmt(tt)} reports</span></button>`; }).join('');
