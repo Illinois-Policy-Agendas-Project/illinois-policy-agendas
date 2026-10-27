@@ -90,6 +90,55 @@ file = "content/legislators/members.csv"
 file = "inputs/thinktanks/Illinois Think Tank Reports.xlsx"
 profiles = "content/thinktanks/profiles.toml"   # in this repository; bios, and logos in content/thinktanks/logos/
 columns = { id = "id", org = "think_tank", date = "date", year = "year", title = "title", abstract = "abstract", url = "url", pdf = "pdf_url", subtopic = "subtopic" }
+# New reports found by "Update think tank reports" (pipeline/fetch_reports.py) go here for coders, not into `file`.
+# A row appears on the site once it has a subtopic; delete rows that aren't reports.
+new = "inputs/thinktanks/new_reports.xlsx"
+
+# Where to look for each organization's new reports. `org` must match the think_tank column.
+#   kind = "wp"     a WordPress site's listing (`type` is the post type: "posts", or e.g. "report")
+#   kind = "links"  links on a listing page whose address matches `match` (a regular expression)
+# An organization with no entry here is collected by hand.
+[[thinktanks.sources]]
+org = "Illinois Policy"
+kind = "wp"
+site = "https://www.illinoispolicy.org"
+type = "report"
+
+[[thinktanks.sources]]
+org = "Illinois Economic Policy Institute"
+kind = "wp"
+site = "https://www.illinoisepi.org"
+type = "posts"
+
+[[thinktanks.sources]]
+org = "Center for Tax and Budget Accountability"
+kind = "links"
+url = "https://www.ctbaonline.org/reports"
+match = "^/reports/[^/?#]+$"
+
+[[thinktanks.sources]]
+org = "Center for Neighborhood Technology"
+kind = "links"
+url = "https://cnt.org/publications"
+match = "^/publications/[^/?#]+$"
+
+[[thinktanks.sources]]
+org = "Institute for Government and Public Affairs"
+kind = "links"
+url = "https://igpa.uillinois.edu/reports/"
+match = "^/the-repository/[^/?#]+$"
+
+[[thinktanks.sources]]
+org = "Delta Institute"
+kind = "wp"
+site = "https://delta-institute.org"
+type = "posts"
+
+[[thinktanks.sources]]
+org = "Chicago Urban League"
+kind = "links"
+url = "https://chiul.org/research/"
+match = "/wp-content/uploads/.+\\.pdf$"
 
 # ---------------------------------------------------------------- home page
 [site]

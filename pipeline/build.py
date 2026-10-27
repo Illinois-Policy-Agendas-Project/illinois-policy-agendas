@@ -809,6 +809,7 @@ def build_tt(cfg, valid, rep):
         y = r.get(c['year'])
         rows.append([int(r[c['id']]), fix_text(r[c['org']]), to_date(r.get(c['date'])), int(y) if pd.notna(y) else None,
                      fix_text(r[c['title']]) or '', fix_text(r.get(c['abstract'])) or '', fix_text(r.get(c['url'])), fix_text(r.get(c['pdf'])), code])
+    add_new_reports(cfg, valid, rep, ds, rows, bad)
     if bad:
         rep.error(ds, f'{pl(len(bad), "report has a code", "reports have codes")} not in the codebook.', bad)
     undated = sum(1 for r in rows if r[3] is None)
@@ -816,6 +817,40 @@ def build_tt(cfg, valid, rep):
         rep.note(ds, f'{pl(undated, "report has", "reports have")} no date.')
     rep.stats[ds] = {'records': len(rows), 'coded': sum(1 for r in rows if r[8] is not None), 'uncoded': sum(1 for r in rows if r[8] is None)}
     return rows
+
+
+def add_new_reports(cfg, valid, rep, ds, rows, bad):
+    """Reports found by "Update think tank reports" (fetch_reports.py) and coded in the new-reports file. A row goes on the
+    site once it has a subtopic; one whose id is already in the main reports file is left out (it was moved there)."""
+    path = DATA / cfg['thinktanks'].get('new', '')
+    if not cfg['thinktanks'].get('new') or not path.is_file():
+        return
+    try:
+        df = read_table(path)
+    except Exception as e:  # noqa: BLE001
+        rep.error(ds, f'Could not read {show(path)}: {e}')
+        return
+    have = {r[0] for r in rows}
+    added, waiting, moved = 0, [], 0
+    for r in df.to_dict('records'):
+        if pd.isna(r.get('id')):
+            continue
+        rid = int(r['id'])
+        if rid in have:
+            moved += 1
+            continue
+        code = check_code(to_code(r.get('subtopic')), valid, rep, ds, f'new report id {rid}', bad)
+        if code is None:
+            waiting.append(f'{r.get("think_tank")}: {r.get("title")}')
+            continue
+        y = r.get('year')
+        rows.append([rid, fix_text(r.get('think_tank')), to_date(r.get('date')), int(y) if pd.notna(y) else None,
+                     fix_text(r.get('title')) or '', fix_text(r.get('abstract')) or '', fix_text(r.get('url')), fix_text(r.get('pdf_url')), code])
+        have.add(rid)
+        added += 1
+    rep.note(ds, f'New reports file: {pl(added, "coded report")} added to the site' + (f'; {moved} already in the main file' if moved else '') + '.')
+    if waiting:
+        rep.warn(ds, f'{pl(len(waiting), "new report is", "new reports are")} waiting for a subtopic in {path.name} and {"is" if len(waiting) == 1 else "are"} not on the site yet.', waiting)
 
 
 # ------------------------------------------------------------------ think tank profiles

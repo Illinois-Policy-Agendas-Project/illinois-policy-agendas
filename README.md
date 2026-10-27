@@ -86,6 +86,14 @@ Commit and push, and the site updates. Lab computers pick up the change the next
   `content/legislators/members.csv` and `content/legislators/photos/`. Check them with **Review legislators**, then publish.
   Run it at the start of each General Assembly. Sponsor pages then show party, district and photo, and the
   co-sponsorship network can be colored by party.
+- **New think tank reports:** click **Update think tank reports** in the control panel (or run
+  `python pipeline/fetch_reports.py`). For each organization with a source under `[[thinktanks.sources]]` in
+  `config.toml` it reads the organization's listing, skips reports already on file, and adds new ones (title, date,
+  summary, link and PDF) to `IAP/Website/inputs/thinktanks/new_reports.xlsx` with an empty `subtopic`. Coders fill in
+  `subtopic` there and delete rows that aren't reports; each report goes on the site once it is coded. Deleted rows are
+  not offered again (`found.json` remembers them). It only looks back to a few weeks before each organization's latest
+  report on file. Sites that block automated requests (CTBA and ILEPI did from a cloud server) and organizations
+  without a source are collected by hand into the main reports file as before.
 - **Keeping bills current (and the day-by-day replay):** click **Update bills from ILGA** in the control panel (or run
   `python pipeline/fetch_actions.py`) before **Check data**. It downloads every House and Senate bill's Bill Status file
   from the General Assembly's public file repository (ftp.ilga.gov, which ILGA asks automated tools to use instead of

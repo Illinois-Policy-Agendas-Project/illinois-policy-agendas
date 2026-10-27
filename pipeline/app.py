@@ -75,6 +75,8 @@ pre{background:#0f1720;color:#dbe4ee;border-radius:8px;padding:12px;font:12.5px/
     <div class="act row"><a class="btn" href="/report" target="_blank">Open report</a><a class="btn" href="/preview/" target="_blank">Preview site</a></div></div>
   <div class="step"><span class="n">3</span><div><h2>Publish</h2><p id="pubdesc"></p></div>
     <div class="act row"><input type="password" id="pw" placeholder="Server password" hidden><button class="primary" id="publish">Publish</button></div></div>
+  <div class="step"><span class="n">+</span><div><h2>Think tank reports</h2><p>Looks for new reports on each think tank's website (the sources listed in <code>config.toml</code>) and adds them to <code>inputs/thinktanks/new_reports.xlsx</code> with an empty subtopic. Coders fill in <code>subtopic</code> there and delete rows that aren't reports; each report goes on the site once it is coded, at the next <b>Check data</b> and <b>Publish</b>. Organizations without a source, or whose sites block automated requests, are collected by hand as before.</p></div>
+    <div class="act row"><button id="tts">Update think tank reports</button></div></div>
   <div class="step"><span class="n">+</span><div><h2>Think tank logos</h2><p>Visits each think tank's website (listed in <code>profiles.toml</code>) and saves its logo into <code>content/thinktanks/logos</code>. Review them before publishing, and use them with each organization's permission.</p></div>
     <div class="act row"><button id="logos">Fetch logos</button><a class="btn" href="/logos" target="_blank">Review logos</a></div></div>
   <div class="step"><span class="n">+</span><div><h2>Legislators</h2><p>Reads the House and Senate member lists on ilga.gov and saves each member's party, district and official photo into <code>content/legislators</code>. Run it at the start of each session or when members change, then review and publish.</p></div>
@@ -100,7 +102,7 @@ async function poll(){
   $('#version').textContent = 'Site code version ' + s.version + ' (updates from GitHub each time you open Update website)';
   $('#pubdesc').textContent = desc[s.method] || '';
   $('#pw').hidden = s.method !== 'sftp';
-  for (const id of ['build','sheet','logos','legs','acts']) $('#'+id).disabled = busy;
+  for (const id of ['build','sheet','logos','legs','acts','tts']) $('#'+id).disabled = busy;
   $('#publish').disabled = busy || !b || !b.ok;
   if (!$('#ga').options.length) $('#ga').innerHTML = s.sessions.slice().reverse().map(g=>`<option value="${g}">${g}th General Assembly</option>`).join('');
   if (s.log.length){ const L = $('#log'); L.hidden = false; const atEnd = L.scrollTop + L.clientHeight >= L.scrollHeight - 8; L.textContent = s.log.join('\n'); if (atEnd) L.scrollTop = L.scrollHeight; }
@@ -112,6 +114,7 @@ $('#sheet').onclick = () => post('/run/worksheet', {ga: +$('#ga').value});
 $('#logos').onclick = () => post('/run/logos');
 $('#legs').onclick = () => post('/run/legislators');
 $('#acts').onclick = () => post('/run/actions');
+$('#tts').onclick = () => post('/run/reports');
 $('#publish').onclick = () => post('/run/publish', {password: $('#pw').value || null});
 poll();
 </script>'''
@@ -195,6 +198,8 @@ class Handler(BaseHTTPRequestHandler):
             ok = run('fetching think tank logos', ['pipeline/fetch_logos.py'])
         elif path == '/run/legislators':
             ok = run('fetching legislators from ilga.gov', ['pipeline/fetch_legislators.py'])
+        elif path == '/run/reports':
+            ok = run('looking for new think tank reports', ['pipeline/fetch_reports.py'])
         elif path == '/run/actions':
             ok = run('updating bills from ftp.ilga.gov', ['pipeline/fetch_actions.py'])
         elif path == '/run/publish':
