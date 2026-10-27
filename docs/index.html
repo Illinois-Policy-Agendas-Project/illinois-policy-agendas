@@ -1668,10 +1668,10 @@ function renderSponsors(){
     <div class="panel"><div class="chead"><h3 id="sn-ct-Sen"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Sen"></div></div>
     <div class="panel"><div class="chead"><h3 id="sn-ct-Rep"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Rep"></div></div>
   </div>
-  <div class="panel" style="margin-bottom:16px"><div class="chead"><h3 id="sk-t">Where bills go</h3>
-      <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['House','House bills'],['Senate','Senate bills']].map(([k,l])=>`<button data-sk="${k}" aria-pressed="${SK.ch===k}">${l}</button>`).join('')}</div></div>
+  <div class="panel" style="margin-bottom:16px"><div class="chead"><h3 id="sk-t">Where a legislator's bills went</h3>
+      <select id="sk-p" aria-label="Legislator"></select></div>
     <div id="sk"></div>
-    <p class="muted" style="margin:6px 0 0;font-size:12px">Each ribbon is a group of bills, from the primary sponsor's party, through the bill's policy topic, to the furthest stage it reached. Hover for counts; click a topic to narrow the page to it. Follows the topic menus above.</p></div>
+    <p class="muted" style="margin:6px 0 0;font-size:12px" id="sk-note"></p></div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h3 id="net-t">Co-sponsorship network</h3><span class="muted" style="font-size:12px" id="net-sub"></span></div>
     <div class="fbar" style="margin:4px 0 8px">
       <div class="seg" role="group" aria-label="Chamber">${[['Sen','Senate'],['Rep','House']].map(([k,l])=>`<button data-nc="${k}" aria-pressed="${NET.ch===k}">${l}</button>`).join('')}</div>
@@ -1689,7 +1689,7 @@ function renderSponsors(){
   </div>
   <div class="tscroll"><table class="dt" id="sn-t" style="min-width:0" data-mcap="20"><thead><tr>${[['name','Legislator'],['C','Primary sponsor'],['law','Bills that became law']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${k!=='name'?'text-align:right;width:180px':''}">${l} <span class="muted">${SN.sort===k?(SN.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
   bindLegBar();
-  $$('[data-sk]').forEach(b=>b.addEventListener('click', ()=>{ SK.ch=b.dataset.sk; $$('[data-sk]').forEach(x=>x.setAttribute('aria-pressed', x===b)); drawSponsorSankey(); }));
+  $('#sk-p').addEventListener('change', e=>{ SK.slug = e.target.value; drawSponsorSankey(); });
   $$('[data-nc]').forEach(b=>b.addEventListener('click', ()=>{ NET.ch=b.dataset.nc; NET.find=null; $$('[data-nc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); drawNetwork(); }));
   $('#net-min').addEventListener('change', e=>{ NET.min = e.target.value==='auto' ? 'auto' : +e.target.value; drawNetwork(); });
   $('#net-col')?.addEventListener('change', e=>{ NET.color = e.target.value; drawNetwork(); });
@@ -1728,9 +1728,9 @@ function snUpdate(){
   $$('#sn-t tr.row').forEach(tr=>tr.addEventListener('click', e=>{ if (!e.target.closest('a')) nav(tr.dataset.h.slice(1)); }));
 }
 
-/* party of the primary sponsor → topic → furthest stage, for the session's House and Senate bills */
-const SK = { ch:'all' };
-const PARTY_ORDER = ['Democratic','Republican','Independent','Party not listed'];
+/* one legislator's bills as primary sponsor, as a pipeline: topic → committee → floor → outcome.
+   Each ribbon keeps its topic's color all the way, so you can follow a topic to where its bills stopped. */
+const SK = { slug:null };
 function topicNodes(rows, major, col, n=8){
   // the largest topics get their own node and the rest share one; within a major topic the nodes are its subtopics
   const key = major==null ? (r=>isPol(r) ? r.major : 'other') : (r=>r.sub ?? 'other');
@@ -1740,19 +1740,38 @@ function topicNodes(rows, major, col, n=8){
   if (rows.some(r=>!keep.has(key(r)))) nodes.push({id:'other', label: major==null ? 'Other topics' : 'Other subtopics', color:'hsl(215 12% 70%)', col, click:false});
   return {nodes, of: r => keep.has(key(r)) ? (major==null ? 'm'+key(r) : 's'+key(r)) : 'other'};
 }
+const STOP = 'hsl(215 14% 78%)';
+function memberSankey(el, rows, {major=null, onNode, height}={}){
+  const tp = topicNodes(rows, major, 0, 7), color = new Map(tp.nodes.map(n=>[n.id, n]));
+  const nodes = [...tp.nodes,
+    {id:'c1', label:'Out of committee', short:'Out', col:1, color:'hsl(212 45% 66%)', click:false}, {id:'c0', label:'Stayed in committee', short:'Stayed', col:1, color:STOP, click:false},
+    {id:'f1', label:'Passed a chamber', short:'Passed', col:2, color:'hsl(212 52% 52%)', click:false}, {id:'f0', label:'No floor vote passed', short:'No vote', col:2, color:STOP, click:false},
+    {id:'o5', label:'Became law', short:'Law', col:3, color:'--navy', click:false}, {id:'o4', label:'Passed both, not law', short:'Both', col:3, color:'hsl(212 58% 42%)', click:false}, {id:'o3', label:'Passed one chamber only', short:'One', col:3, color:STOP, click:false}];
+  const flows = new Map(), add = (a, b, t) => { const k = a+'|'+b+'|'+t; flows.set(k, (flows.get(k)||0)+1); };
+  for (const r of rows){ const t = tp.of(r), st = r.x.stage||1;
+    add(t, st>=2 ? 'c1' : 'c0', t);
+    if (st>=2) add('c1', st>=3 ? 'f1' : 'f0', t);
+    if (st>=3) add('f1', 'o'+Math.min(st,5), t); }
+  // ribbons between the same two nodes stack in topic order, so the colors line up from column to column
+  const order = new Map(tp.nodes.map((n,i)=>[n.id, i]));
+  const links = [...flows].map(([k,v])=>{ const [a,b,t] = k.split('|'), n = color.get(t); return {s:a, t:b, v, color:n.color, label:n.label, o:order.get(t)}; }).sort((x,y)=>x.o-y.o);
+  sankey(el, nodes, links, {height: height || (PHONE() ? 380 : 340), heads:['Topic','Committee','Floor','Outcome'], onNode, phoneLegend:0});
+}
 function drawSponsorSankey(){
   const el = $('#sk'); if (!el) return;
-  const ga = legGA(), rows = byDs('bills').filter(r=>r.x.ga===ga && isBillHBSB(r) && (SK.ch==='all' || r.x.chamber===SK.ch) && (SN.major==null || r.major===SN.major) && (SN.sub==null || r.sub===SN.sub));
-  $('#sk-t').textContent = `Where bills go${snTopic()?' · '+snTopic():''}`;
-  if (!rows.length){ el.innerHTML = '<p class="muted" style="margin:0">No bills on this topic.</p>'; return; }
-  const party = r => chiefOf(r)?.party || 'Party not listed';
-  const parties = PARTY_ORDER.filter(pt=>rows.some(r=>party(r)===pt)).map(pt=>({id:'p'+pt, label:pt==='Party not listed'?pt:pt+' sponsor', color:PCSS[pt]||'hsl(215 12% 70%)', col:0, click:false}));
-  const tp = topicNodes(rows, SN.major, 1);
-  const flows = new Map(), add = (a,b) => { const k = a+'|'+b; flows.set(k, (flows.get(k)||0)+1); };
-  for (const r of rows){ const t = tp.of(r); add('p'+party(r), t); add(t, 'st'+(r.x.stage||1)); }
-  const links = [...flows].map(([k,v])=>{ const [s,t] = k.split('|'); return {s, t, v}; });
-  sankey(el, [...parties, ...tp.nodes, ...outcomeNodes(2)], links, {height: PHONE() ? 440 : 400, heads:['Primary sponsor', SN.major==null?'Topic':'Subtopic', 'Furthest stage'],
-    onNode: n=>{ if (n.major!=null){ SN.major=n.major; SN.sub=null; } else if (n.sub!=null) SN.sub=n.sub; else return; renderSponsors(); $('#sk').scrollIntoView({block:'center'}); }});
+  const ga = legGA(), inTopic = r => (SN.major==null || r.major===SN.major) && (SN.sub==null || r.sub===SN.sub);
+  const mineOf = p => p.bills.filter(b=>b.role==='C' && b.r.x.ga===ga && isBillHBSB(b.r) && inTopic(b.r)).map(b=>b.r);
+  const laws = m => m.filter(r=>r.x.stage>=5).length;
+  const who = SPON.filter(p=>inGA(p, ga)).map(p=>[p, mineOf(p)]).filter(([,m])=>m.length).sort((a,b)=>laws(b[1])-laws(a[1]) || b[1].length-a[1].length || a[0].name.localeCompare(b[0].name));
+  const sel = $('#sk-p');
+  if (!who.length){ sel.hidden = true; el.innerHTML = '<p class="muted" style="margin:0">No legislator was primary sponsor of a bill on this topic.</p>'; $('#sk-note').textContent = ''; return; }
+  if (!who.some(([p])=>p.slug===SK.slug)) SK.slug = who[0][0].slug;
+  const opt = ch => who.filter(([p])=>p.ch===ch).sort((a,b)=>a[0].name.split(' ').slice(-1)[0].localeCompare(b[0].name.split(' ').slice(-1)[0])).map(([p,m])=>`<option value="${p.slug}" ${p.slug===SK.slug?'selected':''}>${esc(p.title)} (${fmt(m.length)})</option>`).join('');
+  sel.hidden = false; sel.innerHTML = `<optgroup label="Senate">${opt('Sen')}</optgroup><optgroup label="House">${opt('Rep')}</optgroup>`;
+  const [p, mine] = who.find(([q])=>q.slug===SK.slug);
+  $('#sk-t').innerHTML = `Where ${esc(p.title)}'s bills went${snTopic()?' · '+esc(snTopic()):''}`;
+  memberSankey(el, mine, {major: SN.major, onNode: n=>{ if (n.major!=null){ SN.major=n.major; SN.sub=null; } else if (n.sub!=null) SN.sub=n.sub; else return; renderSponsors(); $('#sk').scrollIntoView({block:'center'}); }});
+  $('#sk-note').innerHTML = `The ${pl(mine.length, 'House or Senate bill')} ${esc(p.title)} filed as primary sponsor in the ${gaName(ga)}${snTopic()?' on this topic':''}, followed from topic to how far each got. Ribbons keep their topic's color; hover for counts. Pick another legislator above (number of bills in brackets), or <a href="#sponsor-${p.slug}">open their page</a>.`;
 }
 
 /* ---- sponsor page ---- */
@@ -1784,12 +1803,9 @@ SECTIONS.sponsor.push(
   { id:'flow', title:'Where their bills went', render(p, el){
       const mine = p.bills.filter(b=>b.role==='C' && isBillHBSB(b.r)).map(b=>b.r);
       if (mine.length < 2){ el.innerHTML = '<p class="muted" style="margin:0">Too few bills as primary sponsor to chart.</p>'; return; }
-      const tp = topicNodes(mine, null, 0, 6), flows = new Map();
-      for (const r of mine){ const k = tp.of(r)+'|st'+(r.x.stage||1); flows.set(k, (flows.get(k)||0)+1); }
-      el.innerHTML = `<p class="ink2" style="margin:0 0 8px;font-size:13.5px">The ${fmt(mine.length)} House and Senate bills they filed as primary sponsor, by topic and the furthest stage each reached. Click a topic to list those bills below.</p><div id="sg-sk"></div>`;
-      sankey($('#sg-sk'), [...tp.nodes, ...outcomeNodes(1)], [...flows].map(([k,v])=>{ const [s,t] = k.split('|'); return {s, t, v}; }),
-        {height: Math.max(200, Math.min(340, 60 + mine.length*3)), heads:['Topic','Furthest stage'],
-         onNode: n=>{ SPG.major = n.major; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }}); } },
+      el.innerHTML = `<p class="ink2" style="margin:0 0 8px;font-size:13.5px">The ${fmt(mine.length)} House and Senate bills they filed as primary sponsor, followed from topic through committee and the floor to the outcome. Ribbons keep their topic's color. Click a topic to list those bills below.</p><div id="sg-sk"></div>`;
+      memberSankey($('#sg-sk'), mine, {height: Math.max(220, Math.min(360, 80 + mine.length*3)),
+         onNode: n=>{ if (n.major==null) return; SPG.major = n.major; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }}); } },
   { id:'bills', title:'Bills', render(p, el){
       const counts = {all:p.bills.length}; for (const b of p.bills) counts[b.role]=(counts[b.role]||0)+1;
       el.innerHTML = `<div class="fbar" style="margin:0">
@@ -2096,7 +2112,7 @@ function divBars(el, items, colors, ends, {rowH=21}={}){
 /* Sankey: flows between columns of nodes.
    nodes [{id, label, col, color, code}] in top-to-bottom order within each column; links [{s, t, v}] by node id.
    Ribbons take the color of the node they leave. Hover a node or ribbon for counts; onNode(node) makes nodes clickable. */
-function sankey(el, nodes, links, {height=360, heads=[], unit='bills', onNode}={}){
+function sankey(el, nodes, links, {height=360, heads=[], unit='bills', onNode, phoneLegend}={}){
   for (const n of nodes) n.id = String(n.id); for (const l of links){ l.s = String(l.s); l.t = String(l.t); }
   const W=cw(el), nar = W < 520, cols = Math.max(...nodes.map(n=>n.col))+1, nw = 12, top = heads.length ? 22 : 4, pad = nar ? 5 : 7;
   const byId = new Map(nodes.map(n=>[n.id, Object.assign(n, {inV:0, outV:0, ins:[], outs:[]})]));
@@ -2115,29 +2131,27 @@ function sankey(el, nodes, links, {height=360, heads=[], unit='bills', onNode}={
   let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Flow diagram">`;
   heads.forEach((h,c)=>{ const last = c===cols-1 && cols>1; s += `<text x="${last?W:X(c)}" y="12" text-anchor="${last?'end':'start'}" style="font-size:11.5px;font-weight:700;fill:var(--ink-2)">${esc(h)}</text>`; });
   links.forEach((l,i)=>{ const a = byId.get(l.s), b = byId.get(l.t), x0 = a.x+nw, x1 = b.x, xm = (x0+x1)/2, w = l.v*k;
-    s += `<path class="sk-l" data-i="${i}" d="M${x0},${l.sy}C${xm},${l.sy} ${xm},${l.ty} ${x1},${l.ty}L${x1},${l.ty+w}C${xm},${l.ty+w} ${xm},${l.sy+w} ${x0},${l.sy+w}Z" style="fill:${col(a)}"/>`; });
-  const gap = cols>1 ? (W-nw)/(cols-1) - nw - 12 : W, chars = Math.max(8, Math.floor(gap/6.6) - 6);
-  live.forEach(n=>{ const last = n.col===cols-1 && cols>1, lab = n.label.length>chars ? n.label.slice(0,chars-1)+'…' : n.label;
+    s += `<path class="sk-l" data-i="${i}" d="M${x0},${l.sy}C${xm},${l.sy} ${xm},${l.ty} ${x1},${l.ty}L${x1},${l.ty+w}C${xm},${l.ty+w} ${xm},${l.sy+w} ${x0},${l.sy+w}Z" style="fill:${l.color ? cssColor(l.color) : col(a)}"/>`; });
+  const gap = cols>1 ? (W-nw)/(cols-1) - nw - 12 : W, chars = Math.max(8, Math.floor(gap/6.6) - 6), legCol = phoneLegend ?? cols-1;
+  live.forEach(n=>{ const last = n.col===cols-1 && cols>1, full = nar && n.short ? n.short : n.label, lab = full.length>chars ? full.slice(0,chars-1)+'…' : full;
     s += `<g class="sk-n" data-id="${esc(String(n.id))}" style="cursor:${onNode?'pointer':'default'}"><rect x="${n.x}" y="${n.y}" width="${nw}" height="${n.h}" rx="2" style="fill:${col(n)}"/>`;
-    if (n.h >= 9 && !(last && nar)) s += `<text x="${last ? n.x-6 : n.x+nw+6}" y="${n.y+n.h/2+4}" text-anchor="${last?'end':'start'}" class="sk-t">${esc(lab)} <tspan style="fill:var(--muted)">${fmt(n.v)}</tspan></text>`;
+    if (n.h >= 9 && !(nar && n.col===legCol)) s += `<text x="${last ? n.x-6 : n.x+nw+6}" y="${n.y+n.h/2+4}" text-anchor="${last?'end':'start'}" class="sk-t">${esc(lab)} <tspan style="fill:var(--muted)">${fmt(n.v)}</tspan></text>`;
     s += `</g>`; });
   s += `</svg>`;
-  if (nar && cols > 1) s += `<div class="legend" style="margin-top:6px">${live.filter(n=>n.col===cols-1).map(n=>`<span><i class="dot" style="background:${col(n)};border-radius:2px"></i>${esc(n.label)} <span class="muted num">${fmt(n.v)}</span></span>`).join('')}</div>`;
+  if (nar && cols > 1) s += `<div class="legend" style="margin-top:6px">${live.filter(n=>n.col===legCol).map(n=>`<span><i class="dot" style="background:${col(n)};border-radius:2px"></i>${esc(n.label)} <span class="muted num">${fmt(n.v)}</span></span>`).join('')}</div>`;
   el.innerHTML = s; el.classList.add('chart', 'sankey');
   const paths = $$('.sk-l', el), lit = on => paths.forEach(p=>p.classList.toggle('on', on(links[+p.dataset.i])));
   const share = (v, of) => of ? ` <span class="muted">(${pct(v/of,0)})</span>` : '';
   paths.forEach(p=>{ const l = links[+p.dataset.i], a = byId.get(l.s), b = byId.get(l.t);
-    p.addEventListener('pointermove', e=>{ lit(x=>x===l); showTip(e, `<div class="t">${esc(a.label)} → ${esc(b.label)}</div><div class="r"><span>${unit[0].toUpperCase()+unit.slice(1)}</span><b class="num">${fmt(l.v)}</b></div><div class="muted">${pct(l.v/a.v,0)} of ${esc(a.label)} · ${pct(l.v/b.v,0)} of ${esc(b.label)}</div>`); });
+    p.addEventListener('pointermove', e=>{ lit(x=>x===l); showTip(e, `${l.label?`<div class="muted" style="font-size:11.5px">${esc(l.label)}</div>`:''}<div class="t">${esc(a.label)} → ${esc(b.label)}</div><div class="r"><span>${unit[0].toUpperCase()+unit.slice(1)}</span><b class="num">${fmt(l.v)}</b></div><div class="muted">${pct(l.v/a.v,0)} of ${esc(a.label)} · ${pct(l.v/b.v,0)} of ${esc(b.label)}</div>`); });
     p.addEventListener('pointerleave', ()=>{ lit(()=>false); hideTip(); }); });
   $$('.sk-n', el).forEach(g=>{ const n = byId.get(g.dataset.id);
-    const rows = (ls, end) => ls.slice().sort((a,b)=>b.v-a.v).slice(0,6).map(l=>`<div class="r"><span>${end==='t'?'→ ':'← '}${esc(byId.get(l[end]).label)}</span><b class="num">${fmt(l.v)}${share(l.v, n.v)}</b></div>`).join('');
-    g.addEventListener('pointermove', e=>{ lit(l=>l.s===n.id || l.t===n.id); showTip(e, `<div class="t">${n.code!=null?`<span class="mono">${n.code}</span> `:''}${esc(n.label)}</div><div class="r"><span>${unit[0].toUpperCase()+unit.slice(1)}</span><b class="num">${fmt(n.v)}</b></div>${rows(n.outs,'t')}${n.outs.length?'':rows(n.ins,'s')}${onNode&&n.click!==false?'<div class="muted">Click to select</div>':''}`); });
+    const rows = (ls, end) => { const m = new Map(); for (const l of ls) m.set(l[end], (m.get(l[end])||0)+l.v); return [...m].map(([k,v])=>({[end]:k, v})); };
+    const rowsOf = (ls, end) => rows(ls, end).sort((a,b)=>b.v-a.v).slice(0,6).map(l=>`<div class="r"><span>${end==='t'?'→ ':'← '}${esc(byId.get(l[end]).label)}</span><b class="num">${fmt(l.v)}${share(l.v, n.v)}</b></div>`).join('');
+    g.addEventListener('pointermove', e=>{ lit(l=>l.s===n.id || l.t===n.id); showTip(e, `<div class="t">${n.code!=null?`<span class="mono">${n.code}</span> `:''}${esc(n.label)}</div><div class="r"><span>${unit[0].toUpperCase()+unit.slice(1)}</span><b class="num">${fmt(n.v)}</b></div>${rowsOf(n.outs,'t')}${n.outs.length?'':rowsOf(n.ins,'s')}${onNode&&n.click!==false?'<div class="muted">Click to select</div>':''}`); });
     g.addEventListener('pointerleave', ()=>{ lit(()=>false); hideTip(); });
     if (onNode && n.click!==false) g.addEventListener('click', ()=>{ hideTip(); onNode(n); }); });
 }
-/* furthest stage as a Sankey outcome column: became law at the top, never out of committee at the bottom */
-const OUTCOMES = [[5,'Became law','--navy'],[4,'Passed both chambers','hsl(212 58% 46%)'],[3,'Passed one chamber','hsl(212 52% 62%)'],[2,'Out of committee','hsl(212 45% 76%)'],[1,'Not out of committee','hsl(215 14% 80%)']];
-const outcomeNodes = col => OUTCOMES.map(([st,label,color])=>({id:'st'+st, label, color, col, click:false}));
 
 /* =================== COMMITTEES ===================
    Built in the browser from each bill's ILGA action history (bills/<ga>/actions.json), so it needs no extra data files.
