@@ -554,8 +554,8 @@ const DS = {
 const DSK = ['bills','sots','tt'], NOPOL = -555;
 /* top menu: [route, label, dot class, section]. Sponsors, Parties and Committees share the Legislature section and its sub-tabs. */
 const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['codebook','Codebook'],['sponsors','Legislature',null,'legislature'],['search','Search']];
-const LEGTABS = [['sponsors','Sponsors'],['parties','Parties'],['committees','Committees'],['replay','Day by day']];
-const TABLABEL = {sponsors:'Sponsors', parties:'Parties', committees:'Committees'};
+const LEGTABS = [['sponsors','Members'],['parties','Parties'],['committees','Committees'],['replay','Day by day']];
+const TABLABEL = {sponsors:'Members', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
 let GOV = {}, USED_MAJORS = new Set();   // year -> {governor, party}; major topics that have records
@@ -806,7 +806,7 @@ function renderHome(){
     ['speeches', 'ds-sots', 'Speeches', `${fmt(new Set(yrs).size)} addresses`, `Every State of the State address from ${Math.min(...yrs)} to ${Math.max(...yrs)}, readable sentence by sentence.`],
     ['thinktanks', 'ds-tt', 'Think tanks', `${fmt(byDs('tt').length)} reports`, `Reports from ${fmt(orgs().length)} Illinois think tanks and policy institutes.`],
     ['topics', '', 'Topics', '20 major topics', 'Follow one policy area across bills, speeches and reports, down to the subtopic.'],
-    ['sponsors', '', 'Sponsors', `${fmt(SPON.length)} legislators`, 'What each legislator introduced, signed onto and saw become law.'],
+    ['sponsors', '', 'Members', `${fmt(SPON.length)} legislators`, 'What each legislator introduced, signed onto and saw become law.'],
     ['search', '', 'Search', 'All texts', 'Find any word or phrase in every bill synopsis, speech sentence and report.']];
   $('#view').innerHTML = `
   <section class="home-hero">
@@ -1320,7 +1320,7 @@ const HEADS = {
     return { crumb:['thinktanks','Think tanks'], logo:orgLogo(o, 'lg'),
       eyebrow:[P.official_name && P.official_name!==o.name ? esc(P.official_name) : 'Think tank or policy institute', P.founded && `Founded ${P.founded}`, P.based && esc(P.based)].filter(Boolean).join(' · '),
       title:esc(o.name), sub:'', chips:'', actions: web ? `<a class="btn" href="${esc(web.url)}" target="_blank" rel="noopener">${esc(web.host)} ↗</a>` : '' }; },
-  sponsor: (p) => ({ crumb:['sponsors','Sponsors'], logo: p.photo ? `<span class="leg-photo"><img src="data/${esc(p.photo)}" alt="${esc(p.name)}" title="Photo: Illinois General Assembly"></span>` : '',
+  sponsor: (p) => ({ crumb:['sponsors','Members'], logo: p.photo ? `<span class="leg-photo"><img src="data/${esc(p.photo)}" alt="${esc(p.name)}" title="Photo: Illinois General Assembly"></span>` : '',
       eyebrow:[p.ch==='Rep'?'State Representative':'State Senator', p.party && esc(p.party), p.district && `District ${esc(p.district)}`, esc(p.gas().map(gaName).join(', '))].filter(Boolean).join(' · '), title:esc(p.title), sub:'',
       chips:'', actions: p.ilga ? `<a class="btn" href="${esc(p.ilga)}" target="_blank" rel="noopener">Member page on ilga.gov ↗</a>` : '' }),
   speech: (s) => { const yrs = range(2005,2025);
@@ -1650,7 +1650,7 @@ function renderSponsors(){
   const most = (k) => act.map(p=>[p, p.bills.filter(b=>b.role===k && b.r.x.ga===ga && keepBill(b.r)).length]).sort((a,b)=>b[1]-a[1])[0] || [null, 0];
   const [mc, mcn] = most('C'), [mo, mon] = most('O');
   $('#view').innerHTML = `${legBar('sponsors')}
-  <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Bill sponsors</h1>
+  <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Members</h1>
     <p>Every legislator named as a sponsor on a substantive bill in the bills dataset, with what they introduced, what they signed onto and what became law. Open a legislator for their full record.</p></div>
     <button class="btn primary" id="sn-dl">Download sponsor table (CSV)</button></div>
   <div class="kpis">
@@ -2341,11 +2341,11 @@ SECTIONS.committee.push(
 
 /* =================== shell & routing =================== */
 /* =================== SESSION REPLAY ===================
-   Every House and Senate bill is a dot that moves between stage bands on the day ILGA recorded the action.
-   Data: bills/<ga>/timeline.json from the build (made from the dated actions that "Update bills from ILGA" downloads):
-   {start, days, n:[actions per day], ev:{key:[day, stage, day, stage, ...]}}; stage 1-5 as in STAGES, 6 = vetoed. */
+   Every House and Senate bill is a dot that moves, on the day ILGA recorded each step, between the readings and
+   committees of each chamber and then to the governor. Data: bills/<ga>/timeline.json from the build (timeline() in
+   build.py, from the dated actions that "Update bills from ILGA" downloads):
+   {start, days, n:[actions per day], cm:[[chamber, committee]], ev:{key:[day, place, committee, ...]}}. */
 const RP = { ga:null, t:0, playing:false, speed:7, color:'topic', ch:'all', major:null };
-const RP_BANDS = [[1,'In committee'],[2,'Out of committee'],[3,'Passed one chamber'],[4,'Passed both chambers'],[5,'Became law'],[6,'Vetoed']];
 const TL = {};
 let rpRun = 0;
 const rpDate = (tl, d) => { const x = new Date(tl.start+'T12:00:00'); x.setDate(x.getDate()+d); return x; };
@@ -2354,7 +2354,7 @@ async function renderReplay(){
   const ga = legGA(), me = ++rpRun;
   $('#view').innerHTML = `${legBar('replay')}
   <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from ILGA's dated bill actions</div><h1>The session, day by day</h1>
-    <p>Each dot is a House or Senate bill. Press play to watch bills move through the legislature on the days the General Assembly recorded each step, from introduction to committee, floor votes and the governor's desk. Hover a dot for the bill; click to open it.</p></div></div>
+    <p>Each dot is a House or Senate bill. Press play to watch bills move through the legislature on the days the General Assembly recorded each step: first reading, each committee, second and third reading in one chamber, then the other, and on to the governor. Hover a dot for the bill; click to open it.</p></div></div>
   <div id="rp-body"><p class="muted">Loading…</p></div>`;
   bindLegBar();
   if (!(MAN.v||{})['timeline-'+ga]){ $('#rp-body').innerHTML = `<div class="panel"><p style="margin:0">The day-by-day replay for the ${gaName(ga)} isn't available yet. It appears once the bill action dates have been downloaded (<b>Update bills from ILGA</b> in the Update website panel) and the site is published.</p></div>`; return; }
@@ -2379,62 +2379,99 @@ async function renderReplay(){
     <div class="legend" id="rp-leg" style="margin-top:8px"></div>
   </div>
   <div class="panel"><div class="chead"><h3 id="rp-today-t">On this day</h3></div><div id="rp-today"></div></div>
-  <p class="muted" style="font-size:12px">Stages follow the same rules as the rest of the site: a bill is out of committee once a committee approves it or it is placed on the calendar, passes a chamber on a third-reading vote, and becomes law when it receives a Public Act number. Dates are from the General Assembly's Bill Status files; actions on the same day are shown together.</p>`;
+  <p class="muted" style="font-size:12px">A bill sits in first reading while it waits in the House Rules Committee or the Senate Committee on Assignments, moves to a committee when it is assigned, to second reading when a committee approves it, to third reading after its second reading, and to the other chamber when it passes. Committee deadlines send many bills back to Rules or Assignments, so dots can move back. Dates are from the General Assembly's Bill Status files; when a bill moved more than once in a day, it is shown where it ended up.</p>`;
   bindReplay(tl);
 }
 function bindReplay(tl){
-  const keys = Object.keys(tl.ev).filter(k=>BILLKEY.has(k)), recs = keys.map(k=>BILLKEY.get(k)), N = keys.length;
-  const ev = keys.map(k=>tl.ev[k]), days = tl.days;
-  // how many bills sit in each band on each day, to size the bands once for the whole session
-  const diff = RP_BANDS.map(()=>new Int32Array(days+1));
-  ev.forEach(e=>{ for (let j=0; j<e.length; j+=2){ const b = e[j+1]-1, from = e[j], to = j+2<e.length ? e[j+2] : days; diff[b][from]++; diff[b][to]--; } });
-  const peak = diff.map(a=>{ let s=0, m=0; for (let d=0; d<days; d++){ s+=a[d]; if (s>m) m=s; } return m; });
-  // events by day, for the "on this day" list
-  const byDay = new Map(); ev.forEach((e,i)=>{ for (let j=0; j<e.length; j+=2){ const d=e[j]; if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push([i, e[j+1]]); } });
-  const intro = ev.map(e=>e.length ? e[0] : days);
+  if (!tl.cm){ $('#rp-body').innerHTML = '<div class="panel"><p style="margin:0">This replay was built by an older version of the site. Run <b>Check data</b> and <b>Publish</b> to rebuild it.</p></div>'; return; }
+  const keys = Object.keys(tl.ev).filter(k=>BILLKEY.has(k)), recs = keys.map(k=>BILLKEY.get(k)), N = keys.length, days = tl.days;
+  const ev = keys.map(k=>tl.ev[k]);
+  // a bill's place is a container: a reading in one chamber, one committee, or a step after both chambers
+  const cid = (pl, cm) => (pl===2 || pl===6) ? 'c'+cm : 'p'+pl;
+  const diff = new Map(), bump = (id, from, to) => { if (!diff.has(id)) diff.set(id, new Int32Array(days+1)); const a = diff.get(id); a[from]++; a[to]--; };
+  const byDay = new Map(), intro = new Int32Array(N);
+  ev.forEach((e,i)=>{ intro[i] = e.length ? e[0] : days; let prev = 0;
+    for (let j=0; j<e.length; j+=3){ const to = j+3<e.length ? e[j+3] : days; bump(cid(e[j+1], e[j+2]), e[j], to);
+      if (!byDay.has(e[j])) byDay.set(e[j], []); byDay.get(e[j]).push([i, e[j+1], e[j+2], prev]); prev = e[j+1]; } });
+  const peak = new Map(); for (const [id,a] of diff){ let s=0, m=0; for (let d=0; d<days; d++){ s+=a[d]; if (s>m) m=s; } peak.set(id, m); }
+  const total = new Map(); ev.forEach(e=>{ for (let j=0; j<e.length; j+=3) if (e[j+2]>=0) total.set(e[j+2], (total.get(e[j+2])||0)+1); });
+  // ---- layout ----
   const box = $('#rp-cv'), cv = $('canvas', box), ctx = cv.getContext('2d'), dpr = Math.min(2, devicePixelRatio||1);
-  const W = cw(box), nar = W < 560, lw = nar ? 0 : 168, pw = W - lw - 4, cell = Math.max(3, Math.min(6, pw/190)), per = Math.max(1, Math.floor(pw/cell)), sz = Math.max(2, cell*0.8);
-  const bands = []; let y = 0;
-  RP_BANDS.forEach(([st,label],b)=>{ if (!peak[b] && st===6) return; const top = y + (nar ? 18 : 0), rows = Math.max(1, Math.ceil(peak[b]/per)); bands[b] = {st, label, top, rows, h: rows*cell}; y = top + Math.max(rows*cell, nar ? 0 : 44) + (nar ? 10 : 14); });
+  const W = cw(box), wide = W >= 760, gap = 22, pw = wide ? (W-gap)/2 : W, cell = Math.max(wide ? 3 : 2.4, Math.min(5, pw/150)), sz = Math.max(2, cell*0.8);
+  const C = new Map();   // id -> {label, x, y, w, rows, cols, h}
+  const band = (id, label, x, y, w) => { const cols = Math.max(1, Math.floor(w/cell)), rows = Math.max(1, Math.ceil((peak.get(id)||0)/cols));
+    C.set(id, {id, label, x, y:y+17, w, cols, rows, h:rows*cell, big:true}); return y + 17 + rows*cell + 14; };
+  function chamber(ch, x, y0){
+    const off = ch==='House' ? 0 : 4; let y = y0;
+    ctxLabels.push([ch, x, y+16, 'head']); y += 26;
+    y = band('p'+(off+1), ch==='House' ? 'First reading · in the Rules Committee' : 'First reading · in Assignments', x, y, pw);
+    // one box per committee that ever held a bill, largest first
+    const mine = tl.cm.map((c,i)=>[i,c]).filter(([i,c])=>c[0]===ch && peak.get('c'+i)).sort((a,b)=>(total.get(b[0])||0)-(total.get(a[0])||0));
+    ctxLabels.push(['Committees', x, y+11, 'sub']); y += 17;
+    const k = pw >= 520 ? 4 : 3, bw = (pw - (k-1)*6)/k;
+    for (let r=0; r<mine.length; r+=k){ let rowH = 0;
+      mine.slice(r, r+k).forEach(([i,c],j)=>{ const bx = x + j*(bw+6), cols = Math.max(1, Math.floor((bw-8)/cell)), rows = Math.max(1, Math.ceil(peak.get('c'+i)/cols));
+        C.set('c'+i, {id:'c'+i, label:c[1], x:bx+4, y:y+30, w:bw-8, cols, rows, h:rows*cell, frame:[bx, y, bw]}); rowH = Math.max(rowH, 30 + rows*cell + 6); });
+      mine.slice(r, r+k).forEach(([i])=>{ C.get('c'+i).frame.push(rowH); });
+      y += rowH + 6; }
+    y += 8;
+    y = band('p'+(off+3), 'Second reading', x, y, pw);
+    y = band('p'+(off+4), 'Third reading', x, y, pw);
+    return y;
+  }
+  const ctxLabels = [];
+  let yH = chamber('House', 0, 0), yS = chamber('Senate', wide ? pw+gap : 0, wide ? 0 : yH + 10), y = Math.max(yH, yS) + 6;
+  ctxLabels.push(['After both chambers', 0, y+16, 'head']); y += 26;
+  const ends = [[9,'Passed both chambers'],[10,'Sent to the governor'],[11,'Became law'],[12,'Vetoed']], per = wide ? 4 : 2, ew = (W - (per-1)*12)/per;
+  for (let r=0; r<ends.length; r+=per){ let rowY = y, maxY = y;
+    ends.slice(r, r+per).forEach(([pl,label],j)=>{ maxY = Math.max(maxY, band('p'+pl, label, j*(ew+12), rowY, ew)); }); y = maxY; }
   const H = Math.ceil(y);
   cv.width = W*dpr; cv.height = H*dpr; cv.style.width = W+'px'; cv.style.height = H+'px'; ctx.setTransform(dpr,0,0,dpr,0,0);
-  const X = new Float32Array(N), Y = new Float32Array(N), TX = new Float32Array(N), TY = new Float32Array(N), A = new Float32Array(N), TA = new Float32Array(N), cur = new Int8Array(N);
+  // ---- dots ----
+  const X = new Float32Array(N), Y = new Float32Array(N), TX = new Float32Array(N), TY = new Float32Array(N), A = new Float32Array(N), TA = new Float32Array(N);
+  const curP = new Int8Array(N), curC = new Int16Array(N).fill(-1);
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let colorOf, order, rank, groups, bandIdx = [], shown = -1;
+  let colorOf, order, groups, inC = new Map(), shown = -1;
   const PC = {Democratic:'--pd', Republican:'--pr', Independent:'--pi'};
   function recolor(){
     const key = RP.color==='party' ? (r=>chiefOf(r)?.party || 'zz') : RP.color==='chamber' ? (r=>r.x.chamber) : (r=>isPol(r) ? r.major : 99);
     const css = v => RP.color==='party' ? (PC[v] ? getComputedStyle(document.documentElement).getPropertyValue(PC[v]).trim() : '#b8c0cc')
                    : RP.color==='chamber' ? (v==='House' ? '#2f6db5' : '#c0573e') : (v===99 ? '#b8c0cc' : shade(v,0,1));
     const k = recs.map(key); colorOf = k.map(css);
-    // dots of one color sit together in each band; within a color, oldest bills first
-    rank = new Int32Array(N); order = [...Array(N).keys()].sort((a,b)=>(k[a]<k[b]?-1:k[a]>k[b]?1:0) || intro[a]-intro[b] || (keys[a]<keys[b]?-1:1)); order.forEach((i,j)=>rank[i]=j);
+    order = [...Array(N).keys()].sort((a,b)=>(k[a]<k[b]?-1:k[a]>k[b]?1:0) || intro[a]-intro[b] || (keys[a]<keys[b]?-1:1));
     groups = new Map(); for (let i=0; i<N; i++){ const c = colorOf[i]; if (!groups.has(c)) groups.set(c, []); groups.get(c).push(i); }
-    const seen = new Map(); k.forEach((v,i)=>seen.set(v, (seen.get(v)||0)+1));
+    const seen = new Map(); k.forEach(v=>seen.set(v, (seen.get(v)||0)+1));
     const lab = v => RP.color==='party' ? (v==='zz' ? 'Party not listed' : v) : RP.color==='chamber' ? v+' bills' : (v===99 ? 'No policy content or not coded' : CB.majors[v]);
     $('#rp-leg').innerHTML = [...seen].sort((a,b)=>RP.color==='topic' ? b[1]-a[1] : String(a[0]).localeCompare(String(b[0]))).map(([v])=>`<span><i class="dot" style="background:${css(v)};border-radius:2px"></i>${esc(lab(v))}</span>`).join('');
   }
   const match = i => (RP.ch==='all' || recs[i].x.chamber===RP.ch) && (RP.major==null || recs[i].major===RP.major);
   function place(day){
-    for (let i=0; i<N; i++){ const e = ev[i]; let st = 0; for (let j=0; j<e.length && e[j]<=day; j+=2) st = e[j+1]; cur[i] = st; }
-    bandIdx = RP_BANDS.map(()=>[]);
-    for (const i of order) if (cur[i]) bandIdx[cur[i]-1].push(i);
-    bandIdx.forEach((list,b)=>{ const bd = bands[b]; if (!bd) return; list.forEach((i,j)=>{ TX[i] = lw + Math.floor(j/bd.rows)*cell; TY[i] = bd.top + (j%bd.rows)*cell; }); });   // down each column first, so a band grows left to right like a bar
-    for (let i=0; i<N; i++){ TA[i] = cur[i] ? (match(i) ? 1 : .13) : 0; if (cur[i] && A[i]===0){ X[i]=TX[i]; Y[i]=TY[i]; } }
+    for (let i=0; i<N; i++){ const e = ev[i]; let p = 0, c = -1; for (let j=0; j<e.length && e[j]<=day; j+=3){ p = e[j+1]; c = e[j+2]; } curP[i] = p; curC[i] = c; }
+    inC = new Map(); for (const id of C.keys()) inC.set(id, []);
+    for (const i of order) if (curP[i]) inC.get(cid(curP[i], curC[i]))?.push(i);
+    // the long bands fill down each column first, so they grow left to right like a bar; committee boxes fill row by row from the top
+    for (const [id, list] of inC){ const c = C.get(id); list.forEach((i,j)=>{ if (c.big){ TX[i] = c.x + Math.floor(j/c.rows)*cell; TY[i] = c.y + (j%c.rows)*cell; }
+                                                                          else { TX[i] = c.x + (j%c.cols)*cell; TY[i] = c.y + Math.floor(j/c.cols)*cell; } }); }
+    for (let i=0; i<N; i++){ TA[i] = curP[i] ? (match(i) ? 1 : .12) : 0; if (curP[i] && A[i]===0){ X[i]=TX[i]; Y[i]=TY[i]; } }
   }
+  const chName = p => p>=1 && p<=4 ? 'House' : 'Senate';
   function today(day){
-    const d = rpDate(tl, day), list = byDay.get(day) || [];
+    const d = rpDate(tl, day), list = (byDay.get(day) || []).filter(([i])=>match(i));
     $('#rp-d').textContent = d.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
     $('#rp-dn').textContent = ` · day ${fmt(day+1)} of ${fmt(days)} · ${pl(tl.n[day]||0, 'action')} recorded`;
     $('#rp-r').value = day; drawWeeks(day);
-    const cnt = st => list.filter(([i,s])=>s===st && match(i)).length;
-    const big = list.filter(([i,s])=>s>=4 && match(i)).sort((a,b)=>b[1]-a[1]);
-    const word = {5:'Became law', 4:'Passed both chambers', 6:'Vetoed'};
     $('#rp-today-t').textContent = `On ${d.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}`;
-    const summary = [[1,'introduced'],[2,'out of committee'],[3,'passed a chamber']].map(([s,w])=>[cnt(s),w]).filter(([n])=>n).map(([n,w])=>`<b class="num">${fmt(n)}</b> ${w}`).join(' · ');
+    const passed = ([,p,,prev]) => (p===5 && prev>=1 && prev<=4) || (p===1 && prev>=5 && prev<=8);
+    const cnt = f => list.filter(f).length;
+    const summary = [[x=>x[3]===0, 'filed'], [x=>x[1]===2||x[1]===6, 'sent to a committee'], [x=>(x[1]===3||x[1]===7) && (x[3]===2||x[3]===6), 'approved in committee'],
+                     [x=>x[1]===4||x[1]===8, 'read a second time'], [passed, 'passed a chamber']].map(([f,w])=>[cnt(f),w]).filter(([n])=>n).map(([n,w])=>`<b class="num">${fmt(n)}</b> ${w}`).join(' · ');
+    const word = {11:'Became law', 12:'Vetoed', 10:'Sent to the governor', 9:'Passed both chambers'}, rank = {11:0, 12:1, 10:2, 9:3};
+    const chip = {11:5, 10:4, 9:4, 12:2};
+    const big = [...list.filter(x=>x[1]>=9).map(x=>[x[0], word[x[1]], rank[x[1]], chip[x[1]]]),
+                 ...list.filter(passed).map(x=>[x[0], `Passed the ${chName(x[3])}`, 4, 3])].sort((a,b)=>a[2]-b[2]);
     $('#rp-today').innerHTML = (summary ? `<p class="ink2" style="margin:0 0 8px">${summary}</p>` : '') +
-      (big.length ? `<ul class="rp-list">${big.slice(0,12).map(([i,s])=>{ const r = recs[i], ch = chiefOf(r); return `<li><span class="stage s${Math.min(s,5)}">${word[s]}</span> <a href="${href(r)}" class="mono">${esc(r.x.bill)}</a> <a href="${href(r)}" class="rl">${esc(r.x.short)}</a>${ch?` <span class="muted">· ${spLink(ch)}</span>`:''}</li>`; }).join('')}</ul>${big.length>12?`<p class="muted" style="margin:6px 0 0;font-size:12.5px">and ${fmt(big.length-12)} more</p>`:''}` : '')
-      || '<p class="muted" style="margin:0">No bill changed stage on this day.</p>';
+      (big.length ? `<ul class="rp-list">${big.slice(0,12).map(([i,w,,s])=>{ const r = recs[i], ch = chiefOf(r); return `<li><span class="stage s${s}">${w}</span> <a href="${href(r)}" class="mono">${esc(r.x.bill)}</a> <a href="${href(r)}" class="rl">${esc(r.x.short)}</a>${ch?` <span class="muted">· ${spLink(ch)}</span>`:''}</li>`; }).join('')}</ul>${big.length>12?`<p class="muted" style="margin:6px 0 0;font-size:12.5px">and ${fmt(big.length-12)} more</p>`:''}` : '')
+      || '<p class="muted" style="margin:0">No bill moved on this day.</p>';
   }
   const weeks = Math.ceil(days/7), wk = new Array(weeks).fill(0); tl.n.forEach((v,d)=>wk[Math.floor(d/7)] += v);
   function drawWeeks(day){
@@ -2443,19 +2480,23 @@ function bindReplay(tl){
   }
   $('#rp-wk').addEventListener('click', e=>{ const b = e.currentTarget.getBoundingClientRect(); RP.t = Math.max(0, Math.min(days-1, Math.floor((e.clientX-b.left)/b.width*days))); });
   $('#rp-wk').title = 'Actions recorded each week. Click to jump there.';
+  const fit = (t, w) => { if (ctx.measureText(t).width <= w) return t; while (t.length > 2 && ctx.measureText(t+'…').width > w) t = t.slice(0,-1); return t+'…'; };
   function frame(){
     if (!document.contains(cv)) return;     // left the page
     const now = performance.now(), dt = Math.min(.1, (now-(frame.last||now))/1000); frame.last = now;
     if (RP.playing){ RP.t += dt*RP.speed; if (RP.t >= days-1){ RP.t = days-1; setPlay(false); } }
     const day = Math.floor(RP.t); if (day !== shown){ shown = day; place(day); today(day); }
     const k = reduce ? 1 : .16;
-    ctx.clearRect(0,0,W,H);
-    bands.forEach((bd,b)=>{ if (!bd) return; const n = bandIdx[b].filter(match).length;
-      ctx.fillStyle = '#f3f5f8'; ctx.fillRect(lw, bd.top, pw+2, bd.h);
-      ctx.fillStyle = '#13294b'; ctx.font = `600 ${nar?12:13}px Lato, sans-serif`; ctx.textBaseline = 'alphabetic';
-      if (nar){ ctx.fillText(bd.label, 0, bd.top-5); ctx.fillStyle='#5b6676'; ctx.font = '12px Lato, sans-serif'; ctx.textAlign='right'; ctx.fillText(fmt(n), W, bd.top-5); ctx.textAlign='left'; }
-      else { ctx.fillText(bd.label, 0, bd.top+14); ctx.fillStyle='#5b6676'; ctx.font = '600 20px Oswald, sans-serif'; ctx.fillText(fmt(n), 0, bd.top+38); } });
-    for (const [c, list] of groups){ ctx.fillStyle = c;
+    ctx.clearRect(0,0,W,H); ctx.textBaseline = 'alphabetic';
+    for (const [t, x, y, kind] of ctxLabels){ ctx.fillStyle = '#13294b'; ctx.font = kind==='head' ? '400 19px Oswald, sans-serif' : '700 12px Lato, sans-serif'; ctx.fillText(t, x, y); }
+    for (const c of C.values()){ const n = (inC.get(c.id)||[]).filter(match).length;
+      if (c.frame){ const [fx, fy, fw, fh] = c.frame; ctx.fillStyle = n ? '#eef2f7' : '#f6f8fb'; ctx.fillRect(fx, fy, fw, fh);
+        ctx.fillStyle = '#13294b'; ctx.font = '600 11px Lato, sans-serif'; ctx.fillText(fit(c.label, fw-34), fx+4, fy+12);
+        ctx.fillStyle = '#5b6676'; ctx.font = '11px Lato, sans-serif'; ctx.textAlign = 'right'; ctx.fillText(fmt(n), fx+fw-4, fy+12); ctx.textAlign = 'left'; }
+      else { ctx.fillStyle = '#f3f5f8'; ctx.fillRect(c.x, c.y, c.w, c.h);
+        ctx.fillStyle = '#13294b'; ctx.font = '700 12.5px Lato, sans-serif'; ctx.fillText(c.label, c.x, c.y-5);
+        ctx.fillStyle = '#5b6676'; ctx.font = '600 12.5px Lato, sans-serif'; ctx.textAlign = 'right'; ctx.fillText(fmt(n), c.x+c.w, c.y-5); ctx.textAlign = 'left'; } }
+    for (const [col, list] of groups){ ctx.fillStyle = col;
       for (const i of list){ X[i] += (TX[i]-X[i])*k; Y[i] += (TY[i]-Y[i])*k; A[i] += (TA[i]-A[i])*(reduce?1:.2); if (A[i] < .02) continue;
         ctx.globalAlpha = A[i]; ctx.fillRect(X[i], Y[i], sz, sz); } }
     ctx.globalAlpha = 1;
@@ -2469,11 +2510,14 @@ function bindReplay(tl){
   $$('[data-rc]').forEach(b=>b.addEventListener('click', ()=>{ RP.ch = b.dataset.rc; $$('[data-rc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); refilter(); }));
   $('#rp-m').addEventListener('change', e=>{ RP.major = e.target.value==='' ? null : +e.target.value; refilter(); });
   $('#rp-c').addEventListener('change', e=>{ RP.color = e.target.value; recolor(); refilter(); });
-  // hover and click: find the dot under the pointer from its band, row and column
-  const hit = e => { const b = cv.getBoundingClientRect(), x = e.clientX-b.left-lw, y = e.clientY-b.top; if (x < 0) return null;
-    for (let j=0; j<bands.length; j++){ const bd = bands[j]; if (!bd || y < bd.top || y >= bd.top+bd.h) continue; const idx = Math.floor(x/cell)*bd.rows + Math.floor((y-bd.top)/cell); return bandIdx[j][idx] ?? null; } return null; };
+  // hover and click: find the container under the pointer, then the dot from its column and row
+  const hit = e => { const b = cv.getBoundingClientRect(), x = e.clientX-b.left, y = e.clientY-b.top;
+    for (const c of C.values()){ if (x < c.x || x >= c.x+c.w || y < c.y || y >= c.y+c.h) continue;
+      const col = Math.floor((x-c.x)/cell), row = Math.floor((y-c.y)/cell);
+      return (inC.get(c.id)||[])[c.big ? col*c.rows + row : row*c.cols + col] ?? null; } return null; };
+  const where = i => { const p = curP[i]; return p===2||p===6 ? `${chName(p)} ${tl.cm[curC[i]][1]} Committee` : C.get('p'+p)?.label.replace(/^First reading · /, `${chName(p)}: first reading, `) .replace(/^(Second|Third) reading$/, m=>`${chName(p)}: ${m.toLowerCase()}`) || ''; };
   cv.addEventListener('pointermove', e=>{ const i = hit(e); if (i==null){ cv.style.cursor=''; return hideTip(); } cv.style.cursor='pointer'; const r = recs[i], ch = chiefOf(r);
-    showTip(e, `<div class="t"><span class="mono">${esc(r.x.bill)}</span> ${esc(r.x.short)}</div>${ch?`<div class="r"><span>Primary sponsor</span><b>${esc(ch.title)}</b></div>`:''}<div class="r"><span>Topic</span><b>${esc(r.sub!=null&&r.sub!==NOPOL?subName(r.sub):'No policy content')}</b></div><div class="r"><span>On this day</span><b>${esc(RP_BANDS[cur[i]-1][1])}</b></div><div class="muted">Click to open the bill</div>`); });
+    showTip(e, `<div class="t"><span class="mono">${esc(r.x.bill)}</span> ${esc(r.x.short)}</div>${ch?`<div class="r"><span>Primary sponsor</span><b>${esc(ch.title)}</b></div>`:''}<div class="r"><span>Topic</span><b>${esc(r.sub!=null&&r.sub!==NOPOL?subName(r.sub):'No policy content')}</b></div><div class="r"><span>On this day</span><b>${esc(where(i))}</b></div><div class="muted">Click to open the bill</div>`); });
   cv.addEventListener('pointerleave', hideTip);
   cv.addEventListener('click', e=>{ const i = hit(e); if (i!=null){ hideTip(); RP.playing = false; nav(href(recs[i]).slice(1)); } });
   recolor(); setPlay(RP.playing); requestAnimationFrame(frame);

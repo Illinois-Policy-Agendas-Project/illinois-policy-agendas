@@ -728,31 +728,74 @@ def stage_after(text, stage):
     return stage
 
 
+AMENDMENT = re.compile(r'^(House|Senate) (Committee|Floor) Amendment')
+TO_FIRST = re.compile(r'^(Filed with|Prefiled|First Reading|Arrive|Placed on Calendar Order of First Reading|Referred to (Rules Committee|Assignments)'
+                      r'|Re-referred to (Rules Committee|Assignments)|Rule [\w-]+\([a-z]\) / Re-referred|Pursuant to Senate Rule .*Referred to Assignments)')
+TO_CMTE = re.compile(r'^(?:Assigned|Re-assigned) to (.+?)(?: Committee)?\s*$')
+TO_SECOND = re.compile(r'^(Placed on Calendar (Order of )?2nd Reading|Held on Calendar Order of Second Reading|Approved for Consideration|Recalled to Second Reading)')
+TO_THIRD = re.compile(r'^(Second Reading|Placed on Calendar (Order of )?3rd Reading)')
+PASSED = re.compile(r'^Third Reading.*Passed')
+
+
 def timeline(dated):
-    """Each bill's moves between stages, by day, for the session replay.
-    start: the first day; n: actions taken on each day; ev: {key: [day, stage, day, stage, ...]} where stage is
-    1 introduced, 2 out of committee, 3 passed one chamber, 4 passed both chambers, 5 became law, 6 vetoed."""
+    """Where each bill was, day by day, for the session replay.
+    start: the first day; n: actions taken on each day; cm: [[chamber, committee name], ...];
+    ev: {key: [day, place, committee, day, place, committee, ...]} (committee is an index into cm, or -1), where place is
+      1-4 in the House and 5-8 in the Senate: 1/5 first reading (in Rules / Assignments), 2/6 in a committee,
+      3/7 second reading, 4/8 third reading; then 9 passed both chambers, 10 sent to the governor, 11 became law, 12 vetoed.
+    A bill that passes its first chamber moves to the other chamber's first reading. Bills can move back, e.g. when a
+    deadline sends them back to Rules. Several moves on one day keep only where the bill ended up."""
     start = min(a[0] for acts in dated.values() for a in acts)
     d0 = dt.date.fromisoformat(start)
     day = lambda d: (dt.date.fromisoformat(d) - d0).days
-    n, ev = defaultdict(int), {}
+    n, ev, cms = defaultdict(int), {}, {}
     for key, acts in dated.items():
-        out, stage = [], 0
-        for d, _, text in sorted(acts, key=lambda a: a[0]):   # stable: keeps ILGA's order within a day
+        origin = 'House' if re.match(r'^\d+-H', key) else 'Senate'
+        out, place, cm, passed_origin = [], 0, -1, False
+        for d, chamber, text in sorted(acts, key=lambda a: a[0]):   # stable: keeps ILGA's order within a day
             n[day(d)] += 1
-            if stage == 6:                                     # vetoed: only an override or accepted veto makes it law
-                new = 5 if STAGE_LAW.match(text) else 6
-            else:
-                new = 6 if stage < 5 and VETO.search(text) else stage_after(text, max(stage, 1))
-            if new != stage:
-                if out and out[-2] == day(d):
-                    out[-1] = new                              # several moves in one day: keep where it ended up
+            if AMENDMENT.match(text) or chamber not in ('House', 'Senate') or place == 11:
+                continue
+            off = 0 if chamber == 'House' else 4
+            new = None
+            if STAGE_LAW.match(text) or text.startswith('Governor Approved'):
+                new = (11, -1)
+            elif place == 12:
+                continue                                       # vetoed: only an override or accepted veto (a Public Act) moves it
+            elif VETO.search(text):
+                new = (12, -1)
+            elif text.startswith('Sent to the Governor'):
+                new = (10, -1)
+            elif text.startswith('Passed Both Houses'):
+                new = (9, -1)
+            elif place >= 9:
+                continue                                       # concurrence and the like: still between the chambers and the governor
+            elif PASSED.match(text):
+                if chamber == origin and not passed_origin:
+                    passed_origin, new = True, ((5 if origin == 'House' else 1), -1)
                 else:
-                    out += [day(d), new]
-                stage = new
+                    new = (9, -1)
+            elif TO_FIRST.match(text):
+                new = (off + 1, -1)
+            elif (m := TO_CMTE.match(text)) and m.group(1).strip() in ('Rules', 'Assignments'):
+                new = (off + 1, -1)
+            elif m:
+                c = cms.setdefault((chamber, m.group(1).strip()), len(cms))
+                new = (off + 2, c)
+            elif STAGE_CMTE.match(text) or TO_SECOND.match(text):
+                new = (off + 3, -1)
+            elif TO_THIRD.match(text):
+                new = (off + 4, -1)
+            if new and new != (place, cm):
+                place, cm = new
+                if out and out[-3] == day(d):
+                    out[-2:] = [place, cm]
+                else:
+                    out += [day(d), place, cm]
         ev[key] = out
     last = max(n)
-    return {'start': start, 'days': last + 1, 'n': [n.get(i, 0) for i in range(last + 1)], 'ev': ev}
+    return {'start': start, 'days': last + 1, 'n': [n.get(i, 0) for i in range(last + 1)],
+            'cm': [list(k) for k in sorted(cms, key=cms.get)], 'ev': ev}
 
 
 # ------------------------------------------------------------------ speeches and reports
