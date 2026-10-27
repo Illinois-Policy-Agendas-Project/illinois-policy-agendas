@@ -468,6 +468,7 @@ footer.foot .fcopy{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.18);p
   nav.tabs .menu-btn{border-color:rgba(255,255,255,.35)} }
 
 .sankey .sk-l{fill-opacity:.32;transition:fill-opacity .12s} .sankey .sk-l:hover,.sankey .sk-l.on{fill-opacity:.62}
+.sankey.strands .sk-l{fill-opacity:.42;stroke:var(--surface);stroke-width:.35} .sankey.strands .sk-l.on{fill-opacity:1;stroke:none} .sankey.strands svg:has(.sk-l.on) .sk-l:not(.on){fill-opacity:.16}
 .sankey .sk-t{font-size:12px;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round;pointer-events:none}
 .rp-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px} .rp-play{min-width:104px;justify-content:center}
 .rp-play::after{content:none!important} .rp-date{flex:1 1 220px;font-size:15px} .rp-date b{font-family:var(--f-display);font-weight:400;font-size:22px;color:var(--navy-2)}
@@ -1730,7 +1731,7 @@ function snUpdate(){
 
 /* one legislator's bills as primary sponsor, as a pipeline: topic → committee → floor → outcome.
    Each ribbon keeps its topic's color all the way, so you can follow a topic to where its bills stopped. */
-const SK = { slug:null };
+const SK = { slug:null, shell:false };   // shell: include placeholder bills
 function topicNodes(rows, major, col, n=8){
   // the largest topics get their own node and the rest share one; within a major topic the nodes are its subtopics
   const key = major==null ? (r=>isPol(r) ? r.major : 'other') : (r=>r.sub ?? 'other');
@@ -1741,26 +1742,30 @@ function topicNodes(rows, major, col, n=8){
   return {nodes, of: r => keep.has(key(r)) ? (major==null ? 'm'+key(r) : 's'+key(r)) : 'other'};
 }
 const STOP = 'hsl(215 14% 78%)';
+const isPlaceholder = r => /-TECH$/i.test((r.x.short||'').trim()) && (r.x.stage||1) < 3;
+const shellNote = (n, id) => n ? `<label class="check" style="font-size:12.5px"><input type="checkbox" id="${id}" ${SK.shell?'checked':''}>Include ${pl(n, 'placeholder bill')}</label>` : '';
 function memberSankey(el, rows, {major=null, onNode, height}={}){
   const tp = topicNodes(rows, major, 0, 7), color = new Map(tp.nodes.map(n=>[n.id, n]));
   const nodes = [...tp.nodes,
     {id:'c1', label:'Out of committee', short:'Out', col:1, color:'hsl(212 45% 66%)', click:false}, {id:'c0', label:'Stayed in committee', short:'Stayed', col:1, color:STOP, click:false},
     {id:'f1', label:'Passed a chamber', short:'Passed', col:2, color:'hsl(212 52% 52%)', click:false}, {id:'f0', label:'No floor vote passed', short:'No vote', col:2, color:STOP, click:false},
     {id:'o5', label:'Became law', short:'Law', col:3, color:'--navy', click:false}, {id:'o4', label:'Passed both, not law', short:'Both', col:3, color:'hsl(212 58% 42%)', click:false}, {id:'o3', label:'Passed one chamber only', short:'One', col:3, color:STOP, click:false}];
-  const flows = new Map(), add = (a, b, t) => { const k = a+'|'+b+'|'+t; flows.set(k, (flows.get(k)||0)+1); };
-  for (const r of rows){ const t = tp.of(r), st = r.x.stage||1;
-    add(t, st>=2 ? 'c1' : 'c0', t);
-    if (st>=2) add('c1', st>=3 ? 'f1' : 'f0', t);
-    if (st>=3) add('f1', 'o'+Math.min(st,5), t); }
-  // ribbons between the same two nodes stack in topic order, so the colors line up from column to column
-  const order = new Map(tp.nodes.map((n,i)=>[n.id, i]));
-  const links = [...flows].map(([k,v])=>{ const [a,b,t] = k.split('|'), n = color.get(t); return {s:a, t:b, v, color:n.color, label:n.label, o:order.get(t)}; }).sort((x,y)=>x.o-y.o);
+  // one strand per bill, so hovering shows that bill and its whole path; strands stack in topic order, then by bill number
+  const order = new Map(tp.nodes.map((n,i)=>[n.id, i])), links = [];
+  const sorted = rows.slice().sort((a,b)=>order.get(tp.of(a))-order.get(tp.of(b)) || a.x.type.localeCompare(b.x.type) || +a.x.bill.split(' ')[1] - +b.x.bill.split(' ')[1]);
+  for (const r of sorted){ const t = tp.of(r), st = r.x.stage||1, n = color.get(t), x = r.x;
+    const tip = `<div class="t"><span class="mono">${esc(x.bill)}</span> ${esc(x.short)}</div><div class="r"><span>Topic</span><b>${esc(subName(r.sub))}</b></div><div class="r"><span>Furthest stage</span><b>${esc(STAGES[st-1])}</b></div><div class="r"><span>Latest action</span><b>${esc(x.last_action)}</b></div><div class="muted">${x.last_date} · click to open the bill</div>`;
+    const add = (a, b) => links.push({s:a, t:b, v:1, color:n.color, group:r.key, tip, href:href(r)});
+    add(t, st>=2 ? 'c1' : 'c0');
+    if (st>=2) add('c1', st>=3 ? 'f1' : 'f0');
+    if (st>=3) add('f1', 'o'+Math.min(st,5)); }
   sankey(el, nodes, links, {height: height || (PHONE() ? 380 : 340), heads:['Topic','Committee','Floor','Outcome'], onNode, phoneLegend:0});
+  el.classList.add('strands');
 }
 function drawSponsorSankey(){
   const el = $('#sk'); if (!el) return;
   const ga = legGA(), inTopic = r => (SN.major==null || r.major===SN.major) && (SN.sub==null || r.sub===SN.sub);
-  const mineOf = p => p.bills.filter(b=>b.role==='C' && b.r.x.ga===ga && isBillHBSB(b.r) && inTopic(b.r)).map(b=>b.r);
+  const allOf = p => p.bills.filter(b=>b.role==='C' && b.r.x.ga===ga && isBillHBSB(b.r) && inTopic(b.r)).map(b=>b.r), mineOf = p => allOf(p).filter(r=>SK.shell || !isPlaceholder(r));
   const laws = m => m.filter(r=>r.x.stage>=5).length;
   const who = SPON.filter(p=>inGA(p, ga)).map(p=>[p, mineOf(p)]).filter(([,m])=>m.length).sort((a,b)=>laws(b[1])-laws(a[1]) || b[1].length-a[1].length || a[0].name.localeCompare(b[0].name));
   const sel = $('#sk-p');
@@ -1768,10 +1773,11 @@ function drawSponsorSankey(){
   if (!who.some(([p])=>p.slug===SK.slug)) SK.slug = who[0][0].slug;
   const opt = ch => who.filter(([p])=>p.ch===ch).sort((a,b)=>a[0].name.split(' ').slice(-1)[0].localeCompare(b[0].name.split(' ').slice(-1)[0])).map(([p,m])=>`<option value="${p.slug}" ${p.slug===SK.slug?'selected':''}>${esc(p.title)} (${fmt(m.length)})</option>`).join('');
   sel.hidden = false; sel.innerHTML = `<optgroup label="Senate">${opt('Sen')}</optgroup><optgroup label="House">${opt('Rep')}</optgroup>`;
-  const [p, mine] = who.find(([q])=>q.slug===SK.slug);
+  const [p, mine] = who.find(([q])=>q.slug===SK.slug), shells = allOf(p).filter(isPlaceholder).length;
   $('#sk-t').innerHTML = `Where ${esc(p.title)}'s bills went${snTopic()?' · '+esc(snTopic()):''}`;
   memberSankey(el, mine, {major: SN.major, onNode: n=>{ if (n.major!=null){ SN.major=n.major; SN.sub=null; } else if (n.sub!=null) SN.sub=n.sub; else return; renderSponsors(); $('#sk').scrollIntoView({block:'center'}); }});
-  $('#sk-note').innerHTML = `The ${pl(mine.length, 'House or Senate bill')} ${esc(p.title)} filed as primary sponsor in the ${gaName(ga)}${snTopic()?' on this topic':''}, followed from topic to how far each got. Ribbons keep their topic's color; hover for counts. Pick another legislator above (number of bills in brackets), or <a href="#sponsor-${p.slug}">open their page</a>.`;
+  $('#sk-note').innerHTML = `The ${pl(mine.length, 'House or Senate bill')} ${esc(p.title)} filed as primary sponsor in the ${gaName(ga)}${snTopic()?' on this topic':''}, followed from topic to how far each got. Each strand is one bill: hover to see it, click to open it. ${shells && !SK.shell ? `Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber). ` : ''}Pick another legislator above (number of bills in brackets), or <a href="#sponsor-${p.slug}">open their page</a>. ${shellNote(shells, 'sk-sh')}`;
+  $('#sk-sh')?.addEventListener('change', e=>{ SK.shell = e.target.checked; drawSponsorSankey(); });
 }
 
 /* ---- sponsor page ---- */
@@ -1801,9 +1807,10 @@ SECTIONS.sponsor.push(
         tip:`<div class="r"><span>Their bills</span><b class="num">${pct(v/mine.length)} (${fmt(v)})</b></div><div class="r"><span>${chamberName(p.ch)} average</span><b class="num">${pct((cp.get(m)||0)/peers.length)}</b></div>`,
         onclick:()=>{ SPG.major = SPG.major===m?null:m; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }})), {labelW:230, rowH:23, valFmt:v=>pct(v,0)}); } },
   { id:'flow', title:'Where their bills went', render(p, el){
-      const mine = p.bills.filter(b=>b.role==='C' && isBillHBSB(b.r)).map(b=>b.r);
-      if (mine.length < 2){ el.innerHTML = '<p class="muted" style="margin:0">Too few bills as primary sponsor to chart.</p>'; return; }
-      el.innerHTML = `<p class="ink2" style="margin:0 0 8px;font-size:13.5px">The ${fmt(mine.length)} House and Senate bills they filed as primary sponsor, followed from topic through committee and the floor to the outcome. Ribbons keep their topic's color. Click a topic to list those bills below.</p><div id="sg-sk"></div>`;
+      const all = p.bills.filter(b=>b.role==='C' && isBillHBSB(b.r)).map(b=>b.r), shells = all.filter(isPlaceholder).length, mine = all.filter(r=>SK.shell || !isPlaceholder(r));
+      if (mine.length < 2){ el.innerHTML = `<p class="muted" style="margin:0">Too few bills as primary sponsor to chart.</p>${shellNote(shells, 'sg-sh')}`; $('#sg-sh')?.addEventListener('change', e=>{ SK.shell = e.target.checked; renderRecord(); }); return; }
+      el.innerHTML = `<p class="ink2" style="margin:0 0 8px;font-size:13.5px">The ${fmt(mine.length)} House and Senate bills they filed as primary sponsor, followed from topic through committee and the floor to the outcome. Each strand is one bill, in its topic's color: hover to see it, click to open it. Click a topic to list those bills below.${shells && !SK.shell ? ` Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber).` : ''}</p><div id="sg-sk"></div>${shellNote(shells, 'sg-sh')}`;
+      $('#sg-sh')?.addEventListener('change', e=>{ SK.shell = e.target.checked; renderRecord(); });
       memberSankey($('#sg-sk'), mine, {height: Math.max(220, Math.min(360, 80 + mine.length*3)),
          onNode: n=>{ if (n.major==null) return; SPG.major = n.major; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }}); } },
   { id:'bills', title:'Bills', render(p, el){
@@ -2142,7 +2149,15 @@ function sankey(el, nodes, links, {height=360, heads=[], unit='bills', onNode, p
   el.innerHTML = s; el.classList.add('chart', 'sankey');
   const paths = $$('.sk-l', el), lit = on => paths.forEach(p=>p.classList.toggle('on', on(links[+p.dataset.i])));
   const share = (v, of) => of ? ` <span class="muted">(${pct(v/of,0)})</span>` : '';
+  let touch = false, armed = null;
   paths.forEach(p=>{ const l = links[+p.dataset.i], a = byId.get(l.s), b = byId.get(l.t);
+    if (l.group != null){
+      p.addEventListener('pointermove', e=>{ lit(x=>x.group===l.group); showTip(e, l.tip || esc(l.label||'')); });
+      p.addEventListener('pointerleave', ()=>{ lit(()=>false); hideTip(); });
+      // on touch screens the first tap shows the bill and a second tap on it opens it
+      if (l.href){ p.style.cursor = 'pointer'; p.addEventListener('pointerdown', e=>{ touch = e.pointerType !== 'mouse'; });
+        p.addEventListener('click', e=>{ if (touch && armed !== l.group){ armed = l.group; lit(x=>x.group===l.group); showTip(e, l.tip || ''); return; } hideTip(); nav(l.href.slice(1)); }); }
+      return; }
     p.addEventListener('pointermove', e=>{ lit(x=>x===l); showTip(e, `${l.label?`<div class="muted" style="font-size:11.5px">${esc(l.label)}</div>`:''}<div class="t">${esc(a.label)} → ${esc(b.label)}</div><div class="r"><span>${unit[0].toUpperCase()+unit.slice(1)}</span><b class="num">${fmt(l.v)}</b></div><div class="muted">${pct(l.v/a.v,0)} of ${esc(a.label)} · ${pct(l.v/b.v,0)} of ${esc(b.label)}</div>`); });
     p.addEventListener('pointerleave', ()=>{ lit(()=>false); hideTip(); }); });
   $$('.sk-n', el).forEach(g=>{ const n = byId.get(g.dataset.id);
