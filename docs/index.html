@@ -426,6 +426,10 @@ header.mast{background:var(--navy);border-bottom:0;color:#fff}
 nav.tabs button{color:rgba(255,255,255,.82);font-size:15px;border-bottom-width:4px}
 nav.tabs button:hover{color:#fff}
 nav.tabs button[aria-selected="true"]{color:#fff;font-weight:700;border-bottom-color:#fff}
+/* the phone menu sits on a white card: keep its text dark whatever the hover/selected state */
+nav.tabs .menu-btn,nav.tabs .menu-btn:hover,nav.tabs .menu-btn:focus{color:var(--ink);font-weight:600;font-size:15px;border-bottom-width:1px;border-bottom-color:var(--line-2)}
+nav.tabs .menu-panel button,nav.tabs .menu-panel button:hover{color:var(--ink-2);font-weight:400;border-bottom:0}
+nav.tabs .menu-panel button[aria-selected="true"]{color:var(--ink);font-weight:700;border-left-color:var(--navy)}
 nav.tabs .sep{background:rgba(255,255,255,.25)}
 /* pale band behind page titles, full width */
 main{overflow-x:clip}
