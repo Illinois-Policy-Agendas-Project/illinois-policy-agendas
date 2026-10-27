@@ -352,6 +352,8 @@ def build_bills(cfg, valid, rep):
                     continue
             bills[key] = rec
 
+        update_from_ilga(sess, ga, bills, rep, ds)
+
         # keep substantive bills only (config [bills] include_types / exclude_flags)
         keep_types = set(cfg['bills'].get('include_types', []))
         drop_flags = set(cfg['bills'].get('exclude_flags', []))
@@ -525,13 +527,68 @@ def bill_stage(steps, last_action, last_date, origin=None):
     return stage, cmte, pa, law_date, veto
 
 
+def update_from_ilga(sess, ga, bills, rep, ds):
+    """Bring the scraped bill file up to date from ILGA's Bill Status files, as saved by fetch_actions.py.
+    Each bill's actions, sponsors, short description and synopsis are replaced by ILGA's current ones, in the same format
+    the scraper writes, and bills introduced since the scrape are added. Codes and the other flags in the bill file are
+    kept; coding files still apply afterwards."""
+    if not sess.get('actions'):
+        return
+    folder = DATA / sess['actions']
+    if not (folder / 'bill_status.csv').exists() or not (folder / 'bill_actions.csv').exists():
+        return
+    acts = defaultdict(list)
+    with (folder / 'bill_actions.csv').open(newline='', encoding='utf-8') as f:
+        for r in csv.DictReader(f):
+            acts[r['bill']].append((int(r['seq']), r['date'], r['chamber'], r['action']))
+    with (folder / 'bill_status.csv').open(newline='', encoding='utf-8') as f:
+        status = list(csv.DictReader(f))
+    updated, added = 0, []
+    for st in status:
+        typ, num = norm_bill(st['bill'])
+        a = [x[1:] for x in sorted(acts.get(st['bill'], []))]
+        if not num or not a:
+            continue
+        key = f'{ga}-{num.replace(" ", "")}'
+        last_date, last = a[-1][0], a[-1][2]
+        fresh = {
+            'short': fix_text(st['shortdesc']) or '', 'sponsors_raw': fix_text(st['sponsors']) or '',
+            'last_date': last_date, 'last_action': last,
+            'actions_raw': '; '.join([last] + [x[2] for x in a]),   # the scraper's format: latest action first, then all of them
+            'synopsis': fix_text(st['synopsis']) or '',
+        }
+        law = any(x[2].startswith('Public Act') for x in a)
+        vote = any(re.search(r'\b\d{3}-\d{3}-\d{3}\b', x[2]) for x in a)
+        b = bills.get(key)
+        if b:
+            if b['last_action'] != last or b['last_date'] != last_date:
+                updated += 1
+            for k, v in fresh.items():
+                if v or k in ('last_action', 'actions_raw'):
+                    b[k] = v
+            b['intro'] = b['intro'] or a[0][0]
+            b['flags'] = ''.join(f for f in b['flags'] if f not in 'LR') + ('L' if law else '') + ('R' if vote or 'R' in b['flags'] else '')
+        else:
+            n = int(num.split()[1])
+            bills[key] = {'ga': ga, 'bill': num, 'type': typ, 'chamber': a[0][1] or ('House' if typ.startswith('H') else 'Senate'),
+                          'intro': a[0][0], **fresh, 'sub': None,
+                          'flags': ('A' if fresh['short'].startswith('$') else '') + ('L' if law else '') + ('R' if vote else ''),
+                          'link': f'{ga}00{typ}{n:04d}', 'source': 'ilga'}
+            added.append(num)
+    fetched = dt.datetime.fromtimestamp((folder / 'bill_status.csv').stat().st_mtime).strftime('%Y-%m-%d')
+    rep.note(ds, f'Brought the bill file up to date from ILGA\'s Bill Status files (downloaded {fetched}): {pl(updated, "bill")} with newer actions'
+                 + (f', and {pl(len(added), "bill")} introduced since the scrape added.' if added else '.'))
+    if added:
+        rep.warn(ds, f'{pl(len(added), "bill was", "bills were")} added from ILGA and {"has" if len(added) == 1 else "have"} no code yet. Make a coding worksheet to code {"it" if len(added) == 1 else "them"}.', added)
+
+
 def load_dated_actions(sess, ga, bills, rep, ds):
     """{bill key: [(date, chamber, action)]} from the session's bill_actions.csv (made by fetch_actions.py), or None."""
     if not sess.get('actions'):
         return None
     path = DATA / sess['actions'] / 'bill_actions.csv'
     if not path.exists():
-        rep.note(ds, f'No dated actions yet ({show(path)}), so the site leaves out the day-by-day session replay. Click "Fetch bill actions" to download them.')
+        rep.note(ds, f'No dated actions yet ({show(path)}), so the site leaves out the day-by-day session replay. Click "Update bills from ILGA" to download them.')
         return None
     out = defaultdict(list)
     try:
@@ -546,7 +603,7 @@ def load_dated_actions(sess, ga, bills, rep, ds):
     fetched = dt.datetime.fromtimestamp(path.stat().st_mtime).strftime('%Y-%m-%d')
     rep.note(ds, f'Dated actions for {len(out):,} of {len(bills):,} bills, downloaded {fetched}.')
     if len(out) < 0.9 * len(bills):
-        rep.warn(ds, f'Only {len(out):,} of {len(bills):,} bills have dated actions. Run "Fetch bill actions" again to fill in the rest.')
+        rep.warn(ds, f'Only {len(out):,} of {len(bills):,} bills have dated actions. Run "Update bills from ILGA" again to fill in the rest.')
     return dict(out)
 
 
@@ -851,7 +908,7 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
             # no dated actions on this computer yet: keep the replay that is already published rather than dropping it
             old = (ROOT / 'docs' / 'data' / 'bills' / str(ga) / 'timeline.json').read_text(encoding='utf-8')
             files[f'timeline-{ga}'] = dump(d / 'bills' / str(ga) / 'timeline.json', json.loads(old))
-            rep.note(f'Bills, {ga}th GA', 'Kept the published day-by-day replay as it was. Click "Fetch bill actions" to bring it up to date.')
+            rep.note(f'Bills, {ga}th GA', 'Kept the published day-by-day replay as it was. Click "Update bills from ILGA" to bring it up to date.')
     files['people'] = dump(d / 'people.json', {'people': people})
     files['sots'] = dump(d / 'sots.json', {'cols': ['id', 'governor', 'year', 'text', 'sub'], 'rows': sots})
     for src, dest in logo_copies:

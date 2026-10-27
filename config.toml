@@ -25,9 +25,9 @@ columns = { year = "year", governor = "governor_name", party = "party" }
 #            unless a codes file gives a different code.
 #   codes:   folder of coding files. Every .xlsx / .csv in it is read. Each needs a `bill` column
 #            (e.g. "HB 1234") and a `subtopic` column. Codes here override the details file.
-#   actions: folder for the dated action history of every bill, written by "Fetch bill actions"
-#            (pipeline/fetch_actions.py) from the General Assembly's public file repository. Used for the
-#            day-by-day session replay; the site works without it.
+#   actions: folder for ILGA's current status of every bill, written by "Update bills from ILGA"
+#            (pipeline/fetch_actions.py) from the General Assembly's public file repository. The build uses it to
+#            bring the details file up to date and for the day-by-day session replay; the site works without it.
 [[bills.sessions]]
 ga = 104
 years = "2025-2026"

@@ -77,8 +77,8 @@ pre{background:#0f1720;color:#dbe4ee;border-radius:8px;padding:12px;font:12.5px/
     <div class="act row"><button id="logos">Fetch logos</button><a class="btn" href="/logos" target="_blank">Review logos</a></div></div>
   <div class="step"><span class="n">+</span><div><h2>Legislators</h2><p>Reads the House and Senate member lists on ilga.gov and saves each member's party, district and official photo into <code>content/legislators</code>. Run it at the start of each session or when members change, then review and publish.</p></div>
     <div class="act row"><button id="legs">Fetch legislators</button><a class="btn" href="/legislators" target="_blank">Review legislators</a></div></div>
-  <div class="step"><span class="n">+</span><div><h2>Bill actions</h2><p>Downloads the date of every action on every bill from the General Assembly's public file repository (ftp.ilga.gov) into <code>inputs/actions</code>, for the day-by-day session replay. The first run takes about half an hour; later runs fetch only bills that changed. Run it before <b>Check data</b> whenever you want the replay brought up to date.</p></div>
-    <div class="act row"><button id="acts">Fetch bill actions</button></div></div>
+  <div class="step"><span class="n">+</span><div><h2>Update bills from ILGA</h2><p>Downloads every House and Senate bill's current status from the General Assembly's public file repository (ftp.ilga.gov) into <code>inputs/actions</code>: dated actions, sponsors, short description and synopsis. <b>Check data</b> then brings the scraped bill file up to date with it (newer actions and stages, new laws, and bills introduced since the scrape) and builds the day-by-day replay. The first run takes about 40 minutes; later runs fetch only bills that changed. Run it before <b>Check data</b> each time you publish.</p></div>
+    <div class="act row"><button id="acts">Update bills from ILGA</button></div></div>
   <div class="step"><span class="n">+</span><div><h2>Coding worksheet</h2><p>Makes a spreadsheet of every bill not yet coded in a session, in <code>inputs/worksheets</code>. Fill in <code>subtopic</code> and save it into that session's codes folder.</p></div>
     <div class="act row"><select id="ga"></select><button id="sheet">Make worksheet</button></div></div>
 </div>
@@ -175,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == '/run/legislators':
             ok = run('fetching legislators from ilga.gov', ['pipeline/fetch_legislators.py'])
         elif path == '/run/actions':
-            ok = run('fetching bill actions from ftp.ilga.gov', ['pipeline/fetch_actions.py'])
+            ok = run('updating bills from ftp.ilga.gov', ['pipeline/fetch_actions.py'])
         elif path == '/run/publish':
             env = {'IL_AGENDAS_SFTP_PASSWORD': body['password']} if body.get('password') else None
             ok = run('publishing', ['pipeline/publish.py'], env)

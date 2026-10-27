@@ -2342,7 +2342,7 @@ SECTIONS.committee.push(
 /* =================== shell & routing =================== */
 /* =================== SESSION REPLAY ===================
    Every House and Senate bill is a dot that moves between stage bands on the day ILGA recorded the action.
-   Data: bills/<ga>/timeline.json from the build (made from the dated actions that "Fetch bill actions" downloads):
+   Data: bills/<ga>/timeline.json from the build (made from the dated actions that "Update bills from ILGA" downloads):
    {start, days, n:[actions per day], ev:{key:[day, stage, day, stage, ...]}}; stage 1-5 as in STAGES, 6 = vetoed. */
 const RP = { ga:null, t:0, playing:false, speed:7, color:'topic', ch:'all', major:null };
 const RP_BANDS = [[1,'In committee'],[2,'Out of committee'],[3,'Passed one chamber'],[4,'Passed both chambers'],[5,'Became law'],[6,'Vetoed']];
@@ -2357,7 +2357,7 @@ async function renderReplay(){
     <p>Each dot is a House or Senate bill. Press play to watch bills move through the legislature on the days the General Assembly recorded each step, from introduction to committee, floor votes and the governor's desk. Hover a dot for the bill; click to open it.</p></div></div>
   <div id="rp-body"><p class="muted">Loading…</p></div>`;
   bindLegBar();
-  if (!(MAN.v||{})['timeline-'+ga]){ $('#rp-body').innerHTML = `<div class="panel"><p style="margin:0">The day-by-day replay for the ${gaName(ga)} isn't available yet. It appears once the bill action dates have been downloaded (<b>Fetch bill actions</b> in the Update website panel) and the site is published.</p></div>`; return; }
+  if (!(MAN.v||{})['timeline-'+ga]){ $('#rp-body').innerHTML = `<div class="panel"><p style="margin:0">The day-by-day replay for the ${gaName(ga)} isn't available yet. It appears once the bill action dates have been downloaded (<b>Update bills from ILGA</b> in the Update website panel) and the site is published.</p></div>`; return; }
   try { TL[ga] = TL[ga] || await get(`bills/${ga}/timeline`); } catch { $('#rp-body').innerHTML = '<p class="muted">Could not load the replay data.</p>'; return; }
   if (me !== rpRun) return;
   const tl = TL[ga]; if (RP.ga !== ga){ RP.ga = ga; RP.t = 0; RP.playing = false; }
