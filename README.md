@@ -60,7 +60,7 @@ latest code from GitHub into `~/illinois-policy-agendas` and opens a control pan
 **Coding** shows what needs coders' attention after the last check: bills without a code (with **Make worksheet**),
 new think tank reports waiting for a code, and how many laws have been reviewed in **Check law codes**.
 
-**Occasionally** (folded away): **Fetch legislators** at the start of each session, **Fetch logos**, and the two
+**Occasionally** (folded away): **Fetch legislators** at the start of each session, and the two
 downloads of Update and check on their own.
 
 ### Setting up a lab computer (once)
@@ -89,9 +89,8 @@ Commit and push, and the site updates. Lab computers pick up the change the next
 - **Home page:** `content/home/home.toml` (overview, methods note, team bios, sponsor and codebook link). Logos go in
   `content/home/logos/`, photos in `content/home/photos/`. Counts like {bills} in the text fill in automatically.
 - **Think tank biographies and logos:** `content/thinktanks/profiles.toml` (one block per organization; set
-  `reviewed = true` once checked). **Fetch logos** in the control panel (or `python pipeline/fetch_logos.py`) saves each
-  organization's logo from its website into `content/thinktanks/logos/`. Check them with **Review logos**, then commit.
-  Use logos with each organization's permission.
+  `reviewed = true` once checked). Logos are files in `content/thinktanks/logos/` named in each block's `logo`; add or
+  replace them by hand, then commit. Use logos with each organization's permission.
 - **Legislators' party, district and photos:** click **Fetch legislators** in the control panel (or run
   `python pipeline/fetch_legislators.py`). It reads the House and Senate member lists on ilga.gov and saves
   `content/legislators/members.csv` and `content/legislators/photos/`. Check them with **Review legislators**, then publish.
@@ -139,7 +138,6 @@ Dropbox folder `IAP/Website/`; `profiles` and `home` are relative to this reposi
 | `pipeline/publish.py` | Publishes the last good build into `docs/` and pushes |
 | `pipeline/refresh_docs.py` | Updates `docs/` after design or content changes, without the data |
 | `pipeline/app.py` | The control panel |
-| `pipeline/fetch_logos.py` | Collects think tank logos from their websites |
 | `pipeline/fetch_legislators.py` | Collects legislators' party, district and photos from ilga.gov |
 | `launcher/` | The files that go in Dropbox `IAP/Website/` |
 | `site/index.html` | The website itself |

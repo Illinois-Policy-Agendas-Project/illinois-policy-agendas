@@ -1,4 +1,4 @@
-"""Downloading web pages for the collectors (fetch_legislators.py, fetch_logos.py), with three certificate fixes.
+"""Downloading web pages for the collectors (fetch_legislators.py, fetch_actions.py, fetch_reports.py), with three certificate fixes.
 
 0. First it uses the operating system's own trust store (the macOS Keychain or the Windows certificate store) through
    the `truststore` package, which is what browsers use. That also covers networks that inspect secure traffic and

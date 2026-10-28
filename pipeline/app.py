@@ -134,12 +134,10 @@ pre{background:#0f1720;color:#dbe4ee;border-radius:8px;padding:12px;font:12.5px/
 <p class="muted" style="font-size:12.5px;margin-top:8px">Counts are from the last check. New codes go on the site at the next <b>Update and check</b> and <b>Publish</b>.</p>
 
 <h2 class="sec">OCCASIONALLY</h2>
-<details class="more"><summary>Legislators, logos, and single steps</summary>
+<details class="more"><summary>Legislators and single steps</summary>
   <div class="occ">
     <div><div><h3>Legislators</h3><p>Party, district and official photo of every member, from the House and Senate member lists on ilga.gov. Run at the start of each session or when members change.</p></div>
       <div class="row"><button id="legs">Fetch legislators</button><a class="btn" href="/legislators" target="_blank">Review</a></div></div>
-    <div><div><h3>Think tank logos</h3><p>Each organization's logo from its website (listed in <code>profiles.toml</code>). Use them with each organization's permission.</p></div>
-      <div class="row"><button id="logos">Fetch logos</button><a class="btn" href="/logos" target="_blank">Review</a></div></div>
     <div><div><h3>Update bills from ILGA only</h3><p>The first part of Update and check: every bill's actions, sponsors and synopsis from ftp.ilga.gov.</p></div>
       <div class="row"><button id="acts">Update bills</button></div></div>
     <div><div><h3>Look for new think tank reports only</h3><p>The second part of Update and check. Sites that block automated requests are collected by hand.</p></div>
@@ -163,7 +161,7 @@ async function poll(){
   $('#ilga').textContent = s.ilga ? `Bills last updated from ILGA ${s.ilga}.` : 'Bills have not been updated from ILGA on this computer yet.';
   $('#pubdesc').textContent = desc[s.method] || '';
   $('#pw').hidden = s.method !== 'sftp';
-  for (const id of ['update','build','sheet','logos','legs','acts','tts']) $('#'+id).disabled = busy;
+  for (const id of ['update','build','sheet','legs','acts','tts']) $('#'+id).disabled = busy;
   $('#publish').disabled = busy || failed || !b || !b.ok;
   if (!$('#ga').options.length) $('#ga').innerHTML = s.sessions.slice().reverse().map(g=>`<option value="${g}">${g}th General Assembly</option>`).join('');
   const t = b?.todo, ga = $('#ga').value;
@@ -181,7 +179,6 @@ $('#update').onclick = () => post('/run/update');
 $('#build').onclick = () => post('/run/build');
 $('#sheet').onclick = () => post('/run/worksheet', {ga: +$('#ga').value});
 $('#ga').onchange = () => poll();
-$('#logos').onclick = () => post('/run/logos');
 $('#legs').onclick = () => post('/run/legislators');
 $('#acts').onclick = () => post('/run/actions');
 $('#tts').onclick = () => post('/run/reports');
@@ -222,20 +219,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/report':
             f = OUT / 'report.html'
             return self.send(200, f.read_bytes()) if f.exists() else self.send(404, 'Run "Check data" first.')
-        if path == '/logos':
-            f = OUT / 'logos.html'
-            return self.send(200, f.read_bytes()) if f.exists() else self.send(404, 'Run "Fetch logos" first.')
         if path == '/legislators':
             f = OUT / 'legislators.html'
             return self.send(200, f.read_bytes()) if f.exists() else self.send(404, 'Run "Fetch legislators" first.')
         if path.startswith('/content/legislators/photos/'):  # images on the legislator review page
             base = (ROOT / 'content' / 'legislators' / 'photos').resolve()
-            f = (ROOT / path.lstrip('/')).resolve()
-            if f.parent != base or not f.is_file():
-                return self.send(404, 'Not found')
-            return self.send(200, f.read_bytes(), mimetypes.guess_type(f.name)[0] or 'application/octet-stream')
-        if path.startswith('/content/thinktanks/logos/'):  # images shown on the logo review page
-            base = (ROOT / 'content' / 'thinktanks' / 'logos').resolve()
             f = (ROOT / path.lstrip('/')).resolve()
             if f.parent != base or not f.is_file():
                 return self.send(404, 'Not found')
@@ -266,8 +254,6 @@ class Handler(BaseHTTPRequestHandler):
             ok = run('checking data', ['pipeline/build.py'])
         elif path == '/run/worksheet':
             ok = run('making a worksheet', ['pipeline/build.py', '--worksheet', str(int(body.get('ga')))])
-        elif path == '/run/logos':
-            ok = run('fetching think tank logos', ['pipeline/fetch_logos.py'])
         elif path == '/run/legislators':
             ok = run('fetching legislators from ilga.gov', ['pipeline/fetch_legislators.py'])
         elif path == '/run/reports':
