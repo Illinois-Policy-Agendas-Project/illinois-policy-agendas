@@ -49,7 +49,9 @@ def main():
     else:
         man['v'].pop('legislators', None)
     B.dump(d / 'manifest.json', man)
-    shutil.copyfile(ROOT / 'site' / 'index.html', docs / 'index.html')
+    for f in (ROOT / 'site').iterdir():   # index.html, the favicon and the link-preview image
+        if f.is_file():
+            shutil.copyfile(f, docs / f.name)
     (docs / '.nojekyll').write_text('')
     for level, ds, msg, _ in rep.items:
         print(f'  [{level}] {ds}: {msg}')
