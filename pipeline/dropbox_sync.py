@@ -34,10 +34,25 @@ def token():
     missing = [k for k in ('DROPBOX_APP_KEY', 'DROPBOX_APP_SECRET', 'DROPBOX_REFRESH_TOKEN') if not os.environ.get(k)]
     if missing:
         raise SystemExit(f'Missing settings: {", ".join(missing)}. Add them as secrets in the GitHub repository (see the README).')
-    body = urllib.parse.urlencode({'grant_type': 'refresh_token', 'refresh_token': os.environ['DROPBOX_REFRESH_TOKEN'],
-                                   'client_id': os.environ['DROPBOX_APP_KEY'], 'client_secret': os.environ['DROPBOX_APP_SECRET']}).encode()
-    with urllib.request.urlopen(urllib.request.Request(f'{API}/oauth2/token', data=body), timeout=60) as r:
-        return json.loads(r.read())['access_token']
+    env = {k: os.environ[k].strip() for k in ('DROPBOX_APP_KEY', 'DROPBOX_APP_SECRET', 'DROPBOX_REFRESH_TOKEN')}   # pasted secrets can carry spaces
+    body = urllib.parse.urlencode({'grant_type': 'refresh_token', 'refresh_token': env['DROPBOX_REFRESH_TOKEN'],
+                                   'client_id': env['DROPBOX_APP_KEY'], 'client_secret': env['DROPBOX_APP_SECRET']}).encode()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(f'{API}/oauth2/token', data=body), timeout=60) as r:
+            return json.loads(r.read())['access_token']
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode('utf-8', 'replace')
+        try:
+            err = json.loads(raw)
+        except ValueError:
+            err = {'error': '', 'error_description': raw[:200]}
+        hint = {'invalid_grant': 'DROPBOX_REFRESH_TOKEN is not a valid refresh token for this app (perhaps the one-time code was saved instead, '
+                                 'or the token came from a different app). Run pipeline/dropbox_auth.py again and save the token it prints.',
+                'invalid_client': 'DROPBOX_APP_KEY and DROPBOX_APP_SECRET do not match each other. Copy both again from the app\'s Settings tab.'}
+        raise SystemExit(f"Dropbox refused the sign-in: {err.get('error', '')} {err.get('error_description', '')}\n"
+                         f"{hint.get(err.get('error'), 'Check the three Dropbox secrets in the repository settings.')}\n"
+                         f"(Lengths, to spot a mis-paste: key {len(env['DROPBOX_APP_KEY'])}, secret {len(env['DROPBOX_APP_SECRET'])}, "
+                         f"refresh token {len(env['DROPBOX_REFRESH_TOKEN'])} characters.)") from None
 
 
 TOKEN = None
