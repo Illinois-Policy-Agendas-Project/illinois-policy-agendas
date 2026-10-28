@@ -607,8 +607,13 @@ const subOptions = (m, sel) => m==null ? '' : `<option value="">All subtopics in
    Bills load as a small summary for every session; each session's synopses, sponsors and histories
    load only when a view needs them (see need() below). */
 let ORGPROF = {}, MAN, SESSIONS = [], ALL_SESSIONS = [], LATEST, BYDS = {bills:[], sots:[], tt:[]};
-const LOADED = {details:new Set(), links:new Set()};
-const vkey = f => ({'bills/summary':'bills', thinktanks:'tt'})[f] || f.replace(/^bills\/(\d+)\/(\w+)$/,'$2-$1');
+const LOADED = {details:new Set(), links:new Set(), slices:new Set()};
+/* synopses and histories also come in slices of 500 bill numbers (bills/<ga>/d/HB3.json is HB 1500-1999), so a bill page
+   loads only its own; bill_slice() in build.py makes them */
+const billSlice = r => r.x.type + Math.floor(+r.x.bill.split(' ')[1] / 500);
+const SLICE_ACTS = {};
+const loadActsFor = r => SLICE_ACTS[`${r.x.ga}/${billSlice(r)}`] ||= get(`bills/${r.x.ga}/a/${billSlice(r)}`);
+const vkey = f => ({'bills/summary':'bills', thinktanks:'tt'})[f] || f.replace(/^bills\/(\d+)\/[ad]\/\w+$/,'slices-$1').replace(/^bills\/(\d+)\/(\w+)$/,'$2-$1');
 const get = f => fetch('data/'+f+'.json?v='+(MAN?.v?.[vkey(f)] || '')).then(r=>{ if (!r.ok) throw new Error(f); return r.json(); });
 const gaName = ga => `${ga}th General Assembly`;
 const gaYears = ga => ALL_SESSIONS.find(s=>s.ga===ga)?.years || '';
@@ -633,13 +638,17 @@ async function load(){
   for (const r of R){ r.major = majorOf(r.sub); setHay(r); if (r.major!=null && r.major!==NOPOL) USED_MAJORS.add(r.major); }
   const u = $('#updated'); const c = MAN.changes?.bills || {}, bits = [c.new && `${fmt(c.new)} new bills`, c.newly_coded && `${fmt(c.newly_coded)} newly coded`, c.recoded && `${fmt(c.recoded)} recoded`].filter(Boolean);
   if (u) u.textContent = `Data updated ${new Date(MAN.updated.replace(' ','T')).toLocaleDateString('en-US',{month:'long', day:'numeric', year:'numeric'})}${bits.length?' ('+bits.join(', ')+')':''}`;
-  await need({details:[LATEST], links:[LATEST]});
+  await need({details:[], links:[LATEST]});
 }
 function setHay(r){ r.hay = (r.title+' '+r.text+' '+(r.ds==='bills' ? r.sp.map(([i])=>SPON[i].name).join(' ')+' '+r.x.bill.replace(' ','') : r.ds==='tt' ? r.x.org : r.x.governor)).toLowerCase(); }
 /* fetch whatever per-session files a view needs; resolves at once if they are already here */
-async function need({details=[], links=[]}){
+async function need({details=[], links=[], text=[]}){
   const live = new Set(SESSIONS.map(s=>s.ga));
   const d = details.filter(g=>live.has(g) && !LOADED.details.has(g)), l = links.filter(g=>live.has(g) && !LOADED.links.has(g));
+  // single bills' synopses: the slice each is in, unless that session's full synopsis file is already here
+  const sl = [...new Set(text.filter(r=>r?.ds==='bills' && !LOADED.details.has(r.x.ga) && !d.includes(r.x.ga)).map(r=>`${r.x.ga}/${billSlice(r)}`))].filter(k=>!LOADED.slices.has(k));
+  if (sl.length){ const got = await Promise.all(sl.map(k=>get(`bills/${k.split('/')[0]}/d/${k.split('/')[1]}`)));
+    got.forEach((m,i)=>{ for (const [key, t] of Object.entries(m)){ const r = BILLKEY.get(key); if (r){ r.text = r.x.synopsis = t || ''; setHay(r); } } LOADED.slices.add(sl[i]); }); }
   if (!d.length && !l.length) return;
   const [dd, ll] = await Promise.all([Promise.all(d.map(g=>get(`bills/${g}/details`))), Promise.all(l.map(g=>get(`bills/${g}/sponsors`)))]);
   d.forEach((g,i)=>{ const m = dd[i]; for (const r of BYDS.bills) if (r.x.ga===g){ r.text = r.x.synopsis = m[r.key] || ''; } LOADED.details.add(g); });
@@ -763,9 +772,13 @@ const ROW = {
 };
 const MIXHEAD = ['dataset','id','year','date','title','text','subtopic','subtopic_label','major_topic','major_topic_label','governor','think_tank','bill_number','status_flags','url'];
 const mixRow = r => [DS[r.ds].short, r.ds==='bills'?r.key:r.id, r.year, r.date, r.title, r.text, ...labels(r), r.x.governor||'', r.x.org||'', r.x.bill||'', r.x.flags?[...r.x.flags].map(f=>FLAGS[f]).join('; '):'', r.ds==='bills'?ilga(r.x):r.x.url||''];
-function csvFor(rows){ const kinds = new Set(rows.map(r=>r.ds)); if (kinds.size===1){ const k=[...kinds][0]; return toCSV(HEAD[k], rows.map(ROW[k])); } return toCSV(MIXHEAD, rows.map(mixRow)); }
+function csvFor(rows){
+  const gas = [...new Set(rows.filter(r=>r.ds==='bills').map(r=>r.x.ga))].filter(g=>!LOADED.details.has(g));
+  if (gas.length) return withLoading(need({details:gas})).then(()=>csvFor(rows));   // save() waits for it
+  const kinds = new Set(rows.map(r=>r.ds)); if (kinds.size===1){ const k=[...kinds][0]; return toCSV(HEAD[k], rows.map(ROW[k])); } return toCSV(MIXHEAD, rows.map(mixRow)); }
 let DL;
 async function save(filename, data){
+  data = await data;
   try { if (DL===undefined) DL = window.claude?.use ? await window.claude.use('downloads') : null; } catch { DL = null; }
   if (DL){ try { await DL.save({filename, data:new Blob([data],{type:'text/csv'})}); toast('Saved '+filename); } catch(e){ if (e?.code!=='declined') toast('Download unavailable here ('+(e?.code||'error')+')'); } return; }
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type:'text/csv;charset=utf-8'})); a.download=filename; document.body.append(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
@@ -930,7 +943,8 @@ function renderBills(){
       : '<p class="muted" style="margin:0">No laws on this topic yet.</p>';
   }
   const go2 = ()=>{ BL.page=0; billsUpdate(); };
-  let deb; $('#b-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ BL.q=e.target.value; go2(); },160); });
+  let deb; $('#b-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ BL.q=e.target.value; go2();
+    const g = BL.ga ?? LATEST; if (BL.q && !LOADED.details.has(g)) need({details:[g]}).then(()=>{ if (BL.q) go2(); }); },160); });
   $('#b-type').addEventListener('change', e=>{ BL.type=e.target.value; go2(); });
   $('#b-major').addEventListener('change', e=>{ BL.major=e.target.value===''?null:+e.target.value; BL.sub=null; BL.page=0; renderBills(); });
   $('#b-sub')?.addEventListener('change', e=>{ BL.sub=e.target.value===''?null:+e.target.value; BL.page=0; renderBills(); });
@@ -1228,7 +1242,11 @@ function topicList(inM){
     .sort((a,b)=>(b.date||String(b.year||0)).localeCompare(a.date||String(a.year||0)));
   $('#tp-lt').innerHTML = `${fmt(rows.length)} records${TP.sub==null?' in all subtopics':''}`;
   const PS=12, pages=Math.ceil(rows.length/PS); TP.page=Math.min(TP.page,Math.max(0,pages-1));
-  $('#tp-res').innerHTML = rows.slice(TP.page*PS, TP.page*PS+PS).map(r=>card(r,[])).join('') || '<p class="muted">No records.</p>';
+  const shown = rows.slice(TP.page*PS, TP.page*PS+PS), page = TP.page;
+  $('#tp-res').innerHTML = shown.map(r=>card(r,[])).join('') || '<p class="muted">No records.</p>';
+  // bills on this page whose synopsis isn't here yet: fetch their slices, then redraw the cards if the page hasn't changed
+  const miss = shown.filter(r=>r.ds==='bills' && !r.x.synopsis && !LOADED.details.has(r.x.ga) && !LOADED.slices.has(`${r.x.ga}/${billSlice(r)}`));
+  if (miss.length) need({text:miss}).then(()=>{ if (TP.page===page && document.contains($('#tp-res'))) $('#tp-res').innerHTML = shown.map(r=>card(r,[])).join(''); });
   pager($('#tp-pg'), TP.page, pages, p=>{ TP.page=p; topicList(inM); $('#tp-lt').scrollIntoView({block:'start'}); });
 }
 
@@ -1296,8 +1314,6 @@ function srUpdate(){
      SECTIONS.bill.push({ id:'votes', title:'Roll-call votes', side:false, render(rec, el, page){ el.innerHTML = '...'; } })
    `side:true` puts it in the right-hand column; return false from show(rec) to skip it for a record. */
 const SECTIONS = { bill:[], report:[], speech:[] };
-const ACTS = {};  // bill histories per session, fetched the first time a bill page from that session opens
-const loadActs = ga => ACTS[ga] ||= get(`bills/${ga}/actions`);
 
 function recordFor(rt){
   if (rt.view==='bill'){ const r = BILLKEY.get(rt.ga ? `${rt.ga}-${rt.key}` : [...SESSIONS].reverse().map(s=>`${s.ga}-${rt.key}`).find(k=>BILLKEY.has(k))); return r && {kind:'bill', rec:r}; }
@@ -1390,7 +1406,7 @@ SECTIONS.bill.push(
   { id:'synopsis', title:'Synopsis', render(r, el){ el.innerHTML = `<div class="prose mclamp">${esc(r.x.synopsis) || '<span class="muted">No synopsis in the data.</span>'}</div>`; } },
   { id:'history', title:'Legislative history', render(r, el){
       el.innerHTML = '<p class="muted" style="margin:0">Loading history…</p>';
-      loadActs(r.x.ga).then(A=>{ const steps = A[r.key] || [];
+      loadActsFor(r).then(A=>{ const steps = A[r.key] || [];
         const mile = /passed|adopted|public act|sent to the governor|governor approved|effective date|veto|concur|enrolled|signed/i;
         el.innerHTML = `<ol class="steps mclamp">${steps.map(s=>{ const [t,v] = Array.isArray(s)?s:[s,null]; const [y,n,p] = v ? v.split('-').map(Number) : [];
           return `<li class="${mile.test(t)?'mile':''}"><span>${esc(t)}</span>${v?`<span class="chip vote" title="Yes–No–Present">Vote ${y}–${n}${p?`–${p}`:''}</span>`:''}</li>`; }).join('')}
@@ -1538,6 +1554,7 @@ function netData(ch, major, sub, ga=null){
       const k = i<L[0] ? i+'-'+L[0] : L[0]+'-'+i; ties.set(k, (ties.get(k)||0)+1); const d = i+'>'+L[0]; signs.set(d, (signs.get(d)||0)+1); } }
   return {people, ties, signs, lead};
 }
+const NETPOS = new Map();
 function netLayout(nodes, edges, W, H){
   let seed = 7; const rnd = ()=>{ seed = (seed*1664525 + 1013904223) % 4294967296; return seed/4294967296; };
   const n = nodes.length, k = Math.sqrt(W*H/Math.max(1,n))*0.75;
@@ -1592,7 +1609,11 @@ function drawNetwork(){
   $('#net-sub').textContent = nodes.length ? `${pl(nodes.length,'legislator')} · ${pl(edges.length,'tie')} of ${pl(min,'shared bill')} or more` : '';
   $('#net-find').innerHTML = '<option value="">Find a legislator…</option>' + nodes.slice().sort((a,b)=>a.p.name.localeCompare(b.p.name)).map(d=>`<option value="${d.i}">${esc(d.p.name)}</option>`).join('');
   if (!nodes.length){ box.innerHTML = '<p class="muted" style="padding:16px">No co-sponsorship ties at this level. Lower the threshold or pick another topic.</p>'; $('#net-leg').innerHTML=''; NETVIEW=null; return; }
-  netLayout(nodes, edges, W, H); const groups = netGroups(nodes, edges);
+  // the layout is deterministic, so reuse it when the same network is drawn again (returning to the page, toggling colors)
+  const lk = [legGA(), NET.ch, SN.major, SN.sub, min, SK.shell, W, H, nodes.length, edges.length].join('|'), cached = NETPOS.get(lk);
+  if (cached) nodes.forEach(d=>{ [d.x, d.y] = cached.get(d.i); });
+  else { netLayout(nodes, edges, W, H); NETPOS.set(lk, new Map(nodes.map(d=>[d.i, [d.x, d.y]]))); }
+  const groups = netGroups(nodes, edges);
   const maxL = Math.max(1, ...nodes.map(d=>d.lead)), maxW = Math.max(...edges.map(e=>e.w)), at = new Map(nodes.map(d=>[d.i,d]));
   const byParty = NET.color==='party' && hasParties(NET.ch), PCOL = {Democratic:'var(--pd)', Republican:'var(--pr)', Independent:'var(--pi)'};
   const rad = d => 3 + 9*Math.sqrt(d.lead/maxL), col = d => byParty ? (PCOL[d.p.party] || 'hsl(220 8% 62%)') : d.g>=0 && d.g<NETCOL.length ? NETCOL[d.g] : 'hsl(220 8% 62%)';
@@ -2204,7 +2225,8 @@ function buildCommittees(ga, acts){
   }
   return CMDATA[ga] = [...by.values()].filter(c=>c.bills.length>=2);   // drops one-off names (typos in the history)
 }
-const ensureCm = ga => CMDATA[ga] ? Promise.resolve(CMDATA[ga]) : loadActs(ga).then(a=>buildCommittees(ga, a));
+const ensureCm = ga => CMDATA[ga] ? Promise.resolve(CMDATA[ga]) : (CMACTS[ga] ||= get(`bills/${ga}/cmacts`)).then(a=>buildCommittees(ga, a));
+const CMACTS = {};
 const cmLink = c => `<a href="#committee-${c.key}">${esc(c.name)}</a>`;
 /* the bills data names the first committee to approve a bill as "House Executive Committee" or "Senate Judiciary" */
 /* older builds sometimes put a House committee in the Senate; once the histories are read, fall back to the other chamber */
@@ -2566,7 +2588,8 @@ function nav(token, {record=true, keep=false}={}){
   if (!R.length) return;
   const want = needsFor(ROUTE), me = ++navSeq;
   const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || (ROUTE.view==='committee' ? renderCommitteePage : renderRecord))(); if (!keep) scrollTo({top:0}); };
-  const pending = [...want.details.filter(g=>!LOADED.details.has(g)), ...want.links.filter(g=>!LOADED.links.has(g))];
+  const pending = [...want.details.filter(g=>!LOADED.details.has(g)), ...want.links.filter(g=>!LOADED.links.has(g)),
+                   ...(want.text||[]).filter(r=>r?.ds==='bills' && !LOADED.details.has(r.x.ga) && !LOADED.slices.has(`${r.x.ga}/${billSlice(r)}`))];
   if (!pending.length) return draw();
   withLoading(need(want)).then(draw);
 }
@@ -2575,9 +2598,9 @@ let navSeq = 0;
 function needsFor(rt){
   const all = allGAs();
   switch (rt.view){
-    case 'bills-committee': { const g = BL.ga ?? LATEST; if (!CMDATA[g]) ensureCm(g).then(()=>{ if (ROUTE.view==='bills-committee') renderBills(); }); return {details:[g], links:[g]}; }
-    case 'bills': case 'bills-introduced': case 'bills-law': case 'bills-activity': return {details:[BL.ga ?? LATEST], links:[BL.ga ?? LATEST]};
-    case 'bill': { const r = recordFor(rt)?.rec; return {details:r?[r.x.ga]:[], links:all}; }
+    case 'bills-committee': { const g = BL.ga ?? LATEST; if (!CMDATA[g]) ensureCm(g).then(()=>{ if (ROUTE.view==='bills-committee') renderBills(); }); return {details:BL.q?[g]:[], links:[g]}; }
+    case 'bills': case 'bills-introduced': case 'bills-law': case 'bills-activity': return {details:BL.q?[BL.ga ?? LATEST]:[], links:[BL.ga ?? LATEST]};
+    case 'bill': { const r = recordFor(rt)?.rec; return {details:[], links:all, text:r?[r]:[]}; }
     case 'search': return {details: SR.gas==='latest' ? [LATEST] : all, links:all};
     case 'topics': case 'sponsors': case 'sponsor': return {details:[], links:all};
     case 'committees': case 'parties': case 'replay': return {details:[], links:[BL.ga ?? LATEST]};

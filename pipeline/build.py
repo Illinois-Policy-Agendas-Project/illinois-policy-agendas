@@ -1063,6 +1063,16 @@ def build_legislators(cfg, rep):
     return rows, copies
 
 
+def bill_slice(b):
+    """Which slice file a bill's synopsis and history are in: its type and number in blocks of 500, e.g. HB3 for HB 1500-1999.
+    The website computes the same name (billSlice in site/index.html)."""
+    return f"{b['type']}{int(b['bill'].split()[1]) // 500}"
+
+
+# the history lines the committee pages read: arrivals in the other chamber, committee assignments and approvals
+CM_LINE = re.compile(r'^(Arrived? in |(?:Re-)?[Aa]ssigned to |Do Pass|Recommends Be Adopted|Recommends Do (?:Adopt|Consent))')
+
+
 def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=None, logo_copies=(), governors=(), home=None, legislators=None):
     out = ROOT / cfg['build']['output'] / 'site'
     if out.exists():
@@ -1082,8 +1092,20 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
         ga = s['ga']
         if s.get('upcoming'):
             continue  # nothing to publish until the session has bills
-        files[f'details-{ga}'] = dump(d / 'bills' / str(ga) / 'details.json', {k: b['synopsis'] for k, b in s['bills'].items()})
-        files[f'actions-{ga}'] = dump(d / 'bills' / str(ga) / 'actions.json', {k: parse_actions(b['actions_raw'], b['last_action']) for k, b in s['bills'].items()})
+        # synopses: one file for full-text search, and slices of ~500 bill numbers so a bill page loads only its own;
+        # histories: slices for bill pages, plus just the committee lines for the committee pages
+        syn = {k: b['synopsis'] for k, b in s['bills'].items()}
+        acts = {k: parse_actions(b['actions_raw'], b['last_action']) for k, b in s['bills'].items()}
+        files[f'details-{ga}'] = dump(d / 'bills' / str(ga) / 'details.json', syn)
+        slices = defaultdict(list)
+        for k, b in s['bills'].items():
+            slices[bill_slice(b)].append(k)
+        hashes = []
+        for name, keys in sorted(slices.items()):
+            hashes.append(dump(d / 'bills' / str(ga) / 'd' / f'{name}.json', {k: syn[k] for k in keys}))
+            hashes.append(dump(d / 'bills' / str(ga) / 'a' / f'{name}.json', {k: acts[k] for k in keys}))
+        files[f'slices-{ga}'] = hashlib.sha1(''.join(hashes).encode()).hexdigest()[:10]
+        files[f'cmacts-{ga}'] = dump(d / 'bills' / str(ga) / 'cmacts.json', {k: [x for x in v if CM_LINE.match(x if isinstance(x, str) else x[0])] for k, v in acts.items()})
         files[f'sponsors-{ga}'] = dump(d / 'bills' / str(ga) / 'sponsors.json', {k: links.get(k, []) for k in s['bills']})
         if s.get('dated'):
             files[f'timeline-{ga}'] = dump(d / 'bills' / str(ga) / 'timeline.json', timeline(s['dated']))
