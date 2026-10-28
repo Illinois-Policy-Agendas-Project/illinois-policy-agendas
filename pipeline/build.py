@@ -1252,7 +1252,8 @@ def main(argv=None):
             'reports_waiting': getattr(rep, 'reports_waiting', 0),
             'laws': {s['ga']: sorted(b['bill'] for b in s['bills'].values() if (b.get('stage') or 0) >= 5) for s in sessions if not s.get('upcoming')}}
     (ROOT / cfg['build']['output'] / 'status.json').write_text(json.dumps({'ok': not rep.errors, 'errors': len(rep.errors), 'warnings': sum(1 for i in rep.items if i[0] == 'warning'),
-                                                                            'built': manifest['updated'], 'todo': todo}))
+                                                                            'built': manifest['updated'], 'todo': todo,
+                                                                            'items': [[lv, ds, msg] for lv, ds, msg, _ in rep.items if lv != 'note']}))
     state.parent.mkdir(parents=True, exist_ok=True)
     state.write_text(json.dumps(snapshot))
     write_report(cfg, rep, manifest, report)

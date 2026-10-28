@@ -1,0 +1,106 @@
+# Update the IPAP website on GitHub's servers instead of a lab computer.
+#
+# Every night it updates and checks the data and saves the downloads back to Dropbox, but never publishes.
+# To publish: Actions tab → "Update website" → "Run workflow", tick "Publish", Run. It publishes only if the check passes.
+# Each run's page shows a summary; the full report is attached under Artifacts. Setup (Dropbox secrets) is in the README.
+name: Update website
+
+on:
+  schedule:
+    - cron: '17 9 * * *'          # every day at 9:17 UTC (3:17 or 4:17 a.m. in Chicago)
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish the site if the check passes'
+        type: boolean
+        default: false
+      downloads:
+        description: 'First update bills from ILGA and look for new think tank reports'
+        type: boolean
+        default: true
+      worksheet:
+        description: 'Also make a coding worksheet for this session (e.g. 104); leave blank for none'
+        type: string
+        default: ''
+
+permissions:
+  contents: write                 # publishing commits the site to docs/
+  pages: write                    # and asks GitHub Pages to rebuild
+
+concurrency:
+  group: update-website           # one run at a time
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150          # the first ILGA download takes about 40 minutes
+    env:
+      IL_AGENDAS_DATA: /home/runner/iap/Website
+      DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+      DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
+      DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+      DROPBOX_IAP_PATH: ${{ vars.DROPBOX_IAP_PATH || '/Academic/UIC/Research/IAP' }}
+      DOWNLOADS: ${{ github.event_name == 'schedule' || inputs.downloads }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # publishing rebases onto the latest main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Get the data from Dropbox
+        run: python pipeline/dropbox_sync.py pull
+
+      - name: Update bills from ILGA
+        if: env.DOWNLOADS == 'true'
+        continue-on-error: true   # a failed download is reported; the check still runs on what is there
+        run: python pipeline/fetch_actions.py
+
+      - name: Look for new think tank reports
+        if: env.DOWNLOADS == 'true'
+        continue-on-error: true
+        run: python pipeline/fetch_reports.py
+
+      - name: Check data
+        id: check
+        continue-on-error: true   # so the downloads are still saved and the report attached
+        run: python pipeline/build.py ${{ inputs.worksheet && format('--worksheet {0}', inputs.worksheet) || '' }}
+
+      - name: Save downloads and worksheets to Dropbox
+        if: always()
+        run: python pipeline/dropbox_sync.py push
+
+      - name: Summary
+        if: always()
+        run: python pipeline/run_summary.py >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attach the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: build/report.html
+          if-no-files-found: ignore
+
+      - name: Publish
+        if: inputs.publish && steps.check.outcome == 'success'
+        run: |
+          python pipeline/publish.py
+          python pipeline/dropbox_sync.py push      # the publish log, so "what changed" works everywhere
+          gh api -X POST "repos/${{ github.repository }}/pages/builds" > /dev/null || echo "GitHub Pages will rebuild on its own."
+          echo "### Published" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Stop if the check found errors
+        if: steps.check.outcome == 'failure'
+        run: |
+          echo "::error::The check found errors, so nothing was published. See the summary and the attached report."
+          exit 1

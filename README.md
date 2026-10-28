@@ -63,6 +63,38 @@ new think tank reports waiting for a code, and how many laws have been reviewed 
 **Occasionally** (folded away): **Fetch legislators** at the start of each session, and the two
 downloads of Update and check on their own.
 
+### Updating from GitHub instead of a lab computer
+
+The same update also runs on GitHub's servers (`.github/workflows/update.yml`), so no lab computer is needed.
+
+- **Every night** it updates bills from ILGA, looks for new think tank reports and checks the data. It saves the
+  downloads back to Dropbox but **never publishes**.
+- **To publish:** on GitHub, open the repository's **Actions** tab → **Update website** → **Run workflow**, tick
+  **Publish the site if the check passes**, and click **Run workflow**. It publishes only if the check finds no errors.
+  The same form can skip the downloads, or make a coding worksheet for a session (saved to `inputs/worksheets` in
+  Dropbox).
+- **Each run's page** shows a summary (errors, warnings, what needs coding); the full report is under **Artifacts**.
+  GitHub emails you when a run fails.
+- It reads the data from Dropbox and writes back only what it produced (bill status from ILGA, new think tank
+  reports, worksheets, the publish log). A file someone edits in Dropbox during a run is never overwritten.
+- **Check law codes**, **Preview site** and **Fetch legislators** still need the control panel on a computer.
+- GitHub pauses scheduled runs in a repository with no commits for 60 days; publishing (or any commit) restarts them.
+
+**Setting it up (once, about 15 minutes):**
+
+1. **Make a Dropbox app.** At https://www.dropbox.com/developers/apps, signed in to the Dropbox account that has the
+   IAP folder: **Create app** → **Scoped access** → **Full Dropbox** → name it (e.g. "IPAP website"). On its
+   **Permissions** tab tick `files.metadata.read`, `files.content.read` and `files.content.write`, then **Submit**. Its
+   **Settings** tab shows the **App key** and **App secret**.
+2. **Get a refresh token.** On any computer with Python, in this repository, run `python pipeline/dropbox_auth.py`. It
+   asks for the key and secret, gives you a link to allow access, and prints the token.
+3. **Give them to GitHub.** In the repository: **Settings** → **Secrets and variables** → **Actions** → **New repository
+   secret**, three times: `DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET`, `DROPBOX_REFRESH_TOKEN`. If the IAP folder isn't at
+   `/Academic/UIC/Research/IAP` in that Dropbox, also add a **variable** (same page, Variables tab) `DROPBOX_IAP_PATH`
+   with its path.
+4. **Try it.** Actions tab → **Update website** → **Run workflow** with Publish unticked. The first run takes about 45
+   minutes (it downloads every bill from ILGA); later runs a few minutes.
+
 ### Setting up a lab computer (once)
 
 1. Install Python 3.11 or newer from https://www.python.org/downloads/.
