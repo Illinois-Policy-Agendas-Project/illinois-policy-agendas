@@ -44,13 +44,24 @@ different codes, the check reports it and the bill stays "Not yet coded" until y
 Double-click **Update website.command** (Mac) or **Update website.bat** (Windows) in `IAP/Website/`. It gets the
 latest code from GitHub into `~/illinois-policy-agendas` and opens a control panel in your browser.
 
-1. **Check data.** Reads all the files, checks every code, and builds the site on this computer (about a minute).
-2. **Open report / Preview site.**
+**Publishing an update is three steps:**
+
+1. **Update and check.** Gets every bill's latest status from the General Assembly (ftp.ilga.gov), looks for new
+   think tank reports, then reads every file, checks every code and rebuilds the site on this computer. A few minutes;
+   about 40 the first time on a computer. If a download fails (a site is down or blocks the request), the panel says
+   so and the check still runs on what is there. **Check only** skips the downloads.
+2. **Look it over.** **Open report** and **Preview site**.
    - **Errors** block publishing: a code that isn't in the codebook, coders who disagree, a missing or unreadable file, missing columns.
    - **Warnings** are worth a look but don't block anything: duplicate bills, a coded bill the scraper hasn't picked up yet, records that lost their code.
    - The report also says what changed since the last publish.
-3. **Publish.** It's only enabled when the check found no errors. It copies the site into `docs/`, commits and
-   pushes. GitHub Pages shows the new version within a minute or two.
+3. **Publish.** Only enabled when the check found no errors. It copies the site into `docs/`, commits and pushes.
+   GitHub Pages shows the new version within a minute or two.
+
+**Coding** shows what needs coders' attention after the last check: bills without a code (with **Make worksheet**),
+new think tank reports waiting for a code, and how many laws have been reviewed in **Check law codes**.
+
+**Occasionally** (folded away): **Fetch legislators** at the start of each session, **Fetch logos**, and the two
+downloads of Update and check on their own.
 
 ### Setting up a lab computer (once)
 

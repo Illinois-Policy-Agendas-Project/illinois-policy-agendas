@@ -213,7 +213,9 @@ def main(argv=None):
         print('Collected by hand (no source in config.toml): ' + ', '.join(hand))
     if problems:
         print(f'\n{len(problems)} problem{"s" if len(problems) > 1 else ""}:', *problems[:20], sep='\n  ')
-    return 1 if problems and not added else 0
+    # some sites refusing is normal (they are collected by hand); fail only when no listing could be read at all
+    listed = len(tt.get('sources', [])) - sum(1 for p in problems if 'could not read the listing' in p)
+    return 1 if problems and listed <= 0 else 0
 
 
 if __name__ == '__main__':

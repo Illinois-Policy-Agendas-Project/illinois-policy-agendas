@@ -892,6 +892,7 @@ def add_new_reports(cfg, valid, rep, ds, rows, bad):
         have.add(rid)
         added += 1
     rep.note(ds, f'New reports file: {pl(added, "coded report")} added to the site' + (f'; {moved} already in the main file' if moved else '') + '.')
+    rep.reports_waiting = len(waiting)
     if waiting:
         rep.warn(ds, f'{pl(len(waiting), "new report is", "new reports are")} waiting for a subtopic in {path.name} and {"is" if len(waiting) == 1 else "are"} not on the site yet.', waiting)
 
@@ -1245,7 +1246,13 @@ def main(argv=None):
     print('Writing the site…', flush=True)
     out, manifest = write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles, list(logo_copies) + home_media + leg_photos, governors, home, legislators)
     report = ROOT / cfg['build']['output'] / 'report.html'
-    (ROOT / cfg['build']['output'] / 'status.json').write_text(json.dumps({'ok': not rep.errors, 'errors': len(rep.errors), 'built': manifest['updated']}))
+    # what still needs coders' attention, for the control panel: uncoded bills, new reports without a code, and each
+    # session's laws (the panel compares them with the law-code reviews)
+    todo = {'uncoded': {s['ga']: sum(1 for b in s['bills'].values() if b['sub'] is None) for s in sessions if not s.get('upcoming')},
+            'reports_waiting': getattr(rep, 'reports_waiting', 0),
+            'laws': {s['ga']: sorted(b['bill'] for b in s['bills'].values() if (b.get('stage') or 0) >= 5) for s in sessions if not s.get('upcoming')}}
+    (ROOT / cfg['build']['output'] / 'status.json').write_text(json.dumps({'ok': not rep.errors, 'errors': len(rep.errors), 'warnings': sum(1 for i in rep.items if i[0] == 'warning'),
+                                                                            'built': manifest['updated'], 'todo': todo}))
     state.parent.mkdir(parents=True, exist_ok=True)
     state.write_text(json.dumps(snapshot))
     write_report(cfg, rep, manifest, report)
