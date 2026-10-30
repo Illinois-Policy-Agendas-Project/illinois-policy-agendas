@@ -755,7 +755,7 @@ def update_from_ilga(sess, ga, bills, rep, ds):
     rep.note(ds, f'Brought the bill file up to date from ILGA\'s Bill Status files (downloaded {fetched}): {pl(updated, "bill")} with newer actions'
                  + (f', and {pl(len(added), "bill")} introduced since the scrape added.' if added else '.'))
     if added:
-        rep.warn(ds, f'{pl(len(added), "bill was", "bills were")} added from ILGA and {"has" if len(added) == 1 else "have"} no code yet. ' + ('They go into the coding sheet at the next update from GitHub.' if (CFG or {}).get('coding_sheet', {}).get('id') else f'Make a coding worksheet to code {"it" if len(added) == 1 else "them"}.'), added)
+        rep.warn(ds, f'{pl(len(added), "bill was", "bills were")} added from ILGA and {"has" if len(added) == 1 else "have"} no code yet. ' + ('The update from GitHub adds them to the coding sheet.' if (CFG or {}).get('coding_sheet', {}).get('id') else f'Make a coding worksheet to code {"it" if len(added) == 1 else "them"}.'), added)
 
 
 def load_dated_actions(sess, ga, bills, rep, ds):
