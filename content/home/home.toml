@@ -2,7 +2,7 @@
 # In the two paragraphs, {bills}, {sessions}, {sentences}, {addresses}, {reports}, {thinktanks},
 # {legislators} and {updated} are filled in with current counts when the site loads.
 # reviewed: set to true once the text is final; the build warns until then.
-reviewed = false
+reviewed = true
 
 title = "Illinois Policy Agendas Project"
 tagline = "What Illinois governors, legislators and think tanks pay attention to, coded by policy topic."
