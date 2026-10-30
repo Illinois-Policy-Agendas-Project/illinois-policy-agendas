@@ -32,6 +32,13 @@ Codes in the sheet go on the site at the next update, and override the bill file
 still has the last word on laws). A code that isn't in the codebook blocks publishing until it's fixed. If a bill is
 rewritten again after you code it, its row is updated: your code moves to **Code before** and Subtopic is cleared.
 
+**Checking law codes in the sheet.** The **104th GA laws** tab lists every law, grouped by code, with the codebook
+rule for its code. For each, pick a **Decision**: **Correct**, **Change code** (and pick a **New code**), or **Unsure**
+(say why in **Notes**). Put your initials under **Reviewer**. New laws are added as they're signed. Decisions count
+exactly like ones made in **Check law codes** (below): at the next update they're saved as
+`inputs/qc/<session>/review_coding-sheet.csv`, a changed code overrides every other code, and if the sheet and the
+Check law codes page disagree, the most recent decision wins.
+
 ### Coding worksheets (without the sheet)
 
 1. Open **Update website** (see below), pick the session under **Coding worksheet**, and click **Make worksheet**.

@@ -639,22 +639,29 @@ def apply_sheet(ga, bills, valid, rep, ds):
 
 def write_coding_queue(cfg, codebook, sessions, path):
     """What pipeline/coding_sheet.py needs to add bills to the coding sheet after the check: every bill without a code or
-    rewritten by an amendment, and the codebook for the sheet's list of codes."""
+    rewritten by an amendment, every law (for checking law codes), and the codebook with each code's rule."""
     out = {'codebook': [[NOPOL, 'No policy content', '']] + [[c, lab, codebook['majors'].get(c // 100) or codebook['majors'].get(c, '')] for c, lab in sorted(codebook['subs'].items())],
-           'sessions': {}}
+           'sessions': {}, 'laws': {}, 'rules': {}}
+    doc = path.parent / 'site' / 'data' / 'codebook_doc.json'
+    if doc.exists():
+        out['rules'] = {str(sb['code']): sb.get('rule', '') for m in json.loads(doc.read_text(encoding='utf-8')).get('majors', []) for sb in m.get('subs', [])}
     for s in sessions:
         if s.get('upcoming'):
             continue
-        q = {}
+        q, laws = {}, {}
         for b in s['bills'].values():
             n, now = rewrites(b['synopsis'])
+            link = b['link'] or ''
+            url = link if link.startswith('http') or not link else f'https://ilga.gov/ftp/legislation/{s["ga"]}/BillStatus/HTML/{link}.html'
+            if (b.get('stage') or 0) >= 5:
+                laws[b['bill']] = {'code': b['sub'], 'pa': b.get('pa') or '', 'short': b['short'], 'now': now, 'url': url}
             if b['sub'] is not None and not n:
                 continue
-            link = b['link'] or ''
             q[b['bill']] = {'rw': n, 'code': b['sub'], 'law': (b.get('stage') or 0) >= 5, 'shell': bool(re.search(r'-TECH$', b['short'] or '', re.I)),
                             'short': b['short'], 'now': now, 'intro': b['intro'], 'sponsor': b['sponsors_raw'].split(',')[0].strip(),
-                            'url': link if link.startswith('http') or not link else f'https://ilga.gov/ftp/legislation/{s["ga"]}/BillStatus/HTML/{link}.html'}
+                            'url': url}
         out['sessions'][str(s['ga'])] = q
+        out['laws'][str(s['ga'])] = laws
     path.write_text(json.dumps(out))
 
 
