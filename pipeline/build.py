@@ -1214,6 +1214,7 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
                       **({'upcoming': True, 'starts': s.get('starts', '')} if s.get('upcoming') else {})} for s in sessions],
         'counts': {'sots': len(sots), 'tt': len(tt), 'people': len(people)},
         'changes': rep.changes, 'v': files,
+        **({'goatcounter': cfg['analytics']['goatcounter'].strip()} if cfg.get('analytics', {}).get('goatcounter', '').strip() else {}),
     }
     dump(d / 'manifest.json', manifest)
     return out, manifest

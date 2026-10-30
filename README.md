@@ -191,6 +191,11 @@ Commit and push, and the site updates. Lab computers pick up the change the next
 Paths under `[codebook]`, `[governors]`, `[sots]`, `[thinktanks] file` and `[[bills.sessions]]` are relative to the
 Dropbox folder `IAP/Website/`; `profiles` and `home` are relative to this repository.
 
+**Visitor counts.** The site counts page views with GoatCounter (no cookies, no personal data). Sign up at
+https://www.goatcounter.com (free for non-commercial sites), then put the code you chose (e.g. `ipap` for
+ipap.goatcounter.com) under `[analytics] goatcounter` in `config.toml`, and publish. Every view counts as its own
+page (`/speeches`, `/bill-104-HB35`); local previews are never counted. The stats are at https://<code>.goatcounter.com.
+
 - **New scrape of the current session:** overwrite the file named in `details` (same path, same name).
   New bills appear on the site as "Not yet coded", and existing codes are kept.
 - **The 105th General Assembly (2027-2028):** already set up as a placeholder (`status = "upcoming"`). The site lists

@@ -2647,13 +2647,26 @@ function nav(token, {record=true, keep=false}={}){
   CUR = token; ROUTE = parseRoute(token); drawNav(); hideTip(); try { localStorage.setItem('ilpa2-view', token); } catch {}
   if (!R.length) return;
   const want = needsFor(ROUTE), me = ++navSeq;
-  const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || (ROUTE.view==='committee' ? renderCommitteePage : renderRecord))(); if (!keep) scrollTo({top:0}); };
+  const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || (ROUTE.view==='committee' ? renderCommitteePage : renderRecord))(); if (!keep) scrollTo({top:0}); countView(CUR); };
   const pending = [...want.details.filter(g=>!LOADED.details.has(g)), ...want.links.filter(g=>!LOADED.links.has(g)),
                    ...(want.text||[]).filter(r=>r?.ds==='bills' && !LOADED.details.has(r.x.ga) && !LOADED.slices.has(`${r.x.ga}/${billSlice(r)}`))];
   if (!pending.length) return draw();
   withLoading(need(want)).then(draw);
 }
 let navSeq = 0;
+/* page views with GoatCounter (no cookies, no personal data) when config.toml [analytics] goatcounter is set. Each
+   view is counted as its own path (/bill-104-HB35, /speeches), since GoatCounter ignores the part after # by itself. */
+let GC_LAST = null, GC_WAIT = null;
+function countView(token){
+  const code = MAN?.goatcounter; if (!code || token === GC_LAST || /^(localhost|127\.|\[::1\])/.test(location.hostname)) return;
+  GC_LAST = token; const hit = {path: '/' + token, title: document.title};
+  if (window.goatcounter?.count) return window.goatcounter.count(hit);
+  if (GC_WAIT) { GC_WAIT = hit; return; }
+  GC_WAIT = hit; const sc = document.createElement('script'); sc.async = true; sc.src = 'https://gc.zgo.at/count.js';
+  sc.dataset.goatcounter = `https://${encodeURIComponent(code)}.goatcounter.com/count`; sc.dataset.goatcounterSettings = '{"no_onload": true}';
+  sc.onload = () => { try { window.goatcounter.count(GC_WAIT); } catch {} };
+  document.head.appendChild(sc);
+}
 /* which session files a view needs: bill text for search and bill pages, sponsor links for anything about sponsors */
 function needsFor(rt){
   const all = allGAs();
