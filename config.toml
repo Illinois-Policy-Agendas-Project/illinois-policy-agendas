@@ -93,7 +93,7 @@ file = "content/legislators/members.csv"
 # Put the code you chose when signing up, e.g. "ipap" for ipap.goatcounter.com; leave blank for no counting.
 # Every page counts, bill and speech pages included; the stats are at https://<code>.goatcounter.com.
 [analytics]
-goatcounter = ""
+goatcounter = "ejfagan"
 
 [coding_sheet]
 id = "1jykXDjnBxuSfZo6nZbbL1PmKpAp0OIZJpnTBo7TGJY4"
