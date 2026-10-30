@@ -41,6 +41,7 @@ jobs:
       DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
       DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
       DROPBOX_IAP_PATH: ${{ vars.DROPBOX_IAP_PATH || '/Academic/UIC/Research/IAP' }}
+      GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
       DOWNLOADS: ${{ github.event_name == 'schedule' || inputs.downloads }}
     steps:
       - uses: actions/checkout@v4
@@ -68,10 +69,19 @@ jobs:
         continue-on-error: true
         run: python pipeline/fetch_reports.py
 
+      - name: Read the coding sheet
+        continue-on-error: true   # if Google is unreachable, the check uses the copy of its codes from the last run
+        run: python pipeline/coding_sheet.py pull
+
       - name: Check data
         id: check
         continue-on-error: true   # so the downloads are still saved and the report attached
         run: python pipeline/build.py ${{ inputs.worksheet && format('--worksheet {0}', inputs.worksheet) || '' }}
+
+      - name: Add new and rewritten bills to the coding sheet
+        if: always()
+        continue-on-error: true
+        run: python pipeline/coding_sheet.py push
 
       - name: Save downloads and worksheets to Dropbox
         if: always()

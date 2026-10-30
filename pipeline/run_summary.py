@@ -22,4 +22,6 @@ for level, title in (('error', 'Errors (these block publishing)'), ('warning', '
 t = s.get('todo') or {}
 if t:
     unc = ', '.join(f'{n:,} in the {ga}th GA' for ga, n in (t.get('uncoded') or {}).items())
-    print(f"### Coding\n\n- Bills without a code: {unc or 'none'}\n- New think tank reports waiting for a code: {t.get('reports_waiting', 0):,}")
+    sheet = ', '.join(f'{n:,} in the {ga}th GA' for ga, n in (t.get('sheet') or {}).items())
+    print(f"### Coding\n\n- Bills without a code: {unc or 'none'}" + (f"\n- Bills waiting for a code in the coding sheet: {sheet}" if sheet else '')
+          + f"\n- New think tank reports waiting for a code: {t.get('reports_waiting', 0):,}")

@@ -486,10 +486,11 @@ def build_bills(cfg, valid, rep):
         elif cdir:
             rep.note(ds, f'No coding folder at {sess["codes"]} yet; using codes from the bill file only.')
 
+        sheet_waiting = apply_sheet(ga, bills, valid, rep, ds)
         apply_reviews(ga, bills, valid, rep, ds)
 
         # a bad code in the bill file only matters if no coding file or review has replaced it
-        bad_codes = [b for b in bad_codes if bills.get(f'{ga}-{b.split(":")[0].replace(" ", "")}', {}).get('source') not in ('codes', 'qc')]
+        bad_codes = [b for b in bad_codes if bills.get(f'{ga}-{b.split(":")[0].replace(" ", "")}', {}).get('source') not in ('codes', 'sheet', 'qc')]
         if bad_codes:
             rep.error(ds, f'{pl(len(bad_codes), "bill")} in the bill file {"has a code" if len(bad_codes) == 1 else "have codes"} not in the codebook. {"It shows" if len(bad_codes) == 1 else "They show"} as "Not yet coded" until fixed, or until a coding file gives {"it" if len(bad_codes) == 1 else "them"} a code.', bad_codes)
 
@@ -497,7 +498,7 @@ def build_bills(cfg, valid, rep):
         coded = sum(1 for b in bills.values() if b['sub'] not in (None,))
         rep.stats[ds] = {'records': n, 'coded': coded, 'uncoded': n - coded}
         all_sponsor_strings += [b['sponsors_raw'] for b in bills.values() if b['sponsors_raw']]
-        sessions.append({'ga': ga, 'years': sess.get('years', ''), 'bills': bills, 'dated': load_dated_actions(sess, ga, bills, rep, ds)})
+        sessions.append({'ga': ga, 'years': sess.get('years', ''), 'bills': bills, 'dated': load_dated_actions(sess, ga, bills, rep, ds), 'sheet_waiting': sheet_waiting})
 
     # sponsors across all sessions
     sp = SponsorParser(all_sponsor_strings)
@@ -585,6 +586,76 @@ def bill_stage(steps, last_action, last_date, origin=None):
         law_date = last_date
     veto = any(re.search(r'Vetoed|Total Veto|Amendatory Veto', t) for t in texts)
     return stage, cmte, pa, law_date, veto
+
+
+VERSION_SPLIT = re.compile(r'(?<=\.);\s+(?=[A-Z])')   # synopsis versions: as introduced, then each adopted amendment
+REWRITE = re.compile(r'^Replaces everything after the enacting clause', re.I)
+REINSERT = re.compile(r'^Replaces everything after the enacting clause\.\s*Reinserts the (?:contents|provisions) of the (?:introduced |engrossed )?bill', re.I)
+
+
+def rewrites(synopsis):
+    """(number of amendments that rewrote the bill, what the bill does now). A rewrite replaces everything after the
+    enacting clause with something other than the introduced bill again; "now" is the synopsis from the last rewrite on."""
+    v = [x.strip() for x in VERSION_SPLIT.split(synopsis or '') if x.strip()]
+    rw = [i for i, x in enumerate(v) if i and REWRITE.match(x) and not REINSERT.match(x)]
+    return len(rw), '; '.join(v[rw[-1]:] if rw else v)
+
+
+def apply_sheet(ga, bills, valid, rep, ds):
+    """Codes from the Google coding sheet, which pipeline/coding_sheet.py copies to inputs/coding_sheet/<ga>.csv before
+    each check. They override the bill file and coding files; "Check law codes" decisions still override them.
+    Returns how many bills in the sheet are waiting for a code."""
+    f = DATA / 'inputs' / 'coding_sheet' / f'{ga}.csv'
+    if not f.exists():
+        return None
+    try:
+        rows = read_table(f).fillna('').to_dict('records')
+    except Exception as e:  # noqa: BLE001
+        rep.error(ds, f'Could not read the copy of the coding sheet ({f.name}): {e}')
+        return None
+    applied, waiting, bad, unknown = 0, 0, [], []
+    for r in rows:
+        if str(r['subtopic']).strip() == '':
+            waiting += 1
+            continue
+        code = to_code(r['subtopic'])
+        if code is None or (code != NOPOL and code not in valid):
+            bad.append(f'{r["bill"]}: {r["subtopic"]}' + (f' ({r["coder"]})' if r.get('coder') else ''))
+            continue
+        _, num = norm_bill(r['bill'])
+        key = f'{ga}-{(num or "").replace(" ", "")}'
+        if key not in bills:
+            unknown.append(str(r['bill']))
+            continue
+        bills[key]['sub'], bills[key]['source'] = code, 'sheet'
+        applied += 1
+    rep.note(ds, f'Coding sheet: {pl(applied, "code")} applied; {pl(waiting, "bill")} waiting for a code.')
+    if bad:
+        rep.error(ds, f'{pl(len(bad), "code")} in the coding sheet {"is" if len(bad) == 1 else "are"} not in the codebook. Pick {"it" if len(bad) == 1 else "them"} from the list in the sheet.', bad)
+    if unknown:
+        rep.warn(ds, f'{pl(len(unknown), "bill")} in the coding sheet {"is" if len(unknown) == 1 else "are"} not in the bill file (a typo in the bill number?).', unknown)
+    return waiting
+
+
+def write_coding_queue(cfg, codebook, sessions, path):
+    """What pipeline/coding_sheet.py needs to add bills to the coding sheet after the check: every bill without a code or
+    rewritten by an amendment, and the codebook for the sheet's list of codes."""
+    out = {'codebook': [[NOPOL, 'No policy content', '']] + [[c, lab, codebook['majors'].get(c // 100) or codebook['majors'].get(c, '')] for c, lab in sorted(codebook['subs'].items())],
+           'sessions': {}}
+    for s in sessions:
+        if s.get('upcoming'):
+            continue
+        q = {}
+        for b in s['bills'].values():
+            n, now = rewrites(b['synopsis'])
+            if b['sub'] is not None and not n:
+                continue
+            link = b['link'] or ''
+            q[b['bill']] = {'rw': n, 'code': b['sub'], 'law': (b.get('stage') or 0) >= 5, 'shell': bool(re.search(r'-TECH$', b['short'] or '', re.I)),
+                            'short': b['short'], 'now': now, 'intro': b['intro'], 'sponsor': b['sponsors_raw'].split(',')[0].strip(),
+                            'url': link if link.startswith('http') or not link else f'https://ilga.gov/ftp/legislation/{s["ga"]}/BillStatus/HTML/{link}.html'}
+        out['sessions'][str(s['ga'])] = q
+    path.write_text(json.dumps(out))
 
 
 def apply_reviews(ga, bills, valid, rep, ds):
@@ -684,7 +755,7 @@ def update_from_ilga(sess, ga, bills, rep, ds):
     rep.note(ds, f'Brought the bill file up to date from ILGA\'s Bill Status files (downloaded {fetched}): {pl(updated, "bill")} with newer actions'
                  + (f', and {pl(len(added), "bill")} introduced since the scrape added.' if added else '.'))
     if added:
-        rep.warn(ds, f'{pl(len(added), "bill was", "bills were")} added from ILGA and {"has" if len(added) == 1 else "have"} no code yet. Make a coding worksheet to code {"it" if len(added) == 1 else "them"}.', added)
+        rep.warn(ds, f'{pl(len(added), "bill was", "bills were")} added from ILGA and {"has" if len(added) == 1 else "have"} no code yet. ' + ('They go into the coding sheet at the next update from GitHub.' if (CFG or {}).get('coding_sheet', {}).get('id') else f'Make a coding worksheet to code {"it" if len(added) == 1 else "them"}.'), added)
 
 
 def load_dated_actions(sess, ga, bills, rep, ds):
@@ -1246,10 +1317,12 @@ def main(argv=None):
     print('Writing the site…', flush=True)
     out, manifest = write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles, list(logo_copies) + home_media + leg_photos, governors, home, legislators)
     report = ROOT / cfg['build']['output'] / 'report.html'
+    write_coding_queue(cfg, codebook, sessions, ROOT / cfg['build']['output'] / 'coding_queue.json')
     # what still needs coders' attention, for the control panel: uncoded bills, new reports without a code, and each
     # session's laws (the panel compares them with the law-code reviews)
     todo = {'uncoded': {s['ga']: sum(1 for b in s['bills'].values() if b['sub'] is None) for s in sessions if not s.get('upcoming')},
             'reports_waiting': getattr(rep, 'reports_waiting', 0),
+            'sheet': {s['ga']: s['sheet_waiting'] for s in sessions if s.get('sheet_waiting') is not None},
             'laws': {s['ga']: sorted(b['bill'] for b in s['bills'].values() if (b.get('stage') or 0) >= 5) for s in sessions if not s.get('upcoming')}}
     (ROOT / cfg['build']['output'] / 'status.json').write_text(json.dumps({'ok': not rep.errors, 'errors': len(rep.errors), 'warnings': sum(1 for i in rep.items if i[0] == 'warning'),
                                                                             'built': manifest['updated'], 'todo': todo,

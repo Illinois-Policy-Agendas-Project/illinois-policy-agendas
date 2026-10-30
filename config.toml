@@ -86,6 +86,12 @@ columns = { id = "id", governor = "governor", year = "year", text = "text", subt
 [legislators]
 file = "content/legislators/members.csv"
 
+# Google Sheet where coders code new bills and bills an amendment rewrote (pipeline/coding_sheet.py; setup in the
+# README). Each update from GitHub adds those bills to it and reads its codes, which override the bill file and coding
+# files. `id` is the long part of the sheet's link between /d/ and /edit; leave it blank to turn the sheet off.
+[coding_sheet]
+id = "1jykXDjnBxuSfZo6nZbbL1PmKpAp0OIZJpnTBo7TGJY4"
+
 [thinktanks]
 file = "inputs/thinktanks/Illinois Think Tank Reports.xlsx"
 profiles = "content/thinktanks/profiles.toml"   # in this repository; bios, and logos in content/thinktanks/logos/

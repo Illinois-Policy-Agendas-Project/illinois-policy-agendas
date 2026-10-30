@@ -54,7 +54,9 @@ def run(name, args, env=None, steps=None):
 
 UPDATE = [('Updating bills from ILGA', ['pipeline/fetch_actions.py'], False),
           ('Looking for new think tank reports', ['pipeline/fetch_reports.py'], False),
-          ('Checking data', ['pipeline/build.py'], True)]
+          ('Reading the coding sheet', ['pipeline/coding_sheet.py', 'pull'], False),   # these two do nothing without the Google key
+          ('Checking data', ['pipeline/build.py'], True),
+          ('Adding new bills to the coding sheet', ['pipeline/coding_sheet.py', 'push'], False)]
 
 
 def when(path):
@@ -78,6 +80,7 @@ def status():
     return {'version': VERSION, 'build': s, 'published': last_pub, 'method': CFG['publish'].get('method'), 'sessions': sorted(int(x['ga']) for x in live),
             'ilga': when(DATA / latest.get('actions', 'none') / 'listing.json') if latest.get('actions') else None,
             'reports_file': CFG['thinktanks'].get('new', ''), 'review': review,
+            'sheet': f"https://docs.google.com/spreadsheets/d/{CFG['coding_sheet']['id']}/edit" if CFG.get('coding_sheet', {}).get('id') else None,
             'job': {k: JOB[k] for k in ('name', 'running', 'code', 'notes')}, 'log': JOB['log'][-400:]}
 
 
@@ -125,8 +128,8 @@ pre{background:#0f1720;color:#dbe4ee;border-radius:8px;padding:12px;font:12.5px/
 
 <h2 class="sec">CODING</h2>
 <div class="todo">
-  <div class="card"><div class="big" id="t-unc">–</div><p>bills without a code. Make a spreadsheet of them, fill in <code>subtopic</code>, and save it into the session's codes folder in <code>inputs/codes</code>.</p>
-    <div class="row"><select id="ga" aria-label="Session"></select><button id="sheet">Make worksheet</button></div></div>
+  <div class="card"><div class="big" id="t-unc">–</div><p id="t-uncp">bills without a code. Make a spreadsheet of them, fill in <code>subtopic</code>, and save it into the session's codes folder in <code>inputs/codes</code>.</p>
+    <div class="row"><select id="ga" aria-label="Session"></select><a class="btn" id="opensheet" target="_blank" rel="noopener" hidden>Open coding sheet</a><button id="sheet">Make worksheet</button></div></div>
   <div class="card"><div class="big" id="t-rep">–</div><p>new think tank reports waiting for a code. Fill in <code>subtopic</code> in <code id="t-repf"></code> and delete rows that aren't reports.</p></div>
   <div class="card"><div class="big" id="t-law">–</div><div class="bar"><i id="t-lawbar" style="width:0"></i></div><p id="t-lawp">laws reviewed in Check law codes.</p>
     <a class="btn" href="/qc" target="_blank">Check law codes</a></div>
@@ -165,7 +168,9 @@ async function poll(){
   $('#publish').disabled = busy || failed || !b || !b.ok;
   if (!$('#ga').options.length) $('#ga').innerHTML = s.sessions.slice().reverse().map(g=>`<option value="${g}">${g}th General Assembly</option>`).join('');
   const t = b?.todo, ga = $('#ga').value;
+  if (s.sheet){ $('#opensheet').href = s.sheet; $('#opensheet').hidden = false; $('#sheet').className = 'link'; }
   if (t){ const unc = t.uncoded?.[ga] ?? 0; $('#t-unc').textContent = fmt(unc); $('#t-unc').className = 'big' + (unc ? '' : ' done');
+    if (s.sheet) $('#t-uncp').textContent = `bills without a code${t.sheet?.[ga] != null ? `; ${fmt(t.sheet[ga])} bills (new or rewritten by an amendment) waiting in the coding sheet` : ''}. New and rewritten bills go into the sheet each night; codes there reach the site at the next update.`;
     $('#t-rep').textContent = fmt(t.reports_waiting||0); $('#t-rep').className = 'big' + (t.reports_waiting ? '' : ' done');
     const r = s.review?.[ga]; if (r){ $('#t-law').textContent = `${fmt(r.done)} / ${fmt(r.laws)}`; $('#t-law').className = 'big' + (r.done>=r.laws ? ' done' : '');
       $('#t-lawbar').style.width = (100*r.done/Math.max(1,r.laws)).toFixed(1)+'%';

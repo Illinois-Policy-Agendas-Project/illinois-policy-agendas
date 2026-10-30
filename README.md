@@ -14,6 +14,26 @@ The project keeps its parts in two places:
 
 ## For coders
 
+### The coding sheet (new bills and bills an amendment rewrote)
+
+Bills that need a code collect in a Google Sheet, one tab per session ("104th GA"). The nightly update adds:
+
+- every **new bill**, as soon as ILGA lists it;
+- every bill an amendment **rewrote** (it replaced everything after the enacting clause with something other than
+  the introduced bill again), with its earlier code under **Code before**. Leader placeholder bills that got real
+  content say **Placeholder given content**.
+
+For each row, read **What the bill does now** (the synopsis from the last rewrite on; **Status** opens it on
+ilga.gov) and pick a **Subtopic** from the list: type a code or a few words to search it. If the earlier code still
+fits, pick it again. Put your initials under **Coder**. Delete rows that don't need a code; they don't come back.
+Sort and filter freely; the update finds rows by bill number.
+
+Codes in the sheet go on the site at the next update, and override the bill file and coding files (Check law codes
+still has the last word on laws). A code that isn't in the codebook blocks publishing until it's fixed. If a bill is
+rewritten again after you code it, its row is updated: your code moves to **Code before** and Subtopic is cleared.
+
+### Coding worksheets (without the sheet)
+
 1. Open **Update website** (see below), pick the session under **Coding worksheet**, and click **Make worksheet**.
    You get `IAP/Website/inputs/worksheets/uncoded_104_<date>.xlsx`, listing every bill that has no code yet.
 2. Fill in the `subtopic` column with a code from the Illinois subtopic index (`IAP/illinois_subtopic_index.csv`;
@@ -77,6 +97,9 @@ The same update also runs on GitHub's servers (`.github/workflows/update.yml`), 
   GitHub emails you when a run fails.
 - It reads the data from Dropbox and writes back only what it produced (bill status from ILGA, new think tank
   reports, worksheets, the publish log). A file someone edits in Dropbox during a run is never overwritten.
+- It also keeps the **coding sheet** up to date: it reads the sheet's codes before the check and adds new and
+  rewritten bills after it. A lab computer's **Update and check** uses the copy of the sheet's codes from the last
+  GitHub run (`inputs/coding_sheet/` in Dropbox).
 - **Check law codes**, **Preview site** and **Fetch legislators** still need the control panel on a computer.
 - GitHub pauses scheduled runs in a repository with no commits for 60 days; publishing (or any commit) restarts them.
 
@@ -92,7 +115,16 @@ The same update also runs on GitHub's servers (`.github/workflows/update.yml`), 
    secret**, three times: `DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET`, `DROPBOX_REFRESH_TOKEN`. If the IAP folder isn't at
    `/Academic/UIC/Research/IAP` in that Dropbox, also add a **variable** (same page, Variables tab) `DROPBOX_IAP_PATH`
    with its path.
-4. **Try it.** Actions tab → **Update website** → **Run workflow** with Publish unticked. The first run takes about 45
+4. **Connect the coding sheet** (optional, about 10 minutes).
+   - In Google Cloud (https://console.cloud.google.com), make a project (e.g. "IPAP website"), then
+     **APIs & Services** → **Library** → **Google Sheets API** → **Enable**.
+   - **IAM & Admin** → **Service accounts** → **Create service account** (e.g. "ipap-coding-sheet"; no roles needed).
+     Open it → **Keys** → **Add key** → **Create new key** → **JSON**. A .json file downloads.
+   - Add a repository secret `GOOGLE_SERVICE_ACCOUNT` and paste the whole contents of that file. Then delete the file.
+   - Share the coding sheet with the service account's email (`…@….iam.gserviceaccount.com`) as an **Editor**, and put
+     the sheet's ID (the long part of its link between `/d/` and `/edit`) in `config.toml` under `[coding_sheet]`.
+   The next run sets up the tabs and the subtopic list and adds the first bills.
+5. **Try it.** Actions tab → **Update website** → **Run workflow** with Publish unticked. The first run takes about 45
    minutes (it downloads every bill from ILGA); later runs a few minutes.
 
 ### Setting up a lab computer (once)
