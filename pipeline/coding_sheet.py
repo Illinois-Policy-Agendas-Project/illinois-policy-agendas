@@ -96,6 +96,9 @@ class Sheets:
                     time.sleep(2 ** attempt)
                     continue
                 detail = e.read().decode('utf-8', 'replace')[:400]
+                if 'SERVICE_DISABLED' in detail or 'has not been used in project' in detail:
+                    raise SystemExit('The Google Sheets API is not turned on for the service account\'s Cloud project. In the Cloud console: '
+                                     'APIs & Services → Library → Google Sheets API → Enable, wait a few minutes, and try again.') from None
                 if e.code in (403, 404):
                     raise SystemExit(f'Google Sheets said {e.code}: {detail}\nShare the sheet with {self.key["client_email"]} as an Editor, '
                                      'and check [coding_sheet] id in config.toml.') from None
