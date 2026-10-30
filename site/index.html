@@ -112,6 +112,9 @@ input[type=search]{padding:8px 12px}
 .chart text{fill:var(--muted);font-family:var(--f-ui);font-size:11px}
 .chart .grid{stroke:var(--line);stroke-width:1} .chart .base{stroke:var(--line-2);stroke-width:1}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)} .legend span{display:inline-flex;align-items:center;gap:6px}
+.stk-leg{display:flex;gap:4px 6px;flex-wrap:wrap;margin-top:10px} .stk-leg button{font:12px var(--f-ui);color:var(--ink-2);background:none;border:1px solid transparent;border-radius:999px;padding:3px 9px 3px 7px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.stk-leg button:hover{border-color:var(--line-2)} .stk-leg button.on{border-color:var(--ink-2);color:var(--ink);font-weight:600} .stk-leg button.dim{opacity:.45}
+.stk-leg i{width:10px;height:10px;border-radius:2px;flex:none} .chart .stk-s{cursor:pointer;transition:opacity .15s}
 #tip{position:fixed;pointer-events:none;z-index:30;background:var(--surface);border:1px solid var(--line-2);box-shadow:0 6px 18px rgba(30,40,60,.12);border-radius:6px;padding:8px 10px;font-size:12.5px;max-width:300px}
 #tip .t{font-weight:600;margin-bottom:4px} #tip .r b{white-space:nowrap} #tip .r{display:flex;align-items:center;gap:10px;justify-content:space-between} #tip .seg-t{font-weight:600;margin:2px 0 4px;color:var(--ink)}
 svg .seg:hover{stroke:var(--ink)!important;stroke-width:1.25px!important;fill-opacity:1!important}
@@ -768,6 +771,30 @@ function lines(el, xs, series, {height=220, bands=true}={}){
     showTip(e, `<div class="t">${xv}${GOV[xv]?` <span class="muted" style="font-weight:400">· Gov. ${esc(govLabel(null, xv))}</span>`:''}</div>${rows||'<div class="muted">No data this year</div>'}`); });
   hit.addEventListener('pointerleave', ()=>{ hideTip(); xh.setAttribute('visibility','hidden'); });
 }
+/* 100% stacked columns: one per year, each topic's share of that year's policy sentences.
+   keys: topics bottom to top; share(k,y), n(k,y); color(k), label(k); focus: a key drawn solid at the baseline, the rest faded */
+function stackShares(el, years, keys, {share, n, total, color, label, focus=null, onSeg, height=300}={}){
+  const W=cw(el), H=height, m={l:40,r:6,t:22,b:22}, iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const bw = iw/years.length, gap = Math.min(5, bw*.22), every = Math.ceil(years.length/Math.max(3, Math.floor(W/44)));
+  const order = focus!=null && keys.includes(focus) ? [focus, ...keys.filter(k=>k!==focus)] : keys;
+  const X = i => m.l+i*bw;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of attention by topic and year">`;
+  govBands(years[0], years[years.length-1]).forEach((b,i)=>{ const a = X(years.indexOf(b.from)), z = X(years.indexOf(b.to)+1);
+    s += `<line x1="${a+gap/2}" x2="${z-gap/2}" y1="${m.t-8}" y2="${m.t-8}" style="stroke:var(--line-2)" stroke-width="1.5"/>`;
+    const lab = `${b.governor.split(' ').slice(-1)[0]} (${partyAbbr(b.party)})`; if (z-a > lab.length*6) s += `<text x="${(a+z)/2}" y="${m.t-12}" text-anchor="middle" style="font-size:10px">${esc(lab)}</text>`; });
+  for (const t of ticks(1)) { const y = m.t+ih-ih*t; s += `<line class="grid" x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}"/><text x="${m.l-6}" y="${y+3.5}" text-anchor="end">${pct(t,0)}</text>`; }
+  years.forEach((y,i)=>{ const x = X(i)+gap/2, w = Math.max(1, bw-gap); let y0 = m.t+ih;
+    order.forEach(k=>{ const v = share(k,y); if (!v) return; const h = ih*v, op = focus==null || k===focus ? 1 : .28;
+      s += `<rect class="stk-s" data-k="${k}" data-y="${y}" x="${x}" y="${y0-h}" width="${w}" height="${Math.max(0,h-.6)}" style="fill:${color(k)};fill-opacity:${op}"/>`; y0 -= h; });
+    if (i%every===0 || i===years.length-1 && (years.length-1)%every >= every*.6) s += `<text x="${x+w/2}" y="${H-6}" text-anchor="middle">${y}</text>`; });
+  s += `<line class="base" x1="${m.l}" x2="${W-m.r}" y1="${m.t+ih}" y2="${m.t+ih}"/></svg>`;
+  el.innerHTML = s; el.classList.add('chart');
+  $$('.stk-s', el).forEach(r=>{ const k = r.dataset.k === 'other' ? 'other' : +r.dataset.k, y = +r.dataset.y;
+    bindTip(r, ()=>`<div class="t">${y}${GOV[y]?` <span class="muted" style="font-weight:400">· Gov. ${esc(govLabel(null, y))}</span>`:''}</div>`+
+      `<div class="seg-t"><i class="dot" style="background:${color(k)};border-radius:2px"></i> ${esc(label(k))}</div>`+
+      `<div class="r"><span>Share of policy sentences</span><b class="num">${pct(share(k,y))}</b></div><div class="muted">${fmt(n(k,y))} of ${fmt(total(y))} sentences${onSeg && k!=='other' ? ' · click to read the address' : ''}</div>`);
+    if (onSeg && k!=='other') r.addEventListener('click', ()=>onSeg(k, y)); });
+}
 const HEAT = ['--h0','--h1','--h2','--h3','--h4'];
 const heatBg = (v, mx) => v<=0 ? 'background:var(--h0);color:var(--line-2)' : `background:var(${HEAT[Math.min(4, 1+Math.floor(Math.sqrt(v/mx)*4))]})`;
 
@@ -1077,7 +1104,7 @@ function billsUpdate(){
 function snippet(text, terms){ const t=String(text||''), i=t.toLowerCase().indexOf(terms[0]); if (i<0) return t.slice(0,140)+'…'; const a=Math.max(0,i-60); return (a?'…':'')+t.slice(a, i+100)+'…'; }
 
 /* =================== SPEECHES =================== */
-const SP = { major:'all', codes:false };   // topic highlighted on the tab and on speech pages ('all' colors every sentence by its topic on the tab)
+const SP = { major:'all', codes:false, focus:null, allTopics:false };   // topic highlighted on the tab and on speech pages ('all' colors every sentence by its topic on the tab)
 const spMajor = () => typeof SP.major === 'number' ? SP.major : null;
 function speechData(){
   const all = byDs('sots'); const years = range(2005,2025); const pol = all.filter(isPol);
@@ -1085,6 +1112,19 @@ function speechData(){
   const share = (m,y)=> (cell.get(m+':'+y)||0)/(tot.get(y)||1);
   const govOf = y => all.find(r=>r.year===y)?.x.governor || '';
   return {all, years, pol, tot, cell, share, govOf};
+}
+function drawSpeechStack({years, pol, tot, cell, share}){
+  const ranked = [...count(pol, r=>r.major)].sort((a,b)=>b[1]-a[1]).map(d=>d[0]);
+  const shown = SP.allTopics ? ranked : ranked.slice(0, 8), rest = ranked.filter(m=>!shown.includes(m));
+  if (SP.focus!=null && SP.focus!=='other' && !shown.includes(SP.focus)) SP.focus = null;
+  const keys = rest.length ? [...shown, 'other'] : shown;
+  const nOf = (k,y) => k==='other' ? rest.reduce((a,m)=>a+(cell.get(m+':'+y)||0),0) : cell.get(k+':'+y)||0;
+  const color = k => k==='other' ? 'color-mix(in srgb, var(--muted) 55%, var(--surface))' : shade(k,0,1), label = k => k==='other' ? `Other topics (${rest.length})` : CB.majors[k];
+  stackShares($('#s-stack'), years, keys, {share:(k,y)=>nOf(k,y)/(tot.get(y)||1), n:nOf, total:y=>tot.get(y)||0, color, label, focus:SP.focus,
+    height: cw($('#s-stack')) < 480 ? 260 : 320, onSeg:(m,y)=>{ SP.major=m; nav('speech-'+y); }});
+  $('#s-stkleg').innerHTML = keys.map(k=>`<button type="button" data-k="${k}" class="${SP.focus===k?'on':SP.focus!=null?'dim':''}" aria-pressed="${SP.focus===k}"><i style="background:${color(k)}"></i>${esc(label(k))}</button>`).join('');
+  $$('#s-stkleg button').forEach(b=>b.addEventListener('click', ()=>{ const k = b.dataset.k==='other' ? 'other' : +b.dataset.k;
+    SP.focus = SP.focus===k ? null : k; drawSpeechStack({years, pol, tot, cell, share}); }));
 }
 function renderSpeeches(){
   const {all, years, pol, tot, cell, share, govOf} = speechData();
@@ -1107,6 +1147,9 @@ function renderSpeeches(){
       return `<a class="addr" href="#speech-${y}"><span class="yr">${y}</span><span class="gv">${esc(govLabel(govOf(y), y))}</span>
         <span class="mstrip">${ss.map(r=>M==null ? (isPol(r)?`<i style="background:${shade(r.major,0,1)}"></i>`:'<i></i>') : `<i class="${r.major===M?'on':''}"></i>`).join('')}</span>
         <span class="muted num" style="font-size:12px">${fmt(ss.length)} sentences · ${M==null?`${fmt(n)} on policy`:`${fmt(n)} on ${esc(CB.majors[M].split(/,| and /)[0])}`}</span></a>`; }).join('')}</div></div>
+  <div class="panel" style="margin-bottom:16px"><div class="chead"><h3>Share of attention by topic</h3><span class="muted" style="font-size:12px">Each column is one address: its policy sentences split by major topic. Click a topic below to bring it to the baseline.</span></div>
+    <div class="fbar" style="margin:8px 0 10px;justify-content:flex-start"><label class="ink2" for="s-stk" style="font-size:13px">Show</label><select id="s-stk"><option value="top" ${SP.allTopics?'':'selected'}>8 largest topics and other</option><option value="all" ${SP.allTopics?'selected':''}>All topics</option></select></div>
+    <div id="s-stack"></div><div class="stk-leg" id="s-stkleg" role="group" aria-label="Topics"></div></div>
   <div class="panel"><div class="chead"><h3>Topic share of each address</h3><span class="muted" style="font-size:12px">Share of the year's policy sentences. Click a cell to open that address with the topic marked.</span></div>
     <div class="hscroll"><table class="heat"><thead><tr class="gov"><th></th>${spans.map((s,i)=>`<th colspan="${s.n}">${esc(govLabel(s.g, years[spans.slice(0,i).reduce((a,x)=>a+x.n,0)]))}</th>`).join('')}</tr><tr><th></th>${years.map(y=>`<th>'${String(y).slice(2)}</th>`).join('')}</tr></thead>
     <tbody>${MAJORS().map(m=>`<tr><th class="rh">${majChip(m)}</th>${years.map(y=>{ const v=share(m,y); return `<td data-m="${m}" data-y="${y}" style="${heatBg(v,mx)}">${v>=0.005?Math.round(v*100):v>0?'<1':'·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
@@ -1114,6 +1157,8 @@ function renderSpeeches(){
   $$('table.heat td').forEach(td=>{ const m=+td.dataset.m, y=+td.dataset.y;
     bindTip(td, ()=>`<div class="t">${y} · ${esc(govOf(y))}</div><div>${esc(CB.majors[m])}</div><div class="r"><span>Share of policy sentences</span><b class="num">${pct(share(m,y))}</b></div><div class="muted">${fmt(cell.get(m+':'+y)||0)} of ${fmt(tot.get(y)||0)} sentences</div>`);
     td.addEventListener('click', ()=>{ SP.major=m; nav('speech-'+y); }); });
+  drawSpeechStack({years, pol, tot, cell, share});
+  $('#s-stk').addEventListener('change', e=>{ SP.allTopics = e.target.value==='all'; drawSpeechStack({years, pol, tot, cell, share}); });
   $('#s-major').addEventListener('change', e=>{ SP.major=e.target.value==='all'?'all':+e.target.value; renderSpeeches(); });
   $('#s-all').addEventListener('click', ()=>save('ipap-state-of-the-state-2005-2025.csv', csvFor(all)));
 }
