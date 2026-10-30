@@ -168,7 +168,10 @@ def pull():
 
 
 def push():
-    revs = json.loads(REVS.read_text()) if REVS.exists() else {}
+    if not REVS.exists():   # the download didn't happen (e.g. Dropbox refused), so there is nothing of ours to save back
+        print('Nothing to upload: the data was not downloaded from Dropbox in this run.')
+        return
+    revs = json.loads(REVS.read_text())
     sent, kept = [], []
     for folder in FOLDERS:
         root = BASE / folder
