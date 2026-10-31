@@ -1746,7 +1746,7 @@ function bindLegBar(){
 }
 
 /* ---- index tab ---- */
-const SN = { q:'', ch:'all', major:null, sub:null, sort:'C', dir:-1 };
+const SN = { q:'', major:null, sub:null, sort:'C', dir:-1 };
 const NET = { ch:'Sen', min:'auto', find:null, color:'party' };
 const snTopic = () => SN.sub!=null ? CB.subs[SN.sub] : SN.major!=null ? CB.majors[SN.major] : null;
 const inGA = (p, ga) => p.bills.some(b=>b.r.x.ga===ga);
@@ -1766,14 +1766,13 @@ function renderSponsors(){
   </div>
   <div class="fbar">
     <input type="search" id="sn-q" placeholder="Find a legislator" value="${esc(SN.q)}" aria-label="Find a legislator">
-    <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['Rep','House'],['Sen','Senate']].map(([k,l])=>`<button data-ch="${k}" aria-pressed="${SN.ch===k}">${l}</button>`).join('')}</div>
     <select id="sn-m" aria-label="Major topic">${majorOptions(SN.major,'Bills on any topic')}</select>
     ${shellToggle('sn-sh', byDs('bills').filter(r=>r.x.ga===ga && isPlaceholder(r)).length)}
     ${SN.major!=null?`<select id="sn-s" aria-label="Subtopic">${subOptions(SN.major, SN.sub)}</select>`:''}
   </div>
-  <div class="grid2" id="sn-tops">
-    <div class="panel" id="sn-p-Sen"><div class="chead"><h3 id="sn-ct-Sen"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Sen"></div></div>
-    <div class="panel" id="sn-p-Rep"><div class="chead"><h3 id="sn-ct-Rep"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Rep"></div></div>
+  <div class="grid2">
+    <div class="panel"><div class="chead"><h3 id="sn-ct-Sen"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Sen"></div></div>
+    <div class="panel"><div class="chead"><h3 id="sn-ct-Rep"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Rep"></div></div>
   </div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h3 id="sk-t">Where a legislator's bills went</h3>
       <select id="sk-p" aria-label="Legislator"></select></div>
@@ -1803,10 +1802,6 @@ function renderSponsors(){
   $('#net-col')?.addEventListener('change', e=>{ NET.color = e.target.value; drawNetwork(); });
   $('#net-find').addEventListener('change', e=>{ NET.find = e.target.value==='' ? null : +e.target.value; netFocus(NET.find); });
   let deb; $('#sn-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ SN.q=e.target.value; snUpdate(); },120); });
-  $$('[data-ch]').forEach(b=>b.addEventListener('click', ()=>{
-    SN.ch=b.dataset.ch; $$('[data-ch]').forEach(x=>x.setAttribute('aria-pressed', x===b));
-    if (SN.ch!=='all' && NET.ch!==SN.ch) { NET.ch=SN.ch; NET.find=null; $$('[data-nc]').forEach(x=>x.setAttribute('aria-pressed', x.dataset.nc===SN.ch)); }   // the network follows the chamber
-    snUpdate(); }));
   $('#sn-m').addEventListener('change', e=>{ SN.major=e.target.value===''?null:+e.target.value; SN.sub=null; renderSponsors(); });
   $('#sn-s')?.addEventListener('change', e=>{ SN.sub=e.target.value===''?null:+e.target.value; snUpdate(); });
   $$('#sn-t th').forEach(th=>th.addEventListener('click', ()=>{ const k=th.dataset.k; SN.dir = SN.sort===k ? -SN.dir : (k==='name'?1:-1); SN.sort=k; renderSponsors(); }));
@@ -1817,19 +1812,17 @@ function renderSponsors(){
 }
 function snRows(){
   const t = parseQuery(SN.q);
-  const ga = legGA(), rows = SPON.filter(p=>inGA(p, ga) && (SN.ch==='all'||p.ch===SN.ch) && t.every(w=>p.title.toLowerCase().includes(w))).map(p=>[p, sponsorStats(p, SN.major, SN.sub, ga)]).filter(([,s])=>SN.major==null || s.C>0);
+  const ga = legGA(), rows = SPON.filter(p=>inGA(p, ga) && t.every(w=>p.title.toLowerCase().includes(w))).map(p=>[p, sponsorStats(p, SN.major, SN.sub, ga)]).filter(([,s])=>SN.major==null || s.C>0);
   const key = ([p,s]) => SN.sort==='name' ? p.name.split(' ').slice(-1)[0].replace(/,.*/,'') : s[SN.sort];
   return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (x>y?1:x<y?-1:0)*SN.dir || a[0].name.localeCompare(b[0].name); });
 }
 function snUpdate(){
   const rows = snRows();
-  // one chart per chamber, following the topic filters; the chamber buttons show just that chamber's chart (the name search narrows only the table)
+  // one chart per chamber, side by side; they follow the topic filters but not the name search, which narrows the table
   drawNetwork(); drawSponsorSankey();
   const tops = Object.fromEntries(['Sen','Rep'].map(ch=>[ch, SPON.filter(p=>p.ch===ch).map(p=>[p, sponsorStats(p, SN.major, SN.sub, legGA())]).filter(([,s])=>s.law>0).sort((a,b)=>b[1].law-a[1].law || b[1].C-a[1].C || a[0].name.localeCompare(b[0].name)).slice(0,10)]));
   const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.law))));   // same scale in both charts
-  $('#sn-tops').style.gridTemplateColumns = SN.ch==='all' ? '' : '1fr';
   for (const ch of ['Sen','Rep']){
-    $('#sn-p-'+ch).hidden = SN.ch!=='all' && SN.ch!==ch;
     $('#sn-ct-'+ch).textContent = `${ch==='Sen'?'Senators':'Representatives'}${snTopic()?' · '+snTopic():''}`;
     const top = tops[ch];
     if (!top.length) { $('#sn-top-'+ch).innerHTML = '<p class="muted" style="margin:0">No enacted bills on this topic.</p>'; continue; }
@@ -2292,7 +2285,7 @@ function sankey(el, nodes, links, {height=360, heads=[], unit='bills', onNode, p
    A bill counts for a committee when it was assigned (or re-assigned) to it, and as approved when the committee reported it
    out ("Do Pass…", "Recommends Be Adopted…"). The chamber is the bill's chamber of origin until it arrives in the other one.
    House Rules and Senate Assignments, which route bills to committees, are left out. Committee pages: #committee-104-house-executive */
-const CM = { ch:'all', q:'', major:null, sub:null, sort:'n', dir:-1 };
+const CM = { q:'', major:null, sub:null, sort:'n', dir:-1 };
 const CMP = { slug:null, out:'all', major:null, page:0 };
 const CMDATA = {}, CMKEY = new Map();
 const cmName = n => n.replace(/\s+Committee$/,'').replace(/\s*-\s*/g,' - ').replace(/\s+/g,' ').trim();
@@ -2345,7 +2338,6 @@ function renderCommittees(){
   </div>
   <div class="fbar">
     <input type="search" id="cm-q" placeholder="Find a committee" value="${esc(CM.q)}" aria-label="Find a committee">
-    <div class="seg" role="group" aria-label="Chamber">${[['all','Both chambers'],['House','House'],['Senate','Senate']].map(([k,l])=>`<button data-cc="${k}" aria-pressed="${CM.ch===k}">${l}</button>`).join('')}</div>
     <select id="cm-m" aria-label="Major topic">${majorOptions(CM.major,'Bills on any topic')}</select>
     ${CM.major!=null?`<select id="cm-s" aria-label="Subtopic">${subOptions(CM.major, CM.sub)}</select>`:''}
   </div>
@@ -2361,7 +2353,6 @@ function renderCommittees(){
   <div class="tscroll"><table class="dt" id="cm-t" style="min-width:640px" data-mcap="20"><thead><tr>${[['name','Committee'],['ch','Chamber'],['n','Bills assigned'],['ok','Approved'],['rate','Approval rate'],['law','Became law'],['top','Main topic']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${['n','ok','rate','law'].includes(k)?'text-align:right':''}">${l} <span class="muted">${CM.sort===k?(CM.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
   bindLegBar();
   let deb; $('#cm-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ CM.q=e.target.value; cmUpdate(); },120); });
-  $$('[data-cc]').forEach(b=>b.addEventListener('click', ()=>{ CM.ch=b.dataset.cc; $$('[data-cc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); cmUpdate(); }));
   $('#cm-m').addEventListener('change', e=>{ CM.major=e.target.value===''?null:+e.target.value; CM.sub=null; renderCommittees(); });
   $('#cm-s')?.addEventListener('change', e=>{ CM.sub=e.target.value===''?null:+e.target.value; cmUpdate(); });
   $$('#cm-t th').forEach(th=>th.addEventListener('click', ()=>{ const k=th.dataset.k; CM.dir = CM.sort===k ? -CM.dir : (k==='name'||k==='ch'||k==='top' ? 1 : -1); CM.sort=k; renderCommittees(); }));
@@ -2372,13 +2363,13 @@ function renderCommittees(){
 const cmTopic = () => CM.sub!=null ? CB.subs[CM.sub] : CM.major!=null ? CB.majors[CM.major] : null;
 function cmRows(){
   const t = CM.q.toLowerCase().split(/\s+/).filter(Boolean);
-  const rows = CMDATA[legGA()].filter(c=>(CM.ch==='all'||c.ch===CM.ch) && t.every(w=>c.name.toLowerCase().includes(w))).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0);
+  const rows = CMDATA[legGA()].filter(c=>t.every(w=>c.name.toLowerCase().includes(w))).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0);
   const key = ([c,s]) => CM.sort==='name' ? c.name : CM.sort==='ch' ? c.ch+c.name : CM.sort==='top' ? (s.top!=null?CB.majors[s.top]:'~') : s[CM.sort];
   return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (x>y?1:x<y?-1:0)*CM.dir || b[1].n-a[1].n || a[0].name.localeCompare(b[0].name); });
 }
 function cmUpdate(){
   const rows = cmRows();
-  // one chart per chamber, on a shared scale; they follow the topic filters but not the chamber buttons or the search
+  // one chart per chamber, side by side on a shared scale; they follow the topic filters but not the search
   const tops = Object.fromEntries(['Senate','House'].map(ch=>[ch, CMDATA[legGA()].filter(c=>c.ch===ch).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0).sort((a,b)=>b[1].n-a[1].n).slice(0,12)]));
   const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.n))));
   for (const ch of ['Senate','House']){
