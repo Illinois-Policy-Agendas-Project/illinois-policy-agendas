@@ -945,21 +945,25 @@ def apply_links(cfg, rows, rep, ds):
     """Choose each report's links from what pipeline/check_links.py learned (inputs/thinktanks/links.json): the original
     while it works; when it is dead, the PDF found again on the report page, or else the Internet Archive copy. A link
     the site refuses to check keeps the original, with the archived copy as a second link. Adds a last column, links:
-    {pa: PDF is an archived copy, ua: page is an archived copy, p2/u2: archived copy next to the original} or None.
+    {pa: PDF is an archived copy, ua: page is an archived copy, p2/u2: archived copy next to the original,
+    o: the publication elsewhere (a journal, a book, a video) when the report has no PDF of its own} or None.
     A PDF link shared by three or more reports is an organization-wide document, not the report's, and is left off."""
     shared = {p for p, n in Counter(r[7] for r in rows if r[7]).items() if n >= 3}
     f = DATA / Path(cfg['thinktanks']['file']).parent / 'links.json'
     st = json.loads(f.read_text(encoding='utf-8')) if f.exists() else {}
     L, fix = st.get('links', {}), st.get('fix', {})
-    dropped = own_found = archived = repaired = 0
+    dropped = own_found = elsewhere = archived = repaired = 0
     nocopy = []
     for r in rows:
         info = {}
         if r[7] in shared:
-            own = fix.get(str(r[0]), {}).get('p', '')
-            dropped += not own
+            own, other = fix.get(str(r[0]), {}).get('p', ''), fix.get(str(r[0]), {}).get('o', '')
+            dropped += not own and not other
             own_found += bool(own)
+            elsewhere += bool(other) and not own
             r[7] = own or None
+            if other and not own:
+                info['o'] = other
         for i, arch, second, label in ((7, 'pa', 'p2', 'PDF'), (6, 'ua', 'u2', 'page')):
             e = L.get(r[i] or '', {})
             if e.get('s') == 'dead':
@@ -977,9 +981,11 @@ def apply_links(cfg, rows, rep, ds):
     if shared and dropped:
         rep.warn(ds, f'{pl(dropped, "report links", "reports link")} to a PDF shared with many other reports (an organization-wide document, '
                      f'not the report), so {"it shows" if dropped == 1 else "they show"} no PDF. The weekly link check looks for each one\'s own PDF'
-                     f'{f"; found so far for {own_found:,}" if own_found else ""}.', sorted(shared))
+                     f'{f"; found so far for {own_found:,}" if own_found else ""}'
+                     f'{f", and {elsewhere:,} link to the publication elsewhere" if elsewhere else ""}.', sorted(shared))
     elif shared:
-        rep.note(ds, f'{pl(own_found, "report")} that linked to an organization-wide PDF now {"links" if own_found == 1 else "link"} to {"its" if own_found == 1 else "their"} own.')
+        rep.note(ds, f'{pl(own_found + elsewhere, "report")} that linked to an organization-wide PDF now {"links" if own_found + elsewhere == 1 else "link"} '
+                     f'to {"its" if own_found + elsewhere == 1 else "their"} own ({own_found:,} PDFs, {elsewhere:,} publications elsewhere).')
     if L:
         rep.note(ds, f'Report links (checked {str(st.get("pass") or "partly")[:10]}): {pl(repaired, "dead PDF link")} replaced by the PDF found on the report page, '
                      f'{pl(archived, "dead link")} replaced by an Internet Archive copy.')

@@ -806,6 +806,7 @@ function ttLinks(x, cls='', page='Report page'){
   const out = [];
   if (x.url) out.push(a(x.url, L.ua ? `${page} (archived copy) ↗` : `${page} ↗`) + (L.u2 ? ' ' + a(L.u2, 'archived copy', 'arch-alt') : ''));
   if (x.pdf) out.push(a(x.pdf, L.pa ? 'PDF (archived copy) ↗' : 'PDF ↗') + (L.p2 ? ' ' + a(L.p2, 'archived copy', 'arch-alt') : ''));
+  else if (L.o) out.push(a(L.o, 'Original publication ↗'));
   return out;
 }
 const HEAT = ['--h0','--h1','--h2','--h3','--h4'];

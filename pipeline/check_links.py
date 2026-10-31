@@ -170,6 +170,29 @@ def page_pdfs(body, url):
     return out
 
 
+SOCIAL = re.compile(r'(^|\.)(facebook|twitter|x|linkedin|instagram|youtube|youtu|vimeo|flickr|tiktok|threads|bsky|pinterest|google|'
+                    r'googleapis|gstatic|apple|feedburner|eepurl|list-manage|paypal|donorbox|addthis|sharethis|wordpress|gravatar)\.[a-z]+$')
+VIDEO = re.compile(r'^https?://(www\.)?(vimeo\.com/\d+|youtube\.com/watch|youtu\.be/)')
+
+
+def page_elsewhere(body, url):
+    """Links on a page to the publication somewhere else (a journal, a book, a video), in page order: the page of a
+    report the organization wrote for another publisher. Social media and sharing links are left out, except a video."""
+    h = body.decode('utf-8', 'replace')
+    site = '.'.join((urlparse(url).hostname or '').split('.')[-2:])
+    out = []
+    for href in re.findall(r'<a\b[^>]*?\shref=["\'](https?://[^"\']+)["\']', h, re.I):
+        u = href.replace('&amp;', '&')
+        host = (urlparse(u).hostname or '').lower()
+        if host.endswith(site) or re.search(r'\.(png|jpe?g|gif|svg|ico|css|js)(\?|$)', u, re.I):
+            continue
+        if SOCIAL.search(host) and not VIDEO.match(u):
+            continue
+        if u not in out:
+            out.append(u)
+    return out
+
+
 def filename(rid, org, title):
     clean = lambda s, n: re.sub(r'\s+', ' ', re.sub(r'[\\/:*?"<>|#%{}~&]+', ' ', s)).strip()[:n].rstrip(' .')
     return f'{clean(org, 80) or "Unknown"}/{rid} {clean(title, 90) or "report"}.pdf'
@@ -194,7 +217,8 @@ def main(argv=None):
     due = [u for u in pages | pdfs if age_days(links.get(u, {}).get('t')) >= a.every]
     pending_archive = [u for u in pages | pdfs if links.get(u, {}).get('a') is None]
     pending_backup = [r for r in rows if eff(r) and not links.get(eff(r), {}).get('b')]
-    pending_fix = [r for r in rows if r[4] in shared and age_days(fix.get(str(r[0]), {}).get('t')) >= 30]
+    redo = lambda rid: age_days(fix.get(str(rid), {}).get('t')) >= 30 or not fix[str(rid)].get('p') and 'o' not in fix[str(rid)]
+    pending_fix = [r for r in rows if r[4] in shared and redo(r[0])]
     if not a.force and not due and not pending_archive and not pending_backup and not pending_fix:
         print(f'Report links were checked {age_days(st.get("pass")):.0f} days ago; next check in {max(0, a.every - age_days(st.get("pass"))):.0f}.')
         return 0
@@ -250,18 +274,33 @@ def main(argv=None):
     for rid, org, title, page, pdf in rows:
         if time.time() > budget:
             break
-        if pdf not in shared or not page or age_days(fix.get(str(rid), {}).get('t')) < 30:
+        if pdf not in shared or not page or not redo(rid):
             continue
-        found = ''
+        found = other = ''
         try:
             body, ctype, final = webget.get(page, UA, timeout=30)
-            for cand in page_pdfs(body, final) if 'html' in ctype else []:
+            html = 'html' in ctype
+            for cand in page_pdfs(body, final) if html else []:
                 if cand not in shared and probe(cand, True) == 'ok':
                     found = cand
                     break
+            # no PDF of its own: the report was published elsewhere; link to it there (a PDF there if there is one)
+            elsewhere = page_elsewhere(body, final) if html and not found else []
+            for cand in sorted(elsewhere, key=lambda u: not re.search(r'\.pdf(\?|$)', u, re.I)):
+                st_ = probe(cand, cand.lower().split('?')[0].endswith('.pdf'))
+                doi = re.search(r'\b10\.\d{4,9}/[^\s&?#"\']+', urllib.parse.unquote(cand))
+                if st_ == 'dead' and doi:   # a publisher site that has closed: the DOI still leads to the article
+                    cand = 'https://doi.org/' + doi.group(0)
+                    st_ = probe(cand, False)
+                if st_ in ('ok', 'blocked'):
+                    if st_ == 'ok' and cand.lower().split('?')[0].endswith('.pdf'):
+                        found = cand
+                    else:
+                        other = cand
+                    break
         except Exception:  # noqa: BLE001
             pass
-        fix[str(rid)] = {'p': found, 't': NOW()}
+        fix[str(rid)] = {'p': found, 'o': other, 't': NOW()}
         if found:
             repaired += 1
             pdfs.add(found)
@@ -340,7 +379,9 @@ def main(argv=None):
           f'{saved[0]:,} new captures requested this run.')
     if shared:
         own = sum(1 for r in rows if r[4] in shared and fix.get(str(r[0]), {}).get('p'))
-        print(f'Reports whose PDF link was an organization-wide document: {sum(1 for r in rows if r[4] in shared):,}; their own PDF found for {own:,}.')
+        other = sum(1 for r in rows if r[4] in shared and not fix.get(str(r[0]), {}).get('p') and fix.get(str(r[0]), {}).get('o'))
+        print(f'Reports whose PDF link was an organization-wide document: {sum(1 for r in rows if r[4] in shared):,}; their own PDF found for {own:,}, '
+              f'a link to the publication elsewhere for {other:,}.')
     print(f'PDF backups in Dropbox: {sum(1 for p in pdfs if links.get(p, {}).get("b")):,} of {len(pdfs):,}; {backed:,} saved this run.')
     if not finished:
         print(f'\nStopped after {a.minutes:g} minutes; the next run continues.')
