@@ -1771,9 +1771,9 @@ function renderSponsors(){
     ${shellToggle('sn-sh', byDs('bills').filter(r=>r.x.ga===ga && isPlaceholder(r)).length)}
     ${SN.major!=null?`<select id="sn-s" aria-label="Subtopic">${subOptions(SN.major, SN.sub)}</select>`:''}
   </div>
-  <div class="grid2">
-    <div class="panel"><div class="chead"><h3 id="sn-ct-Sen"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Sen"></div></div>
-    <div class="panel"><div class="chead"><h3 id="sn-ct-Rep"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Rep"></div></div>
+  <div class="grid2" id="sn-tops">
+    <div class="panel" id="sn-p-Sen"><div class="chead"><h3 id="sn-ct-Sen"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Sen"></div></div>
+    <div class="panel" id="sn-p-Rep"><div class="chead"><h3 id="sn-ct-Rep"></h3><span class="muted" style="font-size:12px">Most enacted bills as primary sponsor</span></div><div id="sn-top-Rep"></div></div>
   </div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h3 id="sk-t">Where a legislator's bills went</h3>
       <select id="sk-p" aria-label="Legislator"></select></div>
@@ -1803,7 +1803,10 @@ function renderSponsors(){
   $('#net-col')?.addEventListener('change', e=>{ NET.color = e.target.value; drawNetwork(); });
   $('#net-find').addEventListener('change', e=>{ NET.find = e.target.value==='' ? null : +e.target.value; netFocus(NET.find); });
   let deb; $('#sn-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ SN.q=e.target.value; snUpdate(); },120); });
-  $$('[data-ch]').forEach(b=>b.addEventListener('click', ()=>{ SN.ch=b.dataset.ch; $$('[data-ch]').forEach(x=>x.setAttribute('aria-pressed', x===b)); snUpdate(); }));
+  $$('[data-ch]').forEach(b=>b.addEventListener('click', ()=>{
+    SN.ch=b.dataset.ch; $$('[data-ch]').forEach(x=>x.setAttribute('aria-pressed', x===b));
+    if (SN.ch!=='all' && NET.ch!==SN.ch) { NET.ch=SN.ch; NET.find=null; $$('[data-nc]').forEach(x=>x.setAttribute('aria-pressed', x.dataset.nc===SN.ch)); }   // the network follows the chamber
+    snUpdate(); }));
   $('#sn-m').addEventListener('change', e=>{ SN.major=e.target.value===''?null:+e.target.value; SN.sub=null; renderSponsors(); });
   $('#sn-s')?.addEventListener('change', e=>{ SN.sub=e.target.value===''?null:+e.target.value; snUpdate(); });
   $$('#sn-t th').forEach(th=>th.addEventListener('click', ()=>{ const k=th.dataset.k; SN.dir = SN.sort===k ? -SN.dir : (k==='name'?1:-1); SN.sort=k; renderSponsors(); }));
@@ -1820,11 +1823,13 @@ function snRows(){
 }
 function snUpdate(){
   const rows = snRows();
-  // one chart per chamber; they follow the topic filters but not the chamber buttons or name search, which narrow the table
+  // one chart per chamber, following the topic filters; the chamber buttons show just that chamber's chart (the name search narrows only the table)
   drawNetwork(); drawSponsorSankey();
   const tops = Object.fromEntries(['Sen','Rep'].map(ch=>[ch, SPON.filter(p=>p.ch===ch).map(p=>[p, sponsorStats(p, SN.major, SN.sub, legGA())]).filter(([,s])=>s.law>0).sort((a,b)=>b[1].law-a[1].law || b[1].C-a[1].C || a[0].name.localeCompare(b[0].name)).slice(0,10)]));
   const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.law))));   // same scale in both charts
+  $('#sn-tops').style.gridTemplateColumns = SN.ch==='all' ? '' : '1fr';
   for (const ch of ['Sen','Rep']){
+    $('#sn-p-'+ch).hidden = SN.ch!=='all' && SN.ch!==ch;
     $('#sn-ct-'+ch).textContent = `${ch==='Sen'?'Senators':'Representatives'}${snTopic()?' · '+snTopic():''}`;
     const top = tops[ch];
     if (!top.length) { $('#sn-top-'+ch).innerHTML = '<p class="muted" style="margin:0">No enacted bills on this topic.</p>'; continue; }
