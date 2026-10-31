@@ -2,7 +2,8 @@
 
 The public website for the Illinois Policy Agendas Project (IPAP): substantive bills, State of the State speeches
 and think tank reports in Illinois, coded by Comparative Agendas Project subtopic. GitHub Pages serves the site
-from `docs/`.
+from `docs/` at https://www.illinoisagendas.org (the domain is registered at Hover; its DNS points to GitHub, and
+`docs/CNAME`, which publishing keeps, tells GitHub the domain).
 
 The project keeps its parts in two places:
 
