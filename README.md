@@ -101,6 +101,9 @@ The same update also runs on GitHub's servers (`.github/workflows/update.yml`), 
   **Publish the site if the check passes**, and click **Run workflow**. It publishes only if the check finds no errors.
   The same form can skip the downloads, or make a coding worksheet for a session (saved to `inputs/worksheets` in
   Dropbox).
+- **Duplicate bills:** if the check warns that bills appear more than once in the bill file, run it with **Remove
+  duplicate bills** ticked. It keeps each bill's newest row (moving a code over if only the old row had one), saves
+  the bill file back to Dropbox, and lists what it removed in the run's log (`pipeline/dedupe_bills.py`).
 - **Each run's page** shows a summary (errors, warnings, what needs coding); the full report is under **Artifacts**.
   GitHub emails you when a run fails.
 - It reads the data from Dropbox and writes back only what it produced (bill status from ILGA, new think tank

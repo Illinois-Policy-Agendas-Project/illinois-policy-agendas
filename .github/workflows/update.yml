@@ -22,6 +22,10 @@ on:
         description: 'Also make a coding worksheet for this session (e.g. 104); leave blank for none'
         type: string
         default: ''
+      dedupe:
+        description: 'Remove duplicate bills from the bill file in Dropbox (keeps the newest row of each)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write                 # publishing commits the site to docs/
@@ -58,6 +62,12 @@ jobs:
 
       - name: Get the data from Dropbox
         run: python pipeline/dropbox_sync.py pull
+
+      - name: Remove duplicate bills
+        if: inputs.dedupe
+        run: |
+          python pipeline/dedupe_bills.py
+          python pipeline/dropbox_sync.py push-sources
 
       - name: Update bills from ILGA
         if: env.DOWNLOADS == 'true'

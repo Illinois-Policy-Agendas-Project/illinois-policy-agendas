@@ -6,6 +6,7 @@
     python pipeline/dropbox_sync.py push    upload what the run wrote: files under Website/inputs and Website/state that are
                                             new or changed (bill status from ILGA, new think tank reports, worksheets,
                                             the publish log)
+    python pipeline/dropbox_sync.py push-sources   upload bill files this run changed (after dedupe_bills.py)
 
 A file someone changed in Dropbox while the run was going is never overwritten: Dropbox refuses the upload because the
 file's version moved on, and the run reports it. Only the Python standard library is used.
@@ -199,13 +200,36 @@ def push():
         print(f'Not uploaded, because someone changed them in Dropbox during the run (their version is kept): {", ".join(kept)}')
 
 
+def push_sources():
+    """Upload source files outside Website/ (the bill files) that this run changed, e.g. dedupe_bills.py. Same rule as
+    push: if someone changed the file in Dropbox since the download, their version is kept and nothing is uploaded."""
+    if not REVS.exists():
+        raise SystemExit('Nothing to upload: the data was not downloaded from Dropbox in this run.')
+    revs = json.loads(REVS.read_text())
+    sent = []
+    for dbx in wanted_files():
+        f, known = local(dbx), revs.get(dbx.lower())
+        if not known or not f.exists() or content_hash(f) == known['hash']:
+            continue
+        try:
+            res = upload(dbx, f.read_bytes(), {'.tag': 'update', 'update': known['rev']})
+        except DropboxError as e:
+            if e.code == 409 and 'conflict' in e.detail:
+                raise SystemExit(f'Not uploaded: {dbx} changed in Dropbox during the run, so that version is kept. Run again.') from None
+            raise
+        revs[dbx.lower()] = {'rev': res['rev'], 'hash': res['content_hash']}
+        sent.append(posixpath.relpath(dbx, IAP))
+    REVS.write_text(json.dumps(revs, indent=0))
+    print(f'Uploaded {len(sent)} source file(s) to Dropbox' + (':' if sent else '.'), *sent, sep='\n  ')
+
+
 def main(argv=None):
     global TOKEN
     cmd = (argv or sys.argv[1:] or [''])[0]
-    if cmd not in ('pull', 'push'):
+    if cmd not in ('pull', 'push', 'push-sources'):
         raise SystemExit(__doc__)
     TOKEN = token()
-    pull() if cmd == 'pull' else push()
+    {'pull': pull, 'push': push, 'push-sources': push_sources}[cmd]()
 
 
 if __name__ == '__main__':
