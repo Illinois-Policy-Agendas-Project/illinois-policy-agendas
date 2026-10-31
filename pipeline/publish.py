@@ -115,9 +115,12 @@ def to_github(site, cfg, built, log):
     if not (ROOT / '.git').exists():
         raise SystemExit(f'{ROOT} is not a copy of the GitHub repository. Start the site tools with the "Update website" launcher, which sets this up.')
     docs = ROOT / 'docs'
+    cname = (docs / 'CNAME').read_text() if (docs / 'CNAME').exists() else None   # the custom domain set in Settings → Pages
     if docs.exists():
         shutil.rmtree(docs)
     shutil.copytree(site, docs)
+    if cname:
+        (docs / 'CNAME').write_text(cname)
     (docs / '.nojekyll').write_text('')  # serve files as they are; no Jekyll processing
     git('add', '-A', 'docs', 'content')
     if subprocess.run(['git', 'diff', '--cached', '--quiet'], cwd=ROOT).returncode == 0:
