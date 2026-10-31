@@ -11,15 +11,15 @@
 <meta property="og:site_name" content="Illinois Policy Agendas Project">
 <meta property="og:title" content="Illinois Policy Agendas Project">
 <meta property="og:description" content="What Illinois governors, legislators and think tanks pay attention to: bills, State of the State speeches and think tank reports, each coded by policy topic.">
-<meta property="og:url" content="https://illinois-policy-agendas-project.github.io/illinois-policy-agendas/">
-<meta property="og:image" content="https://illinois-policy-agendas-project.github.io/illinois-policy-agendas/social.png">
+<meta property="og:url" content="https://www.illinoisagendas.org/">
+<meta property="og:image" content="https://www.illinoisagendas.org/social.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Illinois Policy Agendas Project: what Illinois pays attention to. A mosaic of the 104th General Assembly's bills colored by policy topic.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Illinois Policy Agendas Project">
 <meta name="twitter:description" content="What Illinois governors, legislators and think tanks pay attention to: bills, State of the State speeches and think tank reports, each coded by policy topic.">
-<meta name="twitter:image" content="https://illinois-policy-agendas-project.github.io/illinois-policy-agendas/social.png">
+<meta name="twitter:image" content="https://www.illinoisagendas.org/social.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Merriweather:wght@400;700&family=Oswald:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -330,6 +330,7 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 .tsbar{height:6px;background:var(--sunk);border-radius:3px;margin-top:5px;overflow:hidden} .tsbar i{display:block;height:100%;background:var(--s-bills);border-radius:3px}
 .tsn{display:flex;flex-direction:column;align-items:flex-end;font-size:13px;white-space:nowrap} .tsn .muted{font-size:12px}
 .btn.soon{opacity:.6;cursor:default;border-style:dashed}
+.tp-rule{max-width:760px;margin-top:6px} .tp-rule p{margin:0;font-size:14px;line-height:1.55;color:var(--ink-2)} .tp-rule .tp-see{margin-top:6px;font-size:12.5px} .tp-see span{font-weight:700;color:var(--muted);margin-right:4px}
 .cb-line{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:14px 0 0;font-size:13.5px}
 .cb-link{font-weight:600} .cb-link.soon{color:var(--muted)}
 .panel.upcoming{border-style:dashed;background:var(--sunk);gap:12px;padding:22px}
@@ -1230,6 +1231,15 @@ function ttUpdate(){
 
 /* =================== TOPICS =================== */
 const TP = { major:5, sub:null, ds:'all', page:0 };
+/* a subtopic's coding rule from the codebook (data/codebook_doc.json, loaded the first time one is shown) */
+async function fillRule(el){
+  if (!el) return; const code = +el.dataset.s;
+  if (!CBDOC && MAN.v?.codebook_doc){ try { CBDOC = await get('codebook_doc'); } catch { CBDOC = null; } }
+  if (!el.isConnected) return;
+  const x = CBDOC?.majors.flatMap(m=>m.subs).find(x=>+x.code===code);
+  if (!x){ el.innerHTML = `<a class="sublink" style="font-size:13px" href="${cbHref(code)}">Codebook entry →</a>`; return; }
+  el.innerHTML = `<p>${esc(x.rule || 'Observations in the topic area not covered by another subtopic.')}</p>${x.see?`<p class="tp-see"><span>See also</span> ${esc(x.see)}</p>`:''}`;
+}
 function renderTopics(){
   const base = Object.fromEntries(DSK.map(k=>[k, byDs(k).filter(isPol)]));
   const sh = Object.fromEntries(DSK.map(k=>[k, count(base[k], r=>r.major)]));
@@ -1256,7 +1266,7 @@ function renderTopics(){
     <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
       <div class="panel"><div class="chead"><div>
           <div class="eyebrow">${sub==null ? `Major topic ${m}` : `Subtopic ${sub} · <button class="linkbtn" id="tp-up" style="font-size:inherit;letter-spacing:inherit;text-transform:inherit">${m} ${esc(CB.majors[m])}</button>`}</div>
-          <h2>${esc(sub==null ? CB.majors[m] : CB.subs[sub])}</h2><a class="sublink" style="font-size:13px" href="${sub==null ? cbmHref(m) : cbHref(sub)}">Codebook entry →</a></div>
+          <h2>${esc(sub==null ? CB.majors[m] : CB.subs[sub])}</h2>${sub==null ? `<a class="sublink" style="font-size:13px" href="${cbmHref(m)}">Codebook entry →</a>` : `<div class="tp-rule" id="tp-rule" data-s="${sub}"></div>`}</div>
         <button class="btn primary" id="tp-dl" ${total?'':'disabled'}>Download ${fmt(total)} records</button></div>
         <div class="kpis tp-k" style="grid-template-columns:repeat(3,minmax(0,1fr));margin:0">${DSK.map(k=>`<div class="kpi ${DS[k].cls}" style="background:var(--ct)"><span class="l" style="display:flex;gap:6px;align-items:center"><i class="dot"></i>${DS[k].name}</span>
           <span class="v">${pct(inF[k].length/base[k].length)}</span><span class="s">${fmt(inF[k].length)} of ${fmt(base[k].length)} policy items${sub!=null && inM[k].length ? ` · ${pct(inF[k].length/inM[k].length,0)} of its ${esc(CB.majors[m].split(/,| and /)[0])} items` : ''}</span></div>`).join('')}</div></div>
@@ -1283,6 +1293,7 @@ function renderTopics(){
     return {label:DS[k].short, cls:DS[k].cls, color:'--s-'+k, pts:xs.filter(y=>(tot.get(y)||0)>=(k==='tt'?8:20)).map(y=>[y,(hit.get(y)||0)/tot.get(y),hit.get(y)||0,tot.get(y)])}; }));
   $$('.subtab tbody tr').forEach(tr=>tr.addEventListener('click', ()=>{ pickSub(+tr.dataset.s); scrollTo({top:0}); }));
   $$('.seg button').forEach(b=>b.addEventListener('click', ()=>{ TP.ds=b.dataset.d; TP.page=0; $$('.seg button').forEach(x=>x.setAttribute('aria-pressed', x===b)); topicList(inF); }));
+  fillRule($('#tp-rule'));
   $('#tp-dl').addEventListener('click', ()=>save(`ipap-topic-${sub??m}-${slug(sub==null?CB.majors[m]:CB.subs[sub])}.csv`, csvFor(DSK.flatMap(k=>inF[k]))));
   topSponsors(inF.bills);
   topicList(inF);
