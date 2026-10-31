@@ -931,6 +931,7 @@ def build_tt(cfg, valid, rep):
         rows.append([int(r[c['id']]), fix_text(r[c['org']]), to_date(r.get(c['date'])), int(y) if pd.notna(y) else None,
                      fix_text(r[c['title']]) or '', fix_text(r.get(c['abstract'])) or '', fix_text(r.get(c['url'])), fix_text(r.get(c['pdf'])), code])
     add_new_reports(cfg, valid, rep, ds, rows, bad)
+    apply_links(cfg, rows, rep, ds)
     if bad:
         rep.error(ds, f'{pl(len(bad), "report has a code", "reports have codes")} not in the codebook.', bad)
     undated = sum(1 for r in rows if r[3] is None)
@@ -938,6 +939,52 @@ def build_tt(cfg, valid, rep):
         rep.note(ds, f'{pl(undated, "report has", "reports have")} no date.')
     rep.stats[ds] = {'records': len(rows), 'coded': sum(1 for r in rows if r[8] is not None), 'uncoded': sum(1 for r in rows if r[8] is None)}
     return rows
+
+
+def apply_links(cfg, rows, rep, ds):
+    """Choose each report's links from what pipeline/check_links.py learned (inputs/thinktanks/links.json): the original
+    while it works; when it is dead, the PDF found again on the report page, or else the Internet Archive copy. A link
+    the site refuses to check keeps the original, with the archived copy as a second link. Adds a last column, links:
+    {pa: PDF is an archived copy, ua: page is an archived copy, p2/u2: archived copy next to the original} or None.
+    A PDF link shared by three or more reports is an organization-wide document, not the report's, and is left off."""
+    shared = {p for p, n in Counter(r[7] for r in rows if r[7]).items() if n >= 3}
+    f = DATA / Path(cfg['thinktanks']['file']).parent / 'links.json'
+    st = json.loads(f.read_text(encoding='utf-8')) if f.exists() else {}
+    L, fix = st.get('links', {}), st.get('fix', {})
+    dropped = own_found = archived = repaired = 0
+    nocopy = []
+    for r in rows:
+        info = {}
+        if r[7] in shared:
+            own = fix.get(str(r[0]), {}).get('p', '')
+            dropped += not own
+            own_found += bool(own)
+            r[7] = own or None
+        for i, arch, second, label in ((7, 'pa', 'p2', 'PDF'), (6, 'ua', 'u2', 'page')):
+            e = L.get(r[i] or '', {})
+            if e.get('s') == 'dead':
+                if e.get('f'):
+                    r[i] = e['f']
+                    repaired += 1
+                elif e.get('a'):
+                    r[i], info[arch] = e['a'], 1
+                    archived += 1
+                else:
+                    nocopy.append(f'id {r[0]} {label}: {r[i]}')
+            elif e.get('s') in ('blocked', 'error') and e.get('a'):
+                info[second] = e['a']
+        r.append(info or None)
+    if shared and dropped:
+        rep.warn(ds, f'{pl(dropped, "report links", "reports link")} to a PDF shared with many other reports (an organization-wide document, '
+                     f'not the report), so {"it shows" if dropped == 1 else "they show"} no PDF. The weekly link check looks for each one\'s own PDF'
+                     f'{f"; found so far for {own_found:,}" if own_found else ""}.', sorted(shared))
+    elif shared:
+        rep.note(ds, f'{pl(own_found, "report")} that linked to an organization-wide PDF now {"links" if own_found == 1 else "link"} to {"its" if own_found == 1 else "their"} own.')
+    if L:
+        rep.note(ds, f'Report links (checked {str(st.get("pass") or "partly")[:10]}): {pl(repaired, "dead PDF link")} replaced by the PDF found on the report page, '
+                     f'{pl(archived, "dead link")} replaced by an Internet Archive copy.')
+        if nocopy:
+            rep.warn(ds, f'{pl(len(nocopy), "dead report link has", "dead report links have")} no replacement and no Internet Archive copy yet.', nocopy)
 
 
 def add_new_reports(cfg, valid, rep, ds, rows, bad):
@@ -1207,7 +1254,7 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
         if doc:
             files['codebook_doc'] = dump(d / 'codebook_doc.json', doc)
         files['home'] = dump(d / 'home.json', home)
-    files['tt'] = dump(d / 'thinktanks.json', {'cols': ['id', 'org', 'date', 'year', 'title', 'abstract', 'url', 'pdf', 'sub'], 'rows': tt})
+    files['tt'] = dump(d / 'thinktanks.json', {'cols': ['id', 'org', 'date', 'year', 'title', 'abstract', 'url', 'pdf', 'sub', 'links'], 'rows': tt})
     manifest = {
         'title': cfg.get('title', ''), 'updated': dt.datetime.now().strftime('%Y-%m-%d %H:%M'),
         'sessions': [{'ga': s['ga'], 'years': s['years'], 'bills': len(s['bills']), 'coded': sum(1 for b in s['bills'].values() if b['sub'] is not None),

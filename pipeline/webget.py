@@ -117,8 +117,8 @@ def _with_intermediates(host, port, timeout):
     return out
 
 
-def get(url, ua, timeout=25):
-    """(bytes, content type, final url). Raises urllib.error.URLError with advice if no certificate fix works."""
+def get(url, ua, timeout=25, limit=None):
+    """(bytes, content type, final url); with limit, only the first `limit` bytes are read. Raises urllib.error.URLError with advice if no certificate fix works."""
     req = urllib.request.Request(url, headers={'User-Agent': ua, 'Accept': '*/*'})
     u = urlparse(url)
     host, port = u.hostname, u.port or 443
@@ -141,7 +141,7 @@ def get(url, ua, timeout=25):
                 with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
                     if ctx is not None and u.scheme == 'https':
                         _FIXED[host] = ctx
-                    return r.read(), r.headers.get('Content-Type', '').split(';')[0].strip().lower(), r.geturl()
+                    return r.read(limit) if limit else r.read(), r.headers.get('Content-Type', '').split(';')[0].strip().lower(), r.geturl()
             except urllib.error.URLError as e:
                 if 'CERTIFICATE_VERIFY_FAILED' not in str(e):
                     raise

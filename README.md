@@ -101,6 +101,13 @@ The same update also runs on GitHub's servers (`.github/workflows/update.yml`), 
   **Publish the site if the check passes**, and click **Run workflow**. It publishes only if the check finds no errors.
   The same form can skip the downloads, or make a coding worksheet for a session (saved to `inputs/worksheets` in
   Dropbox).
+- **Think tank report links** are checked once a week (`pipeline/check_links.py`). A dead PDF link is looked for again
+  on the report's page; otherwise the site links to an Internet Archive copy, marked "archived copy". Sites that refuse
+  automated checks (CTBA, ILEPI) keep their original links with an archived copy beside them. Every PDF is also saved
+  to `IAP/Think tank PDFs/` in Dropbox for the project's own use (never published). What it learns is in
+  `inputs/thinktanks/links.json`; the reports file isn't changed. The first pass takes a few runs; tick **Check think
+  tank report links now** to run it on demand. A PDF link shared by three or more reports (an organization-wide
+  document picked up from every page) is left off the site until the check finds each report's own PDF.
 - **Duplicate bills:** if the check warns that bills appear more than once in the bill file, run it with **Remove
   duplicate bills** ticked. It keeps each bill's newest row (moving a code over if only the old row had one), saves
   the bill file back to Dropbox, and lists what it removed in the run's log (`pipeline/dedupe_bills.py`).

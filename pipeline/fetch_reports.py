@@ -144,10 +144,12 @@ def main(argv=None):
     for df, cols in ((main_df, c), (new_df, {'org': 'think_tank', 'url': 'url', 'pdf': 'pdf_url', 'date': 'date'})):
         for r in df.to_dict('records'):
             org = str(r.get(cols['org']) or '')
-            k = known.setdefault(org, {'keys': set(), 'last': ''})
+            k = known.setdefault(org, {'keys': set(), 'last': '', 'pdfs': set()})
             for u in (r.get(cols['url']), r.get(cols['pdf'])):
                 if isinstance(u, str) and u.strip():
                     k['keys'].add(key(u))
+            if isinstance(r.get(cols['pdf']), str) and r[cols['pdf']].strip():
+                k['pdfs'].add(r[cols['pdf']].strip())
             d = iso(r.get(cols['date']))
             k['last'] = max(k['last'], d)
     next_id = int(max([0, *pd.to_numeric(main_df[c['id']], errors='coerce').dropna(), *pd.to_numeric(new_df['id'], errors='coerce').dropna()])) + 1
@@ -155,7 +157,7 @@ def main(argv=None):
     added, problems, today = [], [], dt.date.today().isoformat()
     for src in tt.get('sources', []):
         org = src['org']
-        k = known.get(org, {'keys': set(), 'last': ''})
+        k = known.get(org, {'keys': set(), 'last': '', 'pdfs': set()})
         last = k['last'] or (dt.date.today() - dt.timedelta(days=365)).isoformat()
         cutoff = (dt.date.fromisoformat(last) - dt.timedelta(days=a.days)).isoformat()
         offered = set(found.get(org, []))
@@ -181,6 +183,8 @@ def main(argv=None):
                     body, ctype, final = get(url)
                     t2, d2, a2, pdf = page_meta(body, final) if 'html' in ctype else ('', '', '', '')
                     title, date, abstract = title or t2, date or d2, abstract or a2
+                    if pdf in k['pdfs']:   # already another report's: an organization-wide PDF linked from every page
+                        pdf = ''
                 except Exception as e:  # noqa: BLE001
                     problems.append(f'{org}: {url} ({e})')
                     continue
