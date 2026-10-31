@@ -330,6 +330,7 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 .tsbar{height:6px;background:var(--sunk);border-radius:3px;margin-top:5px;overflow:hidden} .tsbar i{display:block;height:100%;background:var(--s-bills);border-radius:3px}
 .tsn{display:flex;flex-direction:column;align-items:flex-end;font-size:13px;white-space:nowrap} .tsn .muted{font-size:12px}
 .btn.soon{opacity:.6;cursor:default;border-style:dashed}
+.arch-alt{font-size:12px;color:var(--muted)!important;font-weight:400} a.btn + .arch-alt{align-self:center;margin-left:-2px}
 .tp-rule{max-width:760px;margin-top:6px} .tp-rule p{margin:0;font-size:14px;line-height:1.55;color:var(--ink-2)} .tp-rule .tp-see{margin-top:6px;font-size:12.5px} .tp-see span{font-weight:700;color:var(--muted);margin-right:4px}
 .cb-line{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:14px 0 0;font-size:13.5px}
 .cb-link{font-weight:600} .cb-link.soon{color:var(--muted)}
@@ -798,6 +799,15 @@ function stackShares(el, years, keys, {share, n, total, color, label, focus=null
       `<div class="r"><span>Share of policy sentences</span><b class="num">${pct(share(k,y))}</b></div><div class="muted">${fmt(n(k,y))} of ${fmt(total(y))} sentences${onSeg && k!=='other' ? ' · click to read the address' : ''}</div>`);
     if (onSeg && k!=='other') r.addEventListener('click', ()=>onSeg(k, y)); });
 }
+/* a think tank report's outside links: the original while it works; an Internet Archive copy when it is dead (labeled), or
+   as a second link when the organization's site refuses automated checks (pipeline/check_links.py, x.links) */
+function ttLinks(x, cls='', page='Report page'){
+  const L = x.links || {}, a = (u, t, c=cls) => `<a${c?` class="${c}"`:''} href="${esc(u)}" target="_blank" rel="noopener">${t}</a>`;
+  const out = [];
+  if (x.url) out.push(a(x.url, L.ua ? `${page} (archived copy) ↗` : `${page} ↗`) + (L.u2 ? ' ' + a(L.u2, 'archived copy', 'arch-alt') : ''));
+  if (x.pdf) out.push(a(x.pdf, L.pa ? 'PDF (archived copy) ↗' : 'PDF ↗') + (L.p2 ? ' ' + a(L.p2, 'archived copy', 'arch-alt') : ''));
+  return out;
+}
 const HEAT = ['--h0','--h1','--h2','--h3','--h4'];
 const heatBg = (v, mx) => v<=0 ? 'background:var(--h0);color:var(--line-2)' : `background:var(${HEAT[Math.min(4, 1+Math.floor(Math.sqrt(v/mx)*4))]})`;
 
@@ -840,7 +850,7 @@ function card(r, terms){
     body = `<div class="ctx">${r.prev?`<p class="ctx-side">${hl(r.prev.text,terms)}</p>`:'<p class="ctx-edge">Start of address</p>'}<p class="quote">${hl(r.text,terms)}</p>${r.next?`<p class="ctx-side">${hl(r.next.text,terms)}</p>`:'<p class="ctx-edge">End of address</p>'}</div>`;
     meta = `<a href="${href(r)}">Read the full ${x.year} address →</a>`; }
   else { top += `<span>${orgLink(x.org)}</span><span>${x.date||x.year||'Undated'}</span>`; body = `<a class="ttl rl" href="${href(r)}">${hl(r.title,terms)}</a>${r.text?`<div class="body">${hl(r.text,terms,360)}</div>`:''}`;
-    meta = `<a href="${href(r)}">Report page →</a><a href="${esc(x.url)}" target="_blank" rel="noopener">Original ↗</a>${x.pdf?`<a href="${esc(x.pdf)}" target="_blank" rel="noopener">PDF ↗</a>`:''}`; }
+    meta = `<a href="${href(r)}">Report page →</a>${ttLinks(x, '', 'Original').join('')}`; }
   return `<article class="res"><div class="top">${top}</div>${body}<div class="meta"><span>${subChip(r.sub)}</span>${meta}</div></article>`;
 }
 
@@ -1404,7 +1414,7 @@ const HEADS = {
       chips:(x.pa?`<span class="chip">Public Act ${esc(x.pa)}</span>`:'')+[...x.flags].filter(f=>!(f==='L' && x.pa)).map(f=>`<span class="chip">${f==='L' && B ? 'Became law' : FLAGS[f]}</span>`).join(''),
       actions:`<a class="btn" href="${ilga(x)}" target="_blank" rel="noopener">Status on ilga.gov ↗</a>` }; },
   report: (r) => ({ crumb:['thinktanks','Think tanks'], eyebrow:`${orgLink(r.x.org)} · ${r.x.date||r.x.year||'Undated'}`, title:esc(r.title), sub:'',
-      chips:'', actions:`<a class="btn" href="${esc(r.x.url)}" target="_blank" rel="noopener">Report page ↗</a>${r.x.pdf?`<a class="btn" href="${esc(r.x.pdf)}" target="_blank" rel="noopener">PDF ↗</a>`:''}` }),
+      chips:'', actions:ttLinks(r.x, 'btn').join('') }),
   org: (o) => { const P = ORGPROF[o.name] || {}, web = orgWebsite(o);
     return { crumb:['thinktanks','Think tanks'], logo:orgLogo(o, 'lg'),
       eyebrow:[P.official_name && P.official_name!==o.name ? esc(P.official_name) : 'Think tank or policy institute', P.founded && `Founded ${P.founded}`, P.based && esc(P.based)].filter(Boolean).join(' · '),
@@ -1511,7 +1521,7 @@ SECTIONS.report.push(
       el.innerHTML = relGroup(`More from ${esc(r.x.org)} on ${esc(majorName(r.major))}`, 'tt', more, ()=>{ Object.assign(OG,{slug:orgOf(r.x.org).slug, q:'', major:r.major, page:0}); nav('org-'+orgOf(r.x.org).slug); }) + `<a class="linkbtn" href="#org-${orgOf(r.x.org).slug}">About ${esc(r.x.org)} →</a>`; } },
   { id:'related', title:'Related records', render(r, el){ crossSection(r, el, 'tt'); } },
   { id:'facts', title:'At a glance', side:true, render(r, el){ const x=r.x;
-      el.innerHTML = factList([['Organization',orgLink(x.org)],['Published',x.date||x.year||'Undated'],['Links',`<a href="${esc(x.url)}" target="_blank" rel="noopener">Report page ↗</a>${x.pdf?`<br><a href="${esc(x.pdf)}" target="_blank" rel="noopener">PDF ↗</a>`:''}`],['Row id',`<span class="mono">${r.id}</span>`]]); } },
+      el.innerHTML = factList([['Organization',orgLink(x.org)],['Published',x.date||x.year||'Undated'],['Links',ttLinks(x).join('<br>')],['Row id',`<span class="mono">${r.id}</span>`]]); } },
   { id:'coding', title:'Policy Agendas coding', side:true, render: codingSection }
 );
 
