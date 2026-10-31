@@ -272,8 +272,10 @@ def main(argv=None):
     # 3. Internet Archive copies: look up captures; ask for new ones (a few per run) for working links with none
     look = [u for u in sorted(pages | pdfs) if links.get(u, {}).get('a') is None or (links[u]['a'] == '' and age_days(links[u].get('at')) >= 30)]
     print(f'Looking up Internet Archive copies of {len(look):,} links…', flush=True)
+    # while PDFs still need a backup, the lookups get half the time left, so a long first pass makes progress on both
+    stop = time.time() + (budget - time.time()) / 2 if pending_backup else budget
     for i, u in enumerate(look):
-        if time.time() > budget:
+        if time.time() > stop:
             break
         e = links.setdefault(u, {})
         got = wayback(u)
