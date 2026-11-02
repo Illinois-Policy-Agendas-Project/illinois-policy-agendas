@@ -584,8 +584,8 @@ const DS = {
   tt:{name:'Think tank reports', short:'Think tanks', cls:'ds-tt'}
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
-/* top menu: [route, label, dot class, section]. Legislators has its own tab; Parties, Committees and Day by day share the Legislature section and its sub-tabs. */
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Legislators'],['parties','Legislature',null,'legislature'],['search','Search'],['codebook','Codebook']];
+/* top menu: [route, label, dot class, section]. Parties, Committees and Day by day are sub-tabs of Bills (LEGTABS), next to its stage views. */
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Legislators'],null,['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],['topics','Topics'],['search','Search'],['codebook','Codebook']];
 const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
 const TABLABEL = {sponsors:'Legislators', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
@@ -995,7 +995,7 @@ function renderBills(){
     ${ALL_SESSIONS.length>1?`<div class="fbar" style="margin:10px 0 0"><label class="ink2" for="b-ga" style="font-size:13.5px">Session</label><select id="b-ga">${ALL_SESSIONS.slice().reverse().map(s=>`<option value="${s.ga}" ${s.ga===BL.ga?'selected':''}>${gaName(s.ga)} (${esc(s.years)})${s.upcoming?' · not started':''}</option>`).join('')}</select></div>`:''}</div>
     <button class="btn primary" id="b-all">Download all ${fmt(all.length)} bills (CSV)</button></div>
   <nav class="vtabs" aria-label="Bill stage">${Object.entries(BVIEWS).map(([k,v])=>{ const n = k==='intro' ? all.length : k==='committee' ? out.length : laws.length;
-    return `<a href="#${v.token}" class="vtab" aria-current="${k===V?'page':'false'}">${v.label}${k==='activity'?'':`<span class="num">${fmt(n)}</span>`}</a>`; }).join('')}</nav>
+    return `<a href="#${v.token}" class="vtab" aria-current="${k===V?'page':'false'}">${v.label}${k==='activity'?'':`<span class="num">${fmt(n)}</span>`}</a>`; }).join('')}${LEGTABS.map(([k,l])=>`<a href="#${k}" class="vtab">${l}</a>`).join('')}</nav>
 `;
   if (isUpcoming(BL.ga)){ const sx = ALL_SESSIONS.find(x=>x.ga===BL.ga);
     $('#view').innerHTML = header.replace(/<nav class="vtabs"[\s\S]*<\/nav>/, '').replace(/<button class="btn primary" id="b-all">[\s\S]*?<\/button>/, '') + `<div class="panel upcoming"><div class="eyebrow">Not started</div><h2>The ${gaName(BL.ga)} ${sx.starts?`convenes in ${esc(sx.starts)}`:'has not convened yet'}</h2>
@@ -1791,7 +1791,9 @@ function netFocus(i){
 const legGA = () => SESSIONS.some(x=>x.ga===BL.ga) ? BL.ga : LATEST;   // a session with bills (the Bills tab can also show one that hasn't started)
 function legBar(cur){
   const sub = LEGTABS.some(([k])=>k===cur);   // the Legislators page has its own top tab, so it shows only the session menu
-  return `<div class="legbar${sub?'':' solo'}">${sub?`<nav class="vtabs" aria-label="Legislature">${LEGTABS.map(([k,l])=>`<a class="vtab" href="#${k}" ${k===cur?'aria-current="page"':''}>${l}</a>`).join('')}</nav>`:''}
+  // Parties, Committees and Day by day sit under Bills: the same sub-tabs as the Bills page (its stage views, then these)
+  const tabs = [...Object.values(BVIEWS).map(v=>[v.token, v.label]), ...LEGTABS];
+  return `<div class="legbar${sub?'':' solo'}">${sub?`<nav class="vtabs" aria-label="Bills">${tabs.map(([k,l])=>`<a class="vtab" href="#${k}" ${k===cur?'aria-current="page"':''}>${l}</a>`).join('')}</nav>`:''}
     <label class="ink2 legsess" for="lg-ga">Session <select id="lg-ga">${SESSIONS.slice().reverse().map(x=>`<option value="${x.ga}" ${x.ga===legGA()?'selected':''}>${gaName(x.ga)} (${esc(x.years)})</option>`).join('')}</select></label></div>`;
 }
 function bindLegBar(){
@@ -2702,12 +2704,12 @@ function parseRoute(t){
   return null;
 }
 const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees'})[rt.view] || rt.view;
-const sectionOf = rt => { const t = tabOf(rt); return LEGTABS.some(([k])=>k===t) ? 'legislature' : t; };
+const sectionOf = rt => { const t = tabOf(rt); return LEGTABS.some(([k])=>k===t) ? 'bills' : t; };
 function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
   const btn = t => `<button role="tab" data-v="${t[0]}" aria-selected="${key(t)===cur}">${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>`;
   const here = TABS.find(t=>t && key(t)===cur);
   // phones: one button showing the current section, opening the full menu grouped as on desktop
-  const groups = [], labels = ['', 'Datasets', 'Explore']; let g = 0; groups[0] = [];
+  const groups = [], labels = ['', 'The General Assembly', 'More']; let g = 0; groups[0] = [];
   for (const t of TABS){ if (!t){ groups[++g] = []; continue; } groups[g].push(t); }
   return `<div class="tabs-wide">${TABS.map(t=> t ? btn(t) : '<span class="sep"></span>').join('')}</div>
     <button class="menu-btn" aria-expanded="false" aria-controls="menu-panel"><span class="burger" aria-hidden="true"></span>${here?`${here[2]?`<i class="dot ${here[2]}"></i>`:''}${here[1]}`:'Menu'}<span class="muted" style="margin-left:auto;font-weight:400">Menu</span></button>
