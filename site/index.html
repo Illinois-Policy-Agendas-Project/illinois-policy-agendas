@@ -588,8 +588,9 @@ const DSK = ['bills','sots','tt'], NOPOL = -555;
 /* top menu: [route, label, dot class, section]. Parties, Committees and Day by day are sub-tabs of Bills (LEGTABS), next to its stage views. */
 const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Legislators','nd-leg'],null,['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],['topics','Topics','nd-topics'],['search','Search','nd-search'],['codebook','Codebook']];
 const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
-// the Bills sub-menu (the stage views Introduced, Out of committee and Became law are reached from the stage boxes on the Bills page)
-const BILLTABS = [['bills-activity','Latest actions'], ...LEGTABS];
+// the Bills sub-menu. All bills is the Bills page; its stage views (Introduced, Out of committee, Became law) are reached
+// from the stage boxes on it, and keep All bills underlined
+const BILLTABS = [['bills','All bills'], ['bills-activity','Recent activity'], ...LEGTABS];
 const TABLABEL = {sponsors:'Legislators', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
@@ -957,7 +958,7 @@ function drawHomeMembers(){
    (#bills-committee) and bills that became law (#bills-law). Stages come from the build (pipeline/build.py bill_stage):
    1 introduced, 2 out of committee, 3 passed one chamber, 4 passed both chambers, 5 became law (Public Act). */
 const BL = { ga:null, view:'law', q:'', type:'', major:null, sub:null, status:'', cmte:'', page:0 };
-const BVIEWS = { law:{token:'bills', label:'Became law'}, intro:{token:'bills-introduced', label:'Introduced'}, committee:{token:'bills-committee', label:'Advanced from committee'}, activity:{token:'bills-activity', label:'Latest actions'} };
+const BVIEWS = { law:{token:'bills', label:'Became law'}, intro:{token:'bills-introduced', label:'Introduced'}, committee:{token:'bills-committee', label:'Advanced from committee'}, activity:{token:'bills-activity', label:'Recent activity'} };
 const STAGES = ['Introduced', 'Out of committee', 'Passed one chamber', 'Passed both chambers', 'Became law'];
 const billsOf = ga => byDs('bills').filter(r=>r.x.ga===ga);
 const isBillT = r => r.x.type==='HB' || r.x.type==='SB';
@@ -997,7 +998,7 @@ function renderBills(){
     <p>Every House and Senate bill introduced in the ${gaName(BL.ga)}: what was introduced, what got out of committee, and what became law. Resolutions, appointments and commemorative measures are left out. Each bill has its ILGA synopsis, sponsors, history and policy subtopic.</p>
     ${ALL_SESSIONS.length>1?`<div class="fbar" style="margin:10px 0 0"><label class="ink2" for="b-ga" style="font-size:13.5px">Session</label><select id="b-ga">${ALL_SESSIONS.slice().reverse().map(s=>`<option value="${s.ga}" ${s.ga===BL.ga?'selected':''}>${gaName(s.ga)} (${esc(s.years)})${s.upcoming?' · not started':''}</option>`).join('')}</select></div>`:''}</div>
     <button class="btn primary" id="b-all">Download all ${fmt(all.length)} bills (CSV)</button></div>
-  <nav class="vtabs" aria-label="Bills">${BILLTABS.map(([k,l])=>`<a href="#${k}" class="vtab" aria-current="${k===BVIEWS[V]?.token?'page':'false'}">${l}</a>`).join('')}</nav>
+  <nav class="vtabs" aria-label="Bills">${BILLTABS.map(([k,l])=>`<a href="#${k}" class="vtab" aria-current="${k===(V==='activity'?'bills-activity':'bills')?'page':'false'}">${l}</a>`).join('')}</nav>
 `;
   if (isUpcoming(BL.ga)){ const sx = ALL_SESSIONS.find(x=>x.ga===BL.ga);
     $('#view').innerHTML = header.replace(/<nav class="vtabs"[\s\S]*<\/nav>/, '').replace(/<button class="btn primary" id="b-all">[\s\S]*?<\/button>/, '') + `<div class="panel upcoming"><div class="eyebrow">Not started</div><h2>The ${gaName(BL.ga)} ${sx.starts?`convenes in ${esc(sx.starts)}`:'has not convened yet'}</h2>
@@ -1067,7 +1068,7 @@ function renderBills(){
   billsUpdate();
 }
 
-/* ---- Latest actions: each bill's most recent action, newest first ----
+/* ---- Recent activity: each bill's most recent action, newest first ----
    Only the latest step of a bill's ILGA history carries a date in the data, so each bill appears once. */
 const ACT_KINDS = [
   ['law', 'Became law', /^Public Act|Governor Approved|Effective Date/i],
