@@ -120,6 +120,7 @@ input[type=search]{padding:8px 12px}
 #tip .t{font-weight:600;margin-bottom:4px} #tip .r b{white-space:nowrap} #tip .r{display:flex;align-items:center;gap:10px;justify-content:space-between} #tip .seg-t{font-weight:600;margin:2px 0 4px;color:var(--ink)}
 svg .seg:hover{stroke:var(--ink)!important;stroke-width:1.25px!important;fill-opacity:1!important}
 #tip .r > span:first-child{display:flex;align-items:center;gap:6px}
+#tip .tbills{margin-top:4px;border-top:1px solid var(--line);padding-top:4px} #tip .tbill{font-size:12px;line-height:1.35;margin:3px 0} #tip .tbill .mono{color:var(--muted)} #tip .tbill b{color:var(--s-bills);font-size:11px;margin-left:4px}
 
 /* heatmaps */
 .hscroll{overflow-x:auto}
@@ -761,6 +762,12 @@ const FAMILY = {1:[210,55],2:[265,45],3:[355,60],4:[85,45],5:[28,75],6:[310,45],
 const family = m => FAMILY[m] || [Math.round((m * 47) % 360), 40];
 const shade = (m, j, n) => { const [h,sat] = family(m); return `hsl(${h} ${sat}% ${n>1 ? 40 + 44*j/(n-1) : 50}%)`; };
 const cssColor = c => c.startsWith('--') ? `var(${c})` : c;
+/* a hover list of the bills in one subtopic (rows: bill records): number, short title and "law" for those enacted, enacted first */
+function billsTip(rows, sub, max=8){
+  const bs = rows.filter(r=>r.sub===sub).sort((a,b)=>(b.x.stage||0)-(a.x.stage||0) || a.x.bill.localeCompare(b.x.bill, undefined, {numeric:true}));
+  return `<div class="tbills">${bs.slice(0,max).map(r=>`<div class="tbill"><span class="mono">${esc(r.x.bill)}</span> ${esc(r.x.short||'')}${(r.x.stage||0)>=5?'<b>law</b>':''}</div>`).join('')}`+
+    `${bs.length>max?`<div class="muted" style="font-size:12px">and ${fmt(bs.length-max)} more</div>`:''}</div>`;
+}
 function subSegs(rows, major, scale=1, tip){
   return [...count(rows.filter(r=>r.major===major && r.sub!=null), r=>r.sub)].sort((a,b)=>b[1]-a[1])
     .map(([c,n],j,a)=>({code:c, label:CB.subs[c]||('Subtopic '+c), value:n*scale, n, color:shade(major, j, a.length), tip:tip?.(c,n)}));
@@ -944,7 +951,8 @@ function drawHomeMembers(){
   people.forEach((p,i)=>{
     const mine = p.bills.filter(b=>b.role==='C' && b.r.x.ga===LATEST && keepBill(b.r) && isBillHBSB(b.r) && isPol(b.r));
     const ct = [...count(mine, b=>b.r.major)].sort((a,b)=>b[1]-a[1]), top = ct.slice(0,6), rest = ct.slice(6).reduce((a,[,v])=>a+v, 0);
-    const items = top.map(([m,v])=>({label:CB.majors[m]||('Topic '+m), code:m, value:v, segs:[{value:v, color:shade(m,0,1)}],
+    const rows = mine.map(b=>b.r);
+    const items = top.map(([m,v])=>({label:CB.majors[m]||('Topic '+m), code:m, value:v, segs:subSegs(rows, m, 1, (c,n)=>`<div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(n)}</b></div>${billsTip(rows, c)}`),
       tip:`<div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(v)}</b></div><div class="muted">Click for their page</div>`, onclick:()=>nav('sponsor-'+p.slug)}));
     if (rest) items.push({label:'Other topics', value:rest, color:'--h2', tip:`<div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(rest)}</b></div>`, onclick:()=>nav('sponsor-'+p.slug)});
     const el = $('#hm-c'+i);
@@ -1966,9 +1974,9 @@ SECTIONS.sponsor.push(
       if (!mine.length){ el.innerHTML = '<p class="muted" style="margin:0">No policy-coded bills as primary sponsor.</p>'; return; }
       const peers = byDs('bills').filter(r=>isPol(r) && keepBill(r) && chiefOf(r)?.ch===p.ch);
       const c = count(mine, r=>r.major), cp = count(peers, r=>r.major);
-      el.innerHTML = `<p class="ink2" style="margin:0;font-size:13.5px">Major topics of the ${fmt(mine.length)} policy bills they introduced. Hover for the ${chamberName(p.ch)} average. Click a topic to list those bills below.</p><div id="sg-tp"></div>`;
+      el.innerHTML = `<p class="ink2" style="margin:0;font-size:13.5px">Major topics of the ${fmt(mine.length)} policy bills they introduced, split into subtopics. Hover a subtopic for its bills, or the topic name for the ${chamberName(p.ch)} average. Click a topic to list those bills below.</p><div id="sg-tp"></div>`;
       hbars($('#sg-tp'), [...c].sort((a,b)=>b[1]-a[1]).slice(0,10).map(([m,v])=>({label:CB.majors[m], code:m, value:v/mine.length, color:'--s-bills', on:SPG.major===m,
-        segs: subSegs(mine, m, 1/mine.length, (c,n)=>`<div class="r"><span>Their bills</span><b class="num">${pct(n/mine.length)} (${fmt(n)})</b></div>`),
+        segs: subSegs(mine, m, 1/mine.length, (c,n)=>`<div class="r"><span>Their bills</span><b class="num">${pct(n/mine.length)} (${fmt(n)})</b></div>${billsTip(mine, c)}`),
         tip:`<div class="r"><span>Their bills</span><b class="num">${pct(v/mine.length)} (${fmt(v)})</b></div><div class="r"><span>${chamberName(p.ch)} average</span><b class="num">${pct((cp.get(m)||0)/peers.length)}</b></div>`,
         onclick:()=>{ SPG.major = SPG.major===m?null:m; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }})), {labelW:230, rowH:23, valFmt:v=>pct(v,0)}); } },
   { id:'flow', title:'Where their bills went', render(p, el){
