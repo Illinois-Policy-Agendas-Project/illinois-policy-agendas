@@ -950,7 +950,7 @@ function drawHomeMembers(){
       <div id="hm-c${i}"></div></div>`; }).join('');
   people.forEach((p,i)=>{
     const mine = p.bills.filter(b=>b.role==='C' && b.r.x.ga===LATEST && keepBill(b.r) && isBillHBSB(b.r) && isPol(b.r));
-    const ct = [...count(mine, b=>b.r.major)].sort((a,b)=>b[1]-a[1]), top = ct.slice(0,6), rest = ct.slice(6).reduce((a,[,v])=>a+v, 0);
+    const ct = [...count(mine, b=>b.r.major)].sort((a,b)=>b[1]-a[1]), top = ct.slice(0,8), rest = ct.slice(8).reduce((a,[,v])=>a+v, 0);
     const rows = mine.map(b=>b.r);
     const items = top.map(([m,v])=>({label:CB.majors[m]||('Topic '+m), code:m, value:v, segs:subSegs(rows, m, 1, (c,n)=>`<div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(n)}</b></div>${billsTip(rows, c)}`),
       tip:`<div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(v)}</b></div><div class="muted">Click for their page</div>`, onclick:()=>nav('sponsor-'+p.slug)}));
