@@ -2,7 +2,9 @@
 """One-off check for lobbying data linked to bills: what ILGA's witness slips and the Secretary of State's lobbyist
 files contain. Writes a report and sample pages to probe/ (attached to the GitHub run); changes nothing else.
 
-    python pipeline/probe_lobbying.py HB3769 SB774 ...     bills of the 104th General Assembly
+    python pipeline/probe_lobbying.py HB3769 SB774 ...           bills of the 104th General Assembly
+    python pipeline/probe_lobbying.py --ids SB774 HB2227 ...     where to find a bill's LegID / LegDocId (needed for its
+                                                                 witness slips) when its status page doesn't show one
 
 1. robots.txt of the ILGA hosts (whether automated reading of slip pages is allowed).
 2. For each bill: its ILGA bill status page, every link on it about witness slips or hearings, and the pages those
@@ -189,10 +191,92 @@ def portal_part():
             log(f'  bill? {line[:300]}')
 
 
+IDPAT = re.compile(r'(LegI[Dd]|LegDocI[Dd]|legdocid|legid|LegislationI[Dd]|LegislationDocumentI[Dd]|DocumentI[Dd])["\'\s:=]{1,4}["\']?(\d{3,})', re.I)
+
+
+def ids_in(body):
+    h = body.decode('utf-8', 'replace')
+    found = {}
+    for k, v in IDPAT.findall(h):
+        if v != '0':
+            found.setdefault(k.lower(), set()).add(v)
+    return {k: sorted(v) for k, v in found.items()}
+
+
+def ids_part(bills):
+    log('## Finding LegID / LegDocId for bills whose status page shows none')
+    body, ctype, final, err = fetch(f'https://ftp.ilga.gov/legislation/{GA}/BillStatus/')
+    log(f'- ftp BillStatus folder: ' + (err or ', '.join(l or v for v, l in links(body, final))[:600]))
+    sub = [v for v, l in links(body, final)] if not err else []
+    for b in bills:
+        t, n = re.match(r'([A-Z]+)(\d+)', b).groups()
+        log(f'\n### {t} {n}')
+        found = {}
+        name = f'{GA}00{t}{int(n):04d}'
+        # 1. the bulk repository's bill status files
+        for u in [f'https://ftp.ilga.gov/legislation/{GA}/BillStatus/XML/{name}.xml', f'https://ftp.ilga.gov/legislation/{GA}/BillStatus/HTML/{name}.html']:
+            body, ctype, final, err = fetch(u)
+            got = {} if err else ids_in(body)
+            log(f'  ftp {u.rsplit("/", 2)[-2]}: ' + (err or f'{len(body):,} bytes; ids {got or "none"}'))
+            if not err and u.endswith('.xml') and b == bills[0]:
+                (OUT / 'samples').mkdir(parents=True, exist_ok=True)
+                (OUT / 'samples' / f'{name}.xml').write_bytes(body)
+                tags = sorted(set(re.findall(r'<([A-Za-z_][\w-]*)', body.decode('utf-8', 'replace'))))
+                log(f'    xml tags: {tags[:80]}')
+            for k, v in got.items():
+                found.setdefault(k, set()).update(v)
+        # 2. the interactive pages: status, full text and votes tabs
+        q = f'GAID={GAID}&DocNum={n}&DocTypeID={t}&LegId=0&SessionID={SESSION}'
+        for tab, u in [('status', f'https://www.ilga.gov/Legislation/BillStatus?{q}'),
+                       ('full text', f'https://www.ilga.gov/Legislation/BillStatus/FullText?{q}'),
+                       ('votes', f'https://www.ilga.gov/Legislation/BillStatus/VoteHistory?{q}')]:
+            body, ctype, final, err = fetch(u)
+            got = {} if err else ids_in(body)
+            log(f'  {tab}: ' + (err or f'{len(body):,} bytes; ids {got or "none"}'))
+            if not err and not got and b == bills[0]:
+                (OUT / 'samples').mkdir(parents=True, exist_ok=True)
+                (OUT / 'samples' / f'{b}_{tab.replace(" ", "")}.html').write_bytes(body)
+            for k, v in got.items():
+                found.setdefault(k, set()).update(v)
+        log(f'  all ids found: { {k: sorted(v) for k, v in found.items()} or "none"}')
+        # 3. try the witness slips with what was found
+        legids = sorted(found.get('legid', set()) | found.get('legislationid', set()))
+        docids = sorted(found.get('legdocid', set()) | found.get('documentid', set()) | found.get('legislationdocumentid', set()))
+        for d in docids[:2]:
+            u = f'https://www.ilga.gov/Legislation/BillStatus/ExportWitnessSlips?legdocid={d}&legislationname={t}{n}'
+            body, ctype, final, err = fetch(u)
+            log(f'  export with legdocid {d}: ' + (err or f'{ctype} | {len(body):,} bytes | {body[:160].decode("utf-8", "replace")!r}'))
+        for lid in legids[:1]:
+            u = f'https://www.ilga.gov/Legislation/BillStatus/WitnessSlips?GAID={GAID}&DocNum={n}&DocTypeID={t}&SessionID={SESSION}&LegId={lid}'
+            body, ctype, final, err = fetch(u)
+            if err:
+                log(f'  slip page with LegId {lid}: {err}')
+                continue
+            ex = [v for v, l in links(body, final) if 'ExportWitnessSlips' in v]
+            counts = [l for v, l in links(body, final) if re.match(r'(Proponents|Opponents|No Position):', l)]
+            log(f'  slip page with LegId {lid}: {len(body):,} bytes; {counts}; exports {ex[:4]}')
+    # 4. the Committees folder of the bulk repository
+    log('\n## ftp.ilga.gov/Committees')
+    body, ctype, final, err = fetch('https://ftp.ilga.gov/Committees/')
+    if err:
+        log(f'- {err}')
+        return
+    top = links(body, final)
+    log('- entries: ' + ', '.join(l or v for v, l in top)[:800])
+    for v, l in top[1:4]:
+        b2, c2, f2, e2 = fetch(v)
+        log(f'  {l}: ' + (e2 or ', '.join(x or y for y, x in links(b2, f2))[:600]))
+
+
 def main():
-    bills = [b.strip().upper() for b in (sys.argv[1:] or []) if b.strip()]
+    args = [a.strip() for a in sys.argv[1:] if a.strip()]
+    bills = [a.upper() for a in args if not a.startswith('--')]
     OUT.mkdir(exist_ok=True)
     log(f'# Lobbying data check ({time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())})\n')
+    if '--ids' in args:
+        ids_part(bills)
+        (OUT / 'report.md').write_text('\n'.join(LOG) + '\n', encoding='utf-8')
+        return 0
     ilga_part(bills)
     ftp_part()
     portal_part()
