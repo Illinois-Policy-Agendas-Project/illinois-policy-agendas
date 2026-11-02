@@ -84,6 +84,7 @@ main{padding-block:26px 64px}
 .ds-bills{--c:var(--s-bills);--ct:var(--t-bills)} .ds-sots{--c:var(--s-sots);--ct:var(--t-sots)} .ds-tt{--c:var(--s-tt);--ct:var(--t-tt)}
 .dsb{background:var(--ct);color:var(--ink)}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;background:var(--c)}
+.nd-leg{--c:#a78bfa} .nd-topics{--c:#f2c94c} .nd-search{--c:#e879a6}   /* menu dots for the non-dataset tabs, apart from the three dataset colors */
 .code{font-family:var(--f-mono);font-size:11.5px;padding:1px 6px;border-radius:4px;background:var(--sunk);color:var(--ink-2);white-space:nowrap}
 mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 input[type=search],input[type=number],select{border:1px solid var(--line-2);background:var(--surface);border-radius:var(--r);padding:7px 10px;min-width:0;max-width:100%}
@@ -585,7 +586,7 @@ const DS = {
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
 /* top menu: [route, label, dot class, section]. Parties, Committees and Day by day are sub-tabs of Bills (LEGTABS), next to its stage views. */
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Legislators'],null,['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],['topics','Topics'],['search','Search'],['codebook','Codebook']];
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Legislators','nd-leg'],null,['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],['topics','Topics','nd-topics'],['search','Search','nd-search'],['codebook','Codebook']];
 const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
 const TABLABEL = {sponsors:'Legislators', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
