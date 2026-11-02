@@ -21,7 +21,7 @@ Writes, per session, to Website/inputs/witness_slips/<ga>/ (saved to Dropbox by 
     slips.csv     ga, bill, version_id, version, name, firm, representing, position, committee, hearing: one row per slip
     state.json    per bill: ILGA's id, the versions, how many actions it had when checked, when, and its slip count
 """
-import argparse, csv, json, os, re, sys, time, tomllib
+import argparse, csv, json, os, re, sys, time, tomllib, urllib.error
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,6 +38,7 @@ COLS = ['ga', 'bill', 'version_id', 'version', 'name', 'firm', 'representing', '
 HEARD = re.compile(r'Do Pass|Recommends|Recommend Do Adopt|Postponed|Held in|Tabled', re.I)   # a committee took it up
 ASSIGNED = re.compile(r'Assigned to|Re-assigned to', re.I)
 pl = lambda n, w: f'{n:,} {w}{"" if n == 1 else "s"}'
+age_days = lambda t: (datetime.now(timezone.utc) - datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)).total_seconds() / 86400
 NOW = lambda: datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
@@ -61,6 +62,13 @@ class Client:
             body, ctype, _ = webget.get(url, UA, timeout=60)
             self.fails = 0
             return body.decode('utf-8', 'replace')
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403, 429):   # ILGA refuses automated requests: stop, and don't try to get around it
+                raise Stop(f'ILGA refused the request (HTTP {e.code}) at {url}') from None
+            self.fails += 1
+            if self.fails >= 6:
+                raise Stop(f'ILGA failed {self.fails} requests in a row (last: {url})')
+            raise
         except Exception:
             self.fails += 1
             if self.fails >= 6:
@@ -147,6 +155,9 @@ def run_session(s, deadline, only=None):
     state = json.loads((folder / 'state.json').read_text(encoding='utf-8')) if (folder / 'state.json').exists() else {}
     bills = state.setdefault('bills', {})
     rows = load(folder / 'slips.csv')
+    if state.get('refused') and not only and age_days(state['refused']) < 7:
+        print(f'{ga}th GA: ILGA refused the collector on {state["refused"][:10]}; trying again a week after that.')
+        return True
     acts = actions_of(s['actions'])
     if not acts and not only:
         print(f'{ga}th GA: no bill_actions.csv yet in {s["actions"]} (run pipeline/fetch_actions.py first); skipped.')
@@ -192,8 +203,12 @@ def run_session(s, deadline, only=None):
         stopped = 'time'
     except Stop as ex:
         stopped = str(ex)
+        if 'refused' in stopped:
+            state['refused'] = NOW()
     if not stopped:
         state['pass'] = NOW()
+    if 'refused' not in stopped:
+        state.pop('refused', None)
     save(folder, rows, state)
     left = [b for b in heard + assigned if due(b)]
     all_rows = [r for rs in rows.values() for r in rs]
@@ -208,7 +223,7 @@ def run_session(s, deadline, only=None):
         print('  Most active organizations: ' + '; '.join(f'{o} ({n:,})' for o, n in orgs.most_common(8)))
     if stopped:
         print(f'  Stopped: {"time limit reached; the next run continues" if stopped == "time" else stopped}.')
-    return stopped in ('', 'time')
+    return stopped in ('', 'time') or 'refused' in stopped   # a refusal is reported, not a failed run
 
 
 def main(argv=None):
