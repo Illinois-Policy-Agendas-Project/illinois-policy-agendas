@@ -289,6 +289,16 @@ a.fstep:hover{border-color:var(--s-bills)} .fstep.on{border-color:var(--s-bills)
 .hcard:hover{border-color:var(--line-2);background:var(--sunk)}
 .hcard.ds-bills,.hcard.ds-sots,.hcard.ds-tt{border-top:3px solid var(--c)}
 .hc-t{font-weight:600;display:flex;align-items:center;gap:7px} .hc-n{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums} .hc-d{font-size:13.5px;color:var(--ink-2)}
+.home-members{border:1px solid var(--line);border-top:3px solid var(--navy);border-radius:var(--r);background:var(--surface);padding:18px 20px 20px;margin-bottom:22px}
+.hm-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px 20px;flex-wrap:wrap;margin-bottom:16px}
+.hm-head h2{margin:2px 0 4px} .hm-head p{margin:0;color:var(--ink-2);font-size:14px;max-width:62ch}
+.hm-actions{display:flex;gap:8px;flex-wrap:wrap}
+.hm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.hm-card{display:flex;flex-direction:column;gap:10px;min-width:0}
+.hm-who{display:flex;gap:14px;align-items:center;min-width:0}
+.hm-name{font-size:18px;font-weight:700;line-height:1.25} .hm-role{font-size:13px;color:var(--muted)}
+.hm-stats{font-size:13.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+@media (max-width:760px){ .hm-grid{grid-template-columns:minmax(0,1fr)} .home-members{padding:16px} }
 .home-two{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:36px;margin-bottom:30px}
 .home-two h2{margin-bottom:10px}
 .people{display:flex;flex-direction:column;gap:14px}
@@ -356,7 +366,7 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
   table.dt td:has(div,a.rl)::before{display:block!important;margin-bottom:1px}
   .tscroll{overflow:visible}
 }
-.legbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px} .legbar .vtabs{border-bottom:0;margin-bottom:0;flex:1 1 auto}
+.legbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:18px} .legbar.solo{justify-content:flex-end;padding-bottom:8px} .legbar .vtabs{border-bottom:0;margin-bottom:0;flex:1 1 auto}
 .legsess{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;padding-bottom:6px} @media (max-width:560px){ .legsess{width:100%} .legsess select{flex:1} }
 .orglist{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}
 .orgcard{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
@@ -574,9 +584,9 @@ const DS = {
   tt:{name:'Think tank reports', short:'Think tanks', cls:'ds-tt'}
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
-/* top menu: [route, label, dot class, section]. Sponsors, Parties and Committees share the Legislature section and its sub-tabs. */
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['codebook','Codebook'],['sponsors','Legislature',null,'legislature'],['search','Search']];
-const LEGTABS = [['sponsors','Members'],['parties','Parties'],['committees','Committees'],['replay','Day by day']];
+/* top menu: [route, label, dot class, section]. Members has its own tab; Parties, Committees and Day by day share the Legislature section and its sub-tabs. */
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['codebook','Codebook'],['sponsors','Members'],['parties','Legislature',null,'legislature'],['search','Search']];
+const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
 const TABLABEL = {sponsors:'Members', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
@@ -884,6 +894,7 @@ function renderHome(){
     <p class="home-lede">${fillCounts(H.overview || '')}</p>
     <div class="home-cta"><a class="btn primary" href="#topics">Explore by topic</a><a class="btn" href="#bills">Browse bills</a><a class="btn" href="#search">Search everything</a>${cbLink('btn')}</div>
   </section>
+  ${homeMembersBox()}
   <section class="home-cards" aria-label="What's on the site">${cards.map(([h,cls,t,n,d])=>`<a class="hcard ${cls}" href="#${h}"><span class="hc-t">${cls?'<i class="dot"></i>':''}${t}</span><span class="hc-n">${n}</span><span class="hc-d">${d}</span></a>`).join('')}</section>
   <section class="home-two">
     <div><h2>About the data</h2><p class="prose">${fillCounts(H.methods || '')}</p><p class="cb-line">${cbLink('cb-link')}<span class="muted">Every subtopic code, its label and what it covers.</span></p></div>
@@ -894,6 +905,45 @@ function renderHome(){
   </section>
   ${(H.sponsors||[]).length ? `<section class="home-sponsors">${H.sponsors.map(sp=>`<div class="sponsor"><span class="eyebrow">${esc(sp.role||'')}</span>
       <a href="${esc(sp.url||'#')}" target="_blank" rel="noopener" class="sp-mark">${sp.logo ? `<img src="data/${esc(sp.logo)}" alt="${esc(sp.name)}">` : `<span class="sp-name">${esc(sp.name)}</span>`}</a></div>`).join('')}</section>` : ''}`;
+  drawHomeMembers();
+  $('#hm-shuffle')?.addEventListener('click', ()=>{ HM.pick = null; drawHomeMembers(); });
+}
+
+/* home: two current legislators picked at random, one from each chamber, with their bills as primary sponsor by topic.
+   The pick stays while the page is open (a redraw keeps it); "Show two others" picks again. */
+const HM = { pick:null };
+function hmPool(ch){
+  return SPON.filter(p=>p.ch===ch && p.photo && inGA(p, LATEST)).map(p=>[p, sponsorStats(p, null, null, LATEST)]).filter(([,s])=>s.bills>=3);
+}
+function homeMembersBox(){
+  if (!hmPool('Sen').length && !hmPool('Rep').length) return '';
+  return `<section class="home-members" aria-labelledby="hm-t">
+    <div class="hm-head"><div><div class="eyebrow">Members · ${gaName(LATEST)}</div><h2 id="hm-t">What are legislators working on?</h2>
+      <p>A senator and a representative picked at random, with the bills they filed as primary sponsor by topic. Every member has a page like this.</p></div>
+      <div class="hm-actions"><button class="btn" id="hm-shuffle" type="button">Show two others</button><a class="btn primary" href="#sponsors">See all members</a></div></div>
+    <div class="hm-grid" id="hm-grid"></div></section>`;
+}
+function drawHomeMembers(){
+  const grid = $('#hm-grid'); if (!grid) return;
+  const any = a => a[Math.floor(Math.random()*a.length)];
+  if (!HM.pick) HM.pick = ['Sen','Rep'].map(ch=>{ const pool = hmPool(ch); return pool.length ? any(pool)[0].slug : null; }).filter(Boolean);
+  const people = HM.pick.map(slug=>SPON.find(p=>p.slug===slug)).filter(Boolean);
+  grid.innerHTML = people.map((p,i)=>{ const s = sponsorStats(p, null, null, LATEST);
+    return `<div class="hm-card"><div class="hm-who"><a class="leg-photo" href="#sponsor-${p.slug}"><img src="data/${esc(p.photo)}" alt="${esc(p.name)}" title="Photo: Illinois General Assembly" loading="lazy"></a>
+      <div style="min-width:0"><div class="hm-name"><a href="#sponsor-${p.slug}">${esc(p.title)}</a></div>
+        <div class="hm-role">${p.ch==='Sen'?'State senator':'State representative'}${p.party?` · ${esc(p.party)}`:''}${p.district?` · District ${esc(p.district)}`:''}</div>
+        <div class="hm-stats">${pl(s.bills, 'bill')} as primary sponsor · ${fmt(s.law)} became law</div></div></div>
+      <div id="hm-c${i}"></div></div>`; }).join('');
+  people.forEach((p,i)=>{
+    const mine = p.bills.filter(b=>b.role==='C' && b.r.x.ga===LATEST && keepBill(b.r) && isBillHBSB(b.r) && isPol(b.r));
+    const ct = [...count(mine, b=>b.r.major)].sort((a,b)=>b[1]-a[1]), top = ct.slice(0,6), rest = ct.slice(6).reduce((a,[,v])=>a+v, 0);
+    const items = top.map(([m,v])=>({label:CB.majors[m]||('Topic '+m), code:m, value:v, segs:[{value:v, color:shade(m,0,1)}],
+      tip:`<div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(v)}</b></div><div class="muted">Click for their page</div>`, onclick:()=>nav('sponsor-'+p.slug)}));
+    if (rest) items.push({label:'Other topics', value:rest, color:'--h2', tip:`<div class="r"><span>Bills as primary sponsor</span><b class="num">${fmt(rest)}</b></div>`, onclick:()=>nav('sponsor-'+p.slug)});
+    const el = $('#hm-c'+i);
+    if (!items.length){ el.innerHTML = '<p class="muted" style="margin:0">None of their bills are coded yet.</p>'; return; }
+    hbars(el, items, {labelW:190, rowH:23});
+  });
 }
 
 /* =================== BILLS ===================
@@ -1737,7 +1787,8 @@ function netFocus(i){
 /* ---- Legislature section: sub-tabs and the session menu shared by Sponsors, Parties and Committees (and Bills) ---- */
 const legGA = () => SESSIONS.some(x=>x.ga===BL.ga) ? BL.ga : LATEST;   // a session with bills (the Bills tab can also show one that hasn't started)
 function legBar(cur){
-  return `<div class="legbar"><nav class="vtabs" aria-label="Legislature">${LEGTABS.map(([k,l])=>`<a class="vtab" href="#${k}" ${k===cur?'aria-current="page"':''}>${l}</a>`).join('')}</nav>
+  const sub = LEGTABS.some(([k])=>k===cur);   // the Members page has its own top tab, so it shows only the session menu
+  return `<div class="legbar${sub?'':' solo'}">${sub?`<nav class="vtabs" aria-label="Legislature">${LEGTABS.map(([k,l])=>`<a class="vtab" href="#${k}" ${k===cur?'aria-current="page"':''}>${l}</a>`).join('')}</nav>`:''}
     <label class="ink2 legsess" for="lg-ga">Session <select id="lg-ga">${SESSIONS.slice().reverse().map(x=>`<option value="${x.ga}" ${x.ga===legGA()?'selected':''}>${gaName(x.ga)} (${esc(x.years)})</option>`).join('')}</select></label></div>`;
 }
 function bindLegBar(){
