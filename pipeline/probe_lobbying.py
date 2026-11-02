@@ -5,6 +5,8 @@ files contain. Writes a report and sample pages to probe/ (attached to the GitHu
     python pipeline/probe_lobbying.py HB3769 SB774 ...           bills of the 104th General Assembly
     python pipeline/probe_lobbying.py --ids SB774 HB2227 ...     where to find a bill's LegID / LegDocId (needed for its
                                                                  witness slips) when its status page doesn't show one
+    python pipeline/probe_lobbying.py --versions SB1928 ...      slips for every version of a bill (introduced and each
+                                                                 amendment), counted by position
 
 1. robots.txt of the ILGA hosts (whether automated reading of slip pages is allowed).
 2. For each bill: its ILGA bill status page, every link on it about witness slips or hearings, and the pages those
@@ -268,13 +270,60 @@ def ids_part(bills):
         log(f'  {l}: ' + (e2 or ', '.join(x or y for y, x in links(b2, f2))[:600]))
 
 
+def versions_part(bills):
+    log('## Witness slips for every version of a bill')
+    total = {}
+    for b in bills:
+        t, n = re.match(r'([A-Z]+)(\d+)', b).groups()
+        log(f'\n### {t} {n}')
+        q = f'GAID={GAID}&DocNum={n}&DocTypeID={t}&LegId=0&SessionID={SESSION}'
+        body, ctype, final, err = fetch(f'https://www.ilga.gov/Legislation/BillStatus/FullText?{q}')
+        if err:
+            log(f'  full text: {err}')
+            continue
+        lid = (ids_in(body).get('legid') or [None])[0]
+        if not lid:
+            log('  no LegID on the full text tab')
+            continue
+        u = f'https://www.ilga.gov/Legislation/BillStatus/WitnessSlips?GAID={GAID}&DocNum={n}&DocTypeID={t}&SessionID={SESSION}&LegId={lid}'
+        body, ctype, final, err = fetch(u)
+        if err:
+            log(f'  slip page: {err}')
+            continue
+        vers = list(dict.fromkeys((re.search(r'LegDocId=(\d+)', v, re.I).group(1), l) for v, l in links(body, final)
+                                  if re.search(r'LegDocId=\d+', v, re.I) and 'Export' not in v))
+        counts = [l for v, l in links(body, final) if re.match(r'(Proponents|Opponents|No Position):', l)]
+        log(f'  LegID {lid}; versions on the slip page: {vers}; counts shown for the first: {counts}')
+        if b == bills[0]:
+            (OUT / 'samples').mkdir(parents=True, exist_ok=True)
+            (OUT / 'samples' / f'{b}_slips.html').write_bytes(body)
+        for d, label in vers[:5]:
+            body, ctype, final, err = fetch(f'https://www.ilga.gov/Legislation/BillStatus/ExportWitnessSlips?legdocid={d}&legislationname={t}{n}')
+            if err:
+                log(f'  {label} ({d}): {err}')
+                continue
+            rows = [r.split('|') for r in body.decode('utf-8', 'replace').splitlines()[1:] if r.strip()]
+            pos = {}
+            for r in rows:
+                if len(r) > 4:
+                    pos[r[4]] = pos.get(r[4], 0) + 1
+            orgs = sum(1 for r in rows if len(r) > 3 and not re.fullmatch(r'\s*(self|na|n/a|none|)\s*', (r[3] or r[2]), re.I))
+            hearings = sorted({(r[5], r[6]) for r in rows if len(r) > 6})
+            log(f'  {label} ({d}): {len(rows)} slips {pos}; {orgs} name an organization; hearings {hearings[:4]}')
+            for k, v in pos.items():
+                total[k] = total.get(k, 0) + v
+            for r in rows[:2]:
+                log(f'    e.g. {"|".join(r)[:200]}')
+    log(f'\nAll slips found: {total}')
+
+
 def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     bills = [a.upper() for a in args if not a.startswith('--')]
     OUT.mkdir(exist_ok=True)
     log(f'# Lobbying data check ({time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())})\n')
-    if '--ids' in args:
-        ids_part(bills)
+    if '--ids' in args or '--versions' in args:
+        (ids_part if '--ids' in args else versions_part)(bills)
         (OUT / 'report.md').write_text('\n'.join(LOG) + '\n', encoding='utf-8')
         return 0
     ilga_part(bills)
