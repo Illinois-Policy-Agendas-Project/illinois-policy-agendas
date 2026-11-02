@@ -584,10 +584,10 @@ const DS = {
   tt:{name:'Think tank reports', short:'Think tanks', cls:'ds-tt'}
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
-/* top menu: [route, label, dot class, section]. Members has its own tab; Parties, Committees and Day by day share the Legislature section and its sub-tabs. */
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Members'],['parties','Legislature',null,'legislature'],['search','Search'],['codebook','Codebook']];
+/* top menu: [route, label, dot class, section]. Legislators has its own tab; Parties, Committees and Day by day share the Legislature section and its sub-tabs. */
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Legislators'],['parties','Legislature',null,'legislature'],['search','Search'],['codebook','Codebook']];
 const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
-const TABLABEL = {sponsors:'Members', parties:'Parties', committees:'Committees'};
+const TABLABEL = {sponsors:'Legislators', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
 let GOV = {}, USED_MAJORS = new Set();   // year -> {governor, party}; major topics that have records
@@ -885,7 +885,7 @@ function renderHome(){
     ['speeches', 'ds-sots', 'Speeches', `${fmt(new Set(yrs).size)} addresses`, `Every State of the State address from ${Math.min(...yrs)} to ${Math.max(...yrs)}, readable sentence by sentence.`],
     ['thinktanks', 'ds-tt', 'Think tanks', `${fmt(byDs('tt').length)} reports`, `Reports from ${fmt(orgs().length)} Illinois think tanks and policy institutes.`],
     ['topics', '', 'Topics', '20 major topics', 'Follow one policy area across bills, speeches and reports, down to the subtopic.'],
-    ['sponsors', '', 'Members', `${fmt(SPON.length)} legislators`, 'What each legislator introduced, signed onto and saw become law.'],
+    ['sponsors', '', 'Legislators', `${fmt(SPON.length)} legislators`, 'What each legislator introduced, signed onto and saw become law.'],
     ['search', '', 'Search', 'All texts', 'Find any word or phrase in every bill synopsis, speech sentence and report.']];
   $('#view').innerHTML = `
   <section class="home-hero">${H.notice ? `<p class="home-notice" role="note">${H.notice_label ? `<b>${esc(H.notice_label)}</b>` : ''}<span>${esc(H.notice)}</span></p>` : ''}
@@ -905,23 +905,26 @@ function renderHome(){
   </section>
   ${(H.sponsors||[]).length ? `<section class="home-sponsors">${H.sponsors.map(sp=>`<div class="sponsor"><span class="eyebrow">${esc(sp.role||'')}</span>
       <a href="${esc(sp.url||'#')}" target="_blank" rel="noopener" class="sp-mark">${sp.logo ? `<img src="data/${esc(sp.logo)}" alt="${esc(sp.name)}">` : `<span class="sp-name">${esc(sp.name)}</span>`}</a></div>`).join('')}</section>` : ''}`;
-  drawHomeMembers();
-  $('#hm-shuffle')?.addEventListener('click', ()=>{ HM.pick = null; drawHomeMembers(); });
+  bindMembersBox();
 }
 
-/* home: two current legislators picked at random, one from each chamber, with their bills as primary sponsor by topic.
-   The pick stays while the page is open (a redraw keeps it); "Show two others" picks again. */
+/* two current legislators picked at random, one from each chamber, with their bills as primary sponsor by topic: on the
+   home page and the Legislators page. The pick stays while the site is open (a redraw keeps it); "Show two others" picks again. */
 const HM = { pick:null };
 function hmPool(ch){
   return SPON.filter(p=>p.ch===ch && p.photo && inGA(p, LATEST)).map(p=>[p, sponsorStats(p, null, null, LATEST)]).filter(([,s])=>s.bills>=3);
 }
-function homeMembersBox(){
+function homeMembersBox(onLegislators=false){
   if (!hmPool('Sen').length && !hmPool('Rep').length) return '';
   return `<section class="home-members" aria-labelledby="hm-t">
-    <div class="hm-head"><div><div class="eyebrow">Members · ${gaName(LATEST)}</div><h2 id="hm-t">What are legislators working on?</h2>
-      <p>A senator and a representative picked at random, with the bills they filed as primary sponsor by topic. Every member has a page like this.</p></div>
-      <div class="hm-actions"><button class="btn" id="hm-shuffle" type="button">Show two others</button><a class="btn primary" href="#sponsors">See all members</a></div></div>
+    <div class="hm-head"><div><div class="eyebrow">Legislators · ${gaName(LATEST)}</div><h2 id="hm-t">What are legislators working on?</h2>
+      <p>A senator and a representative picked at random, with the bills they filed as primary sponsor by topic. Every legislator has a page like this.</p></div>
+      <div class="hm-actions"><button class="btn" id="hm-shuffle" type="button">Show two others</button>${onLegislators?'':'<a class="btn primary" href="#sponsors">See all legislators</a>'}</div></div>
     <div class="hm-grid" id="hm-grid"></div></section>`;
+}
+function bindMembersBox(){
+  drawHomeMembers();
+  $('#hm-shuffle')?.addEventListener('click', ()=>{ HM.pick = null; drawHomeMembers(); });
 }
 function drawHomeMembers(){
   const grid = $('#hm-grid'); if (!grid) return;
@@ -1470,7 +1473,7 @@ const HEADS = {
     return { crumb:['thinktanks','Think tanks'], logo:orgLogo(o, 'lg'),
       eyebrow:[P.official_name && P.official_name!==o.name ? esc(P.official_name) : 'Think tank or policy institute', P.founded && `Founded ${P.founded}`, P.based && esc(P.based)].filter(Boolean).join(' · '),
       title:esc(o.name), sub:'', chips:'', actions: web ? `<a class="btn" href="${esc(web.url)}" target="_blank" rel="noopener">${esc(web.host)} ↗</a>` : '' }; },
-  sponsor: (p) => ({ crumb:['sponsors','Members'], logo: p.photo ? `<span class="leg-photo"><img src="data/${esc(p.photo)}" alt="${esc(p.name)}" title="Photo: Illinois General Assembly"></span>` : '',
+  sponsor: (p) => ({ crumb:['sponsors','Legislators'], logo: p.photo ? `<span class="leg-photo"><img src="data/${esc(p.photo)}" alt="${esc(p.name)}" title="Photo: Illinois General Assembly"></span>` : '',
       eyebrow:[p.ch==='Rep'?'State Representative':'State Senator', p.party && esc(p.party), p.district && `District ${esc(p.district)}`, esc(p.gas().map(gaName).join(', '))].filter(Boolean).join(' · '), title:esc(p.title), sub:'',
       chips:'', actions: p.ilga ? `<a class="btn" href="${esc(p.ilga)}" target="_blank" rel="noopener">Member page on ilga.gov ↗</a>` : '' }),
   speech: (s) => { const yrs = range(2005,2025);
@@ -1787,7 +1790,7 @@ function netFocus(i){
 /* ---- Legislature section: sub-tabs and the session menu shared by Sponsors, Parties and Committees (and Bills) ---- */
 const legGA = () => SESSIONS.some(x=>x.ga===BL.ga) ? BL.ga : LATEST;   // a session with bills (the Bills tab can also show one that hasn't started)
 function legBar(cur){
-  const sub = LEGTABS.some(([k])=>k===cur);   // the Members page has its own top tab, so it shows only the session menu
+  const sub = LEGTABS.some(([k])=>k===cur);   // the Legislators page has its own top tab, so it shows only the session menu
   return `<div class="legbar${sub?'':' solo'}">${sub?`<nav class="vtabs" aria-label="Legislature">${LEGTABS.map(([k,l])=>`<a class="vtab" href="#${k}" ${k===cur?'aria-current="page"':''}>${l}</a>`).join('')}</nav>`:''}
     <label class="ink2 legsess" for="lg-ga">Session <select id="lg-ga">${SESSIONS.slice().reverse().map(x=>`<option value="${x.ga}" ${x.ga===legGA()?'selected':''}>${gaName(x.ga)} (${esc(x.years)})</option>`).join('')}</select></label></div>`;
 }
@@ -1806,7 +1809,7 @@ function renderSponsors(){
   const most = (k) => act.map(p=>[p, p.bills.filter(b=>b.role===k && b.r.x.ga===ga && keepBill(b.r)).length]).sort((a,b)=>b[1]-a[1])[0] || [null, 0];
   const [mc, mcn] = most('C'), [mo, mon] = most('O');
   $('#view').innerHTML = `${legBar('sponsors')}
-  <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Members</h1>
+  <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Legislators</h1>
     <p>Every legislator named as a sponsor on a substantive bill in the bills dataset, with what they introduced, what they signed onto and what became law. Open a legislator for their full record.</p></div>
     <button class="btn primary" id="sn-dl">Download sponsor table (CSV)</button></div>
   <div class="kpis">
@@ -1815,6 +1818,7 @@ function renderSponsors(){
     <div class="kpi"><span class="l">Most co-sponsorships</span><span class="v" style="font-size:18px;padding-block:5px">${mo?spLink(mo):'—'}</span><span class="s">${fmt(mon)} bills</span></div>
     <div class="kpi"><span class="l">Sponsorship links</span><span class="v">${fmt(act.reduce((a,p)=>a+p.bills.filter(b=>b.r.x.ga===ga && keepBill(b.r)).length,0))}</span><span class="s">legislator–bill pairs</span></div>
   </div>
+  ${homeMembersBox(true)}
   <div class="fbar">
     <input type="search" id="sn-q" placeholder="Find a legislator" value="${esc(SN.q)}" aria-label="Find a legislator">
     <select id="sn-m" aria-label="Major topic">${majorOptions(SN.major,'Bills on any topic')}</select>
@@ -1845,7 +1849,7 @@ function renderSponsors(){
       <p class="muted" style="margin:0;font-size:12.5px">Names are parsed from the ILGA sponsor field in the bills file. Spelling variants of the same legislator are merged.</p></div>
   </div>
   <div class="tscroll"><table class="dt" id="sn-t" style="min-width:0" data-mcap="20"><thead><tr>${[['name','Legislator'],['C','Primary sponsor'],['law','Bills that became law']].map(([k,l])=>`<th data-k="${k}" style="cursor:pointer;${k!=='name'?'text-align:right;width:180px':''}">${l} <span class="muted">${SN.sort===k?(SN.dir<0?'▼':'▲'):''}</span></th>`).join('')}</tr></thead><tbody></tbody></table></div>`;
-  bindLegBar();
+  bindLegBar(); bindMembersBox();
   $('#sk-p').addEventListener('change', e=>{ SK.slug = e.target.value; drawSponsorSankey(); });
   $('#sn-sh').addEventListener('change', e=>{ SK.shell = e.target.checked; renderSponsors(); });
   $$('[data-nc]').forEach(b=>b.addEventListener('click', ()=>{ NET.ch=b.dataset.nc; NET.find=null; $$('[data-nc]').forEach(x=>x.setAttribute('aria-pressed', x===b)); drawNetwork(); }));
@@ -2175,7 +2179,7 @@ const isBipartisan = r => { const c = chiefOf(r); if (!c?.party) return false; r
 function renderParties(){
   if (!LEGS.length){ $('#view').innerHTML = `${legBar('parties')}<div class="phead"><div><h1>Parties</h1><p>Party comparisons appear once the legislator list is published. Run <b>Fetch legislators</b> in the control panel, then Check data and Publish.</p></div></div>`; return; }
   const ga = legGA(), inCh = r => PT.ch==='all' || chiefOf(r)?.ch===PT.ch;
-  // placeholder bills (technical shells that never passed a chamber) are left out unless asked for, as on the Members pages
+  // placeholder bills (technical shells that never passed a chamber) are left out unless asked for, as on the Legislators pages
   const shells = billsOf(ga).filter(r=>isBillT(r) && inCh(r) && isPlaceholder(r)).length;
   const allB = billsOf(ga).filter(r=>isBillT(r) && inCh(r) && keepBill(r)), known = allB.filter(r=>billParty(r)).length;
   const B = billsOf(ga).filter(r=>isBillT(r) && billParty(r) && inCh(r) && keepBill(r)), by = pt => B.filter(r=>billParty(r)===pt);
