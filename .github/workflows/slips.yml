@@ -1,0 +1,54 @@
+# Collect witness slips for longer than the nightly update allows (pipeline/fetch_slips.py), to finish the first pass
+# over a session sooner. Run by hand: Actions tab → "Collect witness slips" → Run workflow. It saves the slips to
+# Dropbox (IAP/Website/inputs/witness_slips/) and changes nothing on the site.
+name: Collect witness slips
+
+on:
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: 'How long to collect (up to 5.5 hours); the next run continues where this one stops'
+        type: string
+        default: '5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-website           # never at the same time as the nightly update, which uses the same files
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      IL_AGENDAS_DATA: /home/runner/iap/Website
+      DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
+      DROPBOX_APP_SECRET: ${{ secrets.DROPBOX_APP_SECRET }}
+      DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+      DROPBOX_IAP_PATH: ${{ vars.DROPBOX_IAP_PATH || '/Academic/UIC/Research/IAP' }}
+      HOURS: ${{ inputs.hours }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Get the data from Dropbox
+        run: python pipeline/dropbox_sync.py pull
+      - name: Collect witness slips
+        continue-on-error: true   # whatever was collected is still saved
+        run: |
+          minutes=$(python -c "import os; print(max(5, min(330, float(os.environ['HOURS'] or 5) * 60)))")
+          python pipeline/fetch_slips.py --minutes "$minutes" | tee slips.log
+      - name: Save to Dropbox
+        if: always()
+        run: python pipeline/dropbox_sync.py push
+      - name: Summary
+        if: always()
+        run: |
+          echo '### Witness slips' >> "$GITHUB_STEP_SUMMARY"
+          grep -E 'GA:|In the file|Still to check|Most active|Stopped' slips.log | sed 's/^/    /' >> "$GITHUB_STEP_SUMMARY" || true

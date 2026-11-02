@@ -42,7 +42,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 150          # the first ILGA download takes about 40 minutes
+    timeout-minutes: 200          # the first ILGA download takes about 40 minutes; links and witness slips add up to 100
     env:
       IL_AGENDAS_DATA: /home/runner/iap/Website
       DROPBOX_APP_KEY: ${{ secrets.DROPBOX_APP_KEY }}
@@ -77,6 +77,12 @@ jobs:
         if: env.DOWNLOADS == 'true'
         continue-on-error: true   # a failed download is reported; the check still runs on what is there
         run: python pipeline/fetch_actions.py
+
+      - name: Collect witness slips
+        if: env.DOWNLOADS == 'true'
+        continue-on-error: true   # picks up where it left off; the first pass takes many runs (or use "Collect witness slips")
+        timeout-minutes: 50
+        run: python pipeline/fetch_slips.py --minutes 40
 
       - name: Look for new think tank reports
         if: env.DOWNLOADS == 'true'

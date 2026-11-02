@@ -34,6 +34,9 @@ years = "2025-2026"
 details = "../Bills/Live data/igbills_2025_2026_complete.xlsx"
 codes = "inputs/codes/104"
 actions = "inputs/actions/104"
+# ILGA's ids for this session, for collecting witness slips (pipeline/fetch_slips.py): GAID and SessionID in
+# ilga.gov bill links. Leave out to skip the session.
+slips = { gaid = 18, session = 114 }
 
 # Placeholder for the next General Assembly. While the bill file below doesn't exist, the site lists the
 # session as "not started" and the check passes. Once the scraper saves the file there, it goes live by itself;
