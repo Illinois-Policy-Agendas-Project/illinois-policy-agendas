@@ -116,8 +116,10 @@ The same update also runs on GitHub's servers (`.github/workflows/update.yml`), 
   the first pass over a session takes weeks that way; to finish sooner, run **Actions** → **Collect witness slips**
   (up to 5.5 hours a run, each continuing where the last stopped). After the first pass a bill is checked again only
   when it has new actions. Slips name private individuals as well as organizations, so keep the file private.
-  If ILGA refuses the collector (HTTP 403), it stops at once and waits a week before asking again; it never tries to
-  get around a refusal.
+  If ILGA refuses the collector (HTTP 403), it stops at once and waits a week before asking again from that place
+  (GitHub and lab computers are tracked separately). To run it on a lab computer, from a copy of this repository:
+  `IL_AGENDAS_DATA="<Dropbox>/Academic/UIC/Research/IAP/Website" python3 pipeline/fetch_slips.py --minutes 60`
+  (on a Mac, put `caffeinate -i` in front so the computer doesn't sleep). It writes straight into the synced Dropbox folder.
   A session needs ILGA's ids in `config.toml` (`slips = { gaid = 18, session = 114 }` for the 104th).
 - **Duplicate bills:** if the check warns that bills appear more than once in the bill file, run it with **Remove
   duplicate bills** ticked. It keeps each bill's newest row (moving a code over if only the old row had one), saves

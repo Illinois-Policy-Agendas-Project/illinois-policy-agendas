@@ -39,6 +39,7 @@ HEARD = re.compile(r'Do Pass|Recommends|Recommend Do Adopt|Postponed|Held in|Tab
 ASSIGNED = re.compile(r'Assigned to|Re-assigned to', re.I)
 pl = lambda n, w: f'{n:,} {w}{"" if n == 1 else "s"}'
 age_days = lambda t: (datetime.now(timezone.utc) - datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)).total_seconds() / 86400
+WHERE = 'github' if os.environ.get('GITHUB_ACTIONS') else 'local'   # a refusal on GitHub's servers doesn't pause runs on a lab computer
 NOW = lambda: datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
@@ -155,8 +156,10 @@ def run_session(s, deadline, only=None):
     state = json.loads((folder / 'state.json').read_text(encoding='utf-8')) if (folder / 'state.json').exists() else {}
     bills = state.setdefault('bills', {})
     rows = load(folder / 'slips.csv')
-    if state.get('refused') and not only and age_days(state['refused']) < 7:
-        print(f'{ga}th GA: ILGA refused the collector on {state["refused"][:10]}; trying again a week after that.')
+    if not isinstance(state.get('refused'), dict):   # older state files kept one date
+        state['refused'] = {}
+    if state['refused'].get(WHERE) and not only and age_days(state['refused'][WHERE]) < 7:
+        print(f'{ga}th GA: ILGA refused the collector here ({WHERE}) on {state["refused"][WHERE][:10]}; trying again a week after that.')
         return True
     acts = actions_of(s['actions'])
     if not acts and not only:
@@ -204,11 +207,11 @@ def run_session(s, deadline, only=None):
     except Stop as ex:
         stopped = str(ex)
         if 'refused' in stopped:
-            state['refused'] = NOW()
+            state['refused'][WHERE] = NOW()
     if not stopped:
         state['pass'] = NOW()
     if 'refused' not in stopped:
-        state.pop('refused', None)
+        state['refused'].pop(WHERE, None)
     save(folder, rows, state)
     left = [b for b in heard + assigned if due(b)]
     all_rows = [r for rs in rows.values() for r in rs]
