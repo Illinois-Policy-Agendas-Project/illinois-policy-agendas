@@ -17,7 +17,7 @@ import webget
 UA = 'Mozilla/5.0 (Illinois Policy Agendas Project (IPAP) research check; https://www.illinoisagendas.org)'
 OUT = Path('probe')
 GA, GAID, SESSION = 104, 18, 114
-PAUSE = 1.5
+PAUSE = 10   # ILGA's robots.txt asks for a 10-second crawl delay
 LOG = []
 
 
@@ -96,36 +96,62 @@ def ilga_part(bills):
         describe('bill status', url, body, ctype, final, err, save=f'{b}_status.html' if saved < 3 else None)
         if err:
             continue
-        cand = [(u, label) for u, label in links(body, final) if re.search(r'witness|slip|hearing', u + ' ' + label, re.I)]
-        uniq = list(dict.fromkeys(cand))
-        log(f'  witness/hearing links on the page: {len(uniq)}')
-        for u, label in uniq[:12]:
-            log(f'    - [{label}] {u}')
-        for i, (u, label) in enumerate(uniq[:3]):
-            if not re.search(r'(^|\.)ilga\.gov$', urllib.parse.urlparse(u).hostname or ''):
-                continue
-            pat = re.sub(r'\d+', 'N', urllib.parse.urlparse(u).path)
+        ids = sorted(set(re.findall(r'LegI[Dd]=(\d+)', body.decode('utf-8', 'replace'))) - {'0'})
+        log(f'  LegID on the page: {ids or "none"}')
+        base = f'https://www.ilga.gov/Legislation/BillStatus/WitnessSlips?GAID={GAID}&DocNum={n}&DocTypeID={t}&SessionID={SESSION}'
+        uniq = [(f'{base}&LegId={i}', f'Witness Slips, LegId {i}') for i in ids[:1]] + [(base + '&GA=104', 'Witness Slips, no LegId')]
+        body2 = b''
+        for i, (u, label) in enumerate(uniq):   # the first form that works is enough
+            pat = label.split(', ')[1]
             seen_patterns[pat] = seen_patterns.get(pat, 0) + 1
             body2, ctype2, final2, err2 = fetch(u)
-            keep = saved < 6 and seen_patterns[pat] <= 2
-            describe(f'level 1 [{label}]', u, body2, ctype2, final2, err2, save=f'{b}_l1_{i}.html' if keep else None)
+            keep = saved < 8 and seen_patterns[pat] <= 3
+            describe(f'witness slips [{label}]', u, body2, ctype2, final2, err2, save=f'{b}_slips.html' if keep else None)
             saved += keep
-            if err2:
-                continue
-            deeper = [(v, l) for v, l in links(body2, final2) if re.search(r'witness|slip', v + ' ' + l, re.I) and v != u]
-            deeper = list(dict.fromkeys(deeper))
-            log(f'    deeper witness links: {len(deeper)}')
-            for v, l in deeper[:6]:
-                log(f'      - [{l}] {v}')
-            for j, (v, l) in enumerate(deeper[:2]):
-                body3, ctype3, final3, err3 = fetch(v)
-                keep = saved < 8
-                describe(f'level 2 [{l}]', v, body3, ctype3, final3, err3, save=f'{b}_l2_{i}_{j}.html' if keep else None)
-                saved += keep
-    log('\nLink path patterns followed: ' + json.dumps(seen_patterns))
+            if not err2:
+                break
+        if err2 or not body2:
+            continue
+        deeper = [(v, l) for v, l in links(body2, final2) if re.search(r'witness|slip|hearing|page=|view', v + ' ' + l, re.I) and v != u and 'Uploads/' not in v]
+        deeper = list(dict.fromkeys(deeper))
+        log(f'    links from the witness slip page: {len(deeper)}')
+        for v, l in deeper[:8]:
+            log(f'      - [{l}] {v}')
+        for j, (v, l) in enumerate(deeper[:3]):
+            body3, ctype3, final3, err3 = fetch(v)
+            keep = saved < 12
+            describe(f'next level [{l}]', v, body3, ctype3, final3, err3, save=f'{b}_slips_{j}.html' if keep else None)
+            saved += keep
+    log('\nWitness slip URL forms that were tried: ' + json.dumps(seen_patterns))
+
+
+def ftp_part():
+    log('\n## 2b. ftp.ilga.gov (the bulk repository robots.txt points to)')
+    for u in ('https://ftp.ilga.gov/', 'https://ftp.ilga.gov/legislation/', 'https://ftp.ilga.gov/legislation/104/'):
+        body, ctype, final, err = fetch(u)
+        log(f'- {u}: ' + (err or f'{final} | {ctype} | {len(body):,} bytes'))
+        if not err:
+            names = [l or v for v, l in links(body, final)]
+            log('  entries: ' + ', '.join(names[:80]))
+            hits = [v for v, l in links(body, final) if re.search(r'witness|slip|hearing|committee', v + l, re.I)]
+            log('  witness/hearing/committee entries: ' + (', '.join(hits[:20]) or 'none'))
 
 
 def portal_part():
+    log('\n## 3b. Where the state lobbyist files are')
+    for u in ('https://data.illinois.gov/', 'https://data.illinois.gov/api/3/action/package_search?q=lobbyist&rows=20',
+              'https://data.illinois.gov/api/catalog/v1?q=lobbyist&domains=data.illinois.gov&limit=20',
+              'https://data.illinois.gov/browse?q=lobbyist', 'https://apps.ilsos.gov/lobbyistsearch/',
+              'https://www.ilsos.gov/departments/index/lobbyist/home.html'):
+        body, ctype, final, err = fetch(u, limit=400_000)
+        log(f'- {u}: ' + (err or f'{final} | {ctype} | {len(body):,} bytes'))
+        if err:
+            continue
+        if 'json' in ctype:
+            log('  ' + body[:1500].decode('utf-8', 'replace'))
+        hits = list(dict.fromkeys((v, l) for v, l in links(body, final) if re.search(r'lobby', v + ' ' + l, re.I)))
+        for v, l in hits[:25]:
+            log(f'  - [{l}] {v}')
     log('\n## 3. Illinois Data Portal: Daily Lobbyist Data')
     api = 'https://data.illinois.gov/api/3/action/package_show?id=daily-lobbyist-data'
     body, ctype, final, err = fetch(api)
@@ -168,6 +194,7 @@ def main():
     OUT.mkdir(exist_ok=True)
     log(f'# Lobbying data check ({time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime())})\n')
     ilga_part(bills)
+    ftp_part()
     portal_part()
     (OUT / 'report.md').write_text('\n'.join(LOG) + '\n', encoding='utf-8')
     return 0
