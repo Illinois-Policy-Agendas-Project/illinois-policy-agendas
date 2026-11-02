@@ -588,6 +588,8 @@ const DSK = ['bills','sots','tt'], NOPOL = -555;
 /* top menu: [route, label, dot class, section]. Parties, Committees and Day by day are sub-tabs of Bills (LEGTABS), next to its stage views. */
 const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Legislators','nd-leg'],null,['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],['topics','Topics','nd-topics'],['search','Search','nd-search'],['codebook','Codebook']];
 const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
+// the Bills sub-menu (the stage views Introduced, Out of committee and Became law are reached from the stage boxes on the Bills page)
+const BILLTABS = [['bills-activity','Latest actions'], ...LEGTABS];
 const TABLABEL = {sponsors:'Legislators', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
@@ -995,8 +997,7 @@ function renderBills(){
     <p>Every House and Senate bill introduced in the ${gaName(BL.ga)}: what was introduced, what got out of committee, and what became law. Resolutions, appointments and commemorative measures are left out. Each bill has its ILGA synopsis, sponsors, history and policy subtopic.</p>
     ${ALL_SESSIONS.length>1?`<div class="fbar" style="margin:10px 0 0"><label class="ink2" for="b-ga" style="font-size:13.5px">Session</label><select id="b-ga">${ALL_SESSIONS.slice().reverse().map(s=>`<option value="${s.ga}" ${s.ga===BL.ga?'selected':''}>${gaName(s.ga)} (${esc(s.years)})${s.upcoming?' · not started':''}</option>`).join('')}</select></div>`:''}</div>
     <button class="btn primary" id="b-all">Download all ${fmt(all.length)} bills (CSV)</button></div>
-  <nav class="vtabs" aria-label="Bill stage">${Object.entries(BVIEWS).map(([k,v])=>{ const n = k==='intro' ? all.length : k==='committee' ? out.length : laws.length;
-    return `<a href="#${v.token}" class="vtab" aria-current="${k===V?'page':'false'}">${v.label}${k==='activity'?'':`<span class="num">${fmt(n)}</span>`}</a>`; }).join('')}${LEGTABS.map(([k,l])=>`<a href="#${k}" class="vtab">${l}</a>`).join('')}</nav>
+  <nav class="vtabs" aria-label="Bills">${BILLTABS.map(([k,l])=>`<a href="#${k}" class="vtab" aria-current="${k===BVIEWS[V]?.token?'page':'false'}">${l}</a>`).join('')}</nav>
 `;
   if (isUpcoming(BL.ga)){ const sx = ALL_SESSIONS.find(x=>x.ga===BL.ga);
     $('#view').innerHTML = header.replace(/<nav class="vtabs"[\s\S]*<\/nav>/, '').replace(/<button class="btn primary" id="b-all">[\s\S]*?<\/button>/, '') + `<div class="panel upcoming"><div class="eyebrow">Not started</div><h2>The ${gaName(BL.ga)} ${sx.starts?`convenes in ${esc(sx.starts)}`:'has not convened yet'}</h2>
@@ -1792,9 +1793,8 @@ function netFocus(i){
 const legGA = () => SESSIONS.some(x=>x.ga===BL.ga) ? BL.ga : LATEST;   // a session with bills (the Bills tab can also show one that hasn't started)
 function legBar(cur){
   const sub = LEGTABS.some(([k])=>k===cur);   // the Legislators page has its own top tab, so it shows only the session menu
-  // Parties, Committees and Day by day sit under Bills: the same sub-tabs as the Bills page (its stage views, then these)
-  const tabs = [...Object.values(BVIEWS).map(v=>[v.token, v.label]), ...LEGTABS];
-  return `<div class="legbar${sub?'':' solo'}">${sub?`<nav class="vtabs" aria-label="Bills">${tabs.map(([k,l])=>`<a class="vtab" href="#${k}" ${k===cur?'aria-current="page"':''}>${l}</a>`).join('')}</nav>`:''}
+  // Parties, Committees and Day by day sit under Bills, with the same sub-tabs as the Bills page
+  return `<div class="legbar${sub?'':' solo'}">${sub?`<nav class="vtabs" aria-label="Bills">${BILLTABS.map(([k,l])=>`<a class="vtab" href="#${k}" ${k===cur?'aria-current="page"':''}>${l}</a>`).join('')}</nav>`:''}
     <label class="ink2 legsess" for="lg-ga">Session <select id="lg-ga">${SESSIONS.slice().reverse().map(x=>`<option value="${x.ga}" ${x.ga===legGA()?'selected':''}>${gaName(x.ga)} (${esc(x.years)})</option>`).join('')}</select></label></div>`;
 }
 function bindLegBar(){
