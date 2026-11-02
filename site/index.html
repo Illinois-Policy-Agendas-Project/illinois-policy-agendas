@@ -60,7 +60,7 @@ nav.tabs button{border:0;background:none;cursor:pointer;padding:10px 14px;font-s
 nav.tabs button:hover{color:var(--ink)}
 nav.tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--accent)}
 nav.tabs .sep{width:1px;background:var(--line-2);margin:10px 6px}
-nav.tabs{flex-direction:column} .tabs-wide{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav.tabs{flex-direction:column} .tabs-wide{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none} .tabs-wide [data-v="codebook"]{margin-left:auto}   /* the codebook sits at the far right */
 nav.tabs .menu-btn,nav.tabs .menu-panel{display:none}
 @media (max-width:560px){
   .tabs-wide{display:none} nav.tabs{margin-bottom:10px}
@@ -585,7 +585,7 @@ const DS = {
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
 /* top menu: [route, label, dot class, section]. Members has its own tab; Parties, Committees and Day by day share the Legislature section and its sub-tabs. */
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['codebook','Codebook'],['sponsors','Members'],['parties','Legislature',null,'legislature'],['search','Search']];
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],null,['topics','Topics'],['sponsors','Members'],['parties','Legislature',null,'legislature'],['search','Search'],['codebook','Codebook']];
 const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
 const TABLABEL = {sponsors:'Members', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
