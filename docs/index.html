@@ -199,6 +199,16 @@ table.dt tr.det td{background:var(--sel);padding-top:0;color:var(--ink-2)}
 .sugg{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:13px;color:var(--muted)}
 .sugg button{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;padding:3px 11px;cursor:pointer;font-size:13px}
 .sugg button:hover{background:var(--sel)}
+.sr-help{font-size:13px;color:var(--ink-2);margin:8px 0 0}
+.sr-help code{font-family:var(--mono,ui-monospace,monospace);font-size:12.5px;background:var(--sel);border-radius:4px;padding:0 4px}
+.jump{margin-top:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:10px 14px;display:grid;gap:6px}
+.jump[hidden]{display:none}
+.jump .jh{font-weight:600;font-size:13.5px}
+.jump .jr{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:baseline;font-size:14px}
+.jump .jl{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);min-width:96px}
+.jump a{border:1px solid var(--line-2);border-radius:999px;padding:2px 10px;text-decoration:none;color:var(--ink)}
+.jump a:hover{background:var(--sel)}
+.jump a .muted{font-size:12px}
 
 /* record pages */
 a.rl{color:var(--ink);text-decoration:none} a.rl:hover{color:var(--accent);text-decoration:underline}
@@ -624,8 +634,48 @@ function count(a, f){ const m = new Map(); for (const r of a){ const k=f(r); m.s
 const range = (a,b) => Array.from({length:b-a+1}, (_,i)=>a+i);
 function parseQuery(q){ const t=[]; q.toLowerCase().replace(/"([^"]+)"|(\S+)/g,(_,a,b)=>{ const x=(a||b).trim(); if (x) t.push(x); }); return t; }
 const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+/* the keyword language of every search box but the name finders: words match whole words and their common endings
+   (tax → taxes, taxed; policy → policies; rate → rating), a trailing * matches any ending (child* → children),
+   "quotes" keep a phrase together, OR between two terms takes either, and a leading minus (-chicago) leaves records out.
+   compileQuery(q) gives {n, test(hay), re, find(text)}: n is the number of terms that must match (0 = no query), re highlights. */
+const BILLNO = /\b(hb|sb|hr|sr|hjr|sjr|hjrca|sjrca|eo)\s+(\d+)\b/gi;
+function termPattern(raw){
+  let t = raw.toLowerCase().replace(/\s+/g,' ').trim(); const pre = /\*$/.test(t); t = t.replace(/\*+$/,'').trim();
+  if (!t) return null;
+  const words = t.split(' '), last = words.pop(), head = words.map(reEsc).join('[\\s\\-–—]+') + (words.length ? '[\\s\\-–—]+' : '');
+  let tail, lit = last;
+  if (pre) tail = reEsc(last) + "[\\w'’]*";
+  else if (!/^[a-z]+$/.test(last) || last.length < 3) tail = reEsc(last);
+  else if (/ies$/.test(last) && last.length > 4) { lit = last.slice(0,-3); tail = lit + '(?:y|ies)'; }
+  else if (/(x|ch|sh|z)es$/.test(last)) { lit = last.slice(0,-2); tail = lit + '(?:es|ed|ing)?'; }
+  else if (/s$/.test(last) && !/(ss|us|is)$/.test(last) && last.length > 3) { lit = last.slice(0,-1); tail = lit + '(?:s|es)?'; }
+  else if (/[^aeiou]y$/.test(last)) { lit = last.slice(0,-1); tail = lit + "(?:y|ies|ied|y's)"; }
+  else if (/[^aeiou]e$/.test(last)) { lit = last.slice(0,-1); tail = lit + "(?:e|es|ed|ing|e's)"; }
+  else tail = last + "(?:s|es|ed|ing|'s|’s)?";
+  const src = head + tail, b0 = /^\w/.test(t) ? '\\b' : '', b1 = /\w$/.test(t) || pre ? '(?![\\w])' : '';
+  return {src: b0 + src + b1, lit: words.length ? words[0] : lit, re: new RegExp(b0 + src + b1)};
+}
+function compileQuery(q){
+  const groups = [], not = []; let or = false;
+  String(q||'').replace(BILLNO, '$1$2').replace(/(-?)"([^"]*)"?|(\S+)/g, (_, neg, ph, w)=>{
+    if (w && /^(or|\|)$/i.test(w)) { or = groups.length > 0; return; }
+    if (w && /^and$/i.test(w)) return;
+    let s = ph ?? w, isNot = !!neg;
+    if (w && /^-./.test(w)) { isNot = true; s = w.slice(1); }
+    s = s.replace(/^[^\w"*]+|[^\w*]+$/g, '');   // stray punctuation at the ends
+    const p = termPattern(s); if (!p) { or = false; return; }
+    if (isNot) not.push(p); else if (or) groups[groups.length-1].push(p); else groups.push([p]);
+    or = false; });
+  const hit = (p, h) => h.includes(p.lit) && p.re.test(h);
+  const all = groups.flat();
+  const re = all.length ? new RegExp(all.map(p=>p.src).join('|'), 'gi') : null;
+  return { n: groups.length, groups, not,
+    test: h => groups.length > 0 && groups.every(g=>g.some(p=>hit(p,h))) && !not.some(p=>hit(p,h)),
+    re, find: text => { if (!re) return -1; const m = new RegExp(re.source, 'i').exec(String(text||'').toLowerCase()); return m ? m.index : -1; } };
+}
 function hl(text, terms, max){ let t = String(text ?? ''); if (max && t.length > max) t = t.slice(0,max).replace(/\s\S*$/,'') + '…'; const h = esc(t);
-  return terms.length ? h.replace(new RegExp('(' + terms.map(x=>reEsc(esc(x))).join('|') + ')','gi'), '<mark>$1</mark>') : h; }
+  const re = Array.isArray(terms) ? (terms.length ? new RegExp(terms.map(x=>reEsc(esc(x))).join('|'),'gi') : null) : terms?.re;
+  return re ? h.replace(re, '<mark>$&</mark>') : h; }
 const dsChip = ds => `<span class="chip dsb ${DS[ds].cls}"><i class="dot"></i>${DS[ds].short}</span>`;
 /* a subtopic by name (its code shows on hover); withCode puts the code in front, for the coding details on record pages */
 /* every topic label links to its codebook entry (#codebook-602, #codebook-m6); link=false inside buttons */
@@ -972,13 +1022,13 @@ const billsOf = ga => byDs('bills').filter(r=>r.x.ga===ga);
 const isBillT = r => r.x.type==='HB' || r.x.type==='SB';
 const inView = r => BL.view==='intro' ? true : BL.view==='committee' ? r.x.stage>=2 : r.x.stage>=5;
 const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
-function billFilter(skipTopic){ const t=parseQuery(BL.q);
+function billFilter(skipTopic){ const t=compileQuery(BL.q);
   return billsOf(BL.ga).filter(r=>{ const x=r.x; return inView(r)
     && (!BL.type || x.type===BL.type)
     && (skipTopic || BL.major==null || r.major===BL.major) && (skipTopic || BL.sub==null || r.sub===BL.sub)
     && (!BL.status || x.flags.includes(BL.status))
     && (BL.view!=='committee' || !BL.cmte || x.cmte===BL.cmte)
-    && t.every(w=>r.hay.includes(w)); }); }
+    && (!t.n || t.test(r.hay)); }); }
 function renderBills(){
   BL.ga ??= LATEST; const all = billsOf(BL.ga), B = all.filter(isBillT); const y0 = parseInt(gaYears(BL.ga)) || 2025, preStart = `${y0-1}-12`;
   const V = BL.view, inTopic = r => (BL.major==null || r.major===BL.major) && (BL.sub==null || r.sub===BL.sub);
@@ -1113,8 +1163,8 @@ function renderActivity(all, header){
   <div class="pager"><button class="btn" id="a-more" hidden>Show more</button></div>`;
   $('#a-type').value = ACT.type;
   const draw = () => {
-    const t = parseQuery(ACT.q);
-    const base = all.filter(r=>(!ACT.type || r.x.type===ACT.type) && (ACT.major==null || r.major===ACT.major) && t.every(w=>r.hay.includes(w) || r.x.last_action.toLowerCase().includes(w)));
+    const t = compileQuery(ACT.q);
+    const base = all.filter(r=>(!ACT.type || r.x.type===ACT.type) && (ACT.major==null || r.major===ACT.major) && (!t.n || t.test(r.hay + ' ' + r.x.last_action.toLowerCase())));
     const vis = base.filter(r=>ACT.routine || !['routine','sponsor'].includes(r.x.kind));
     const kc = count(vis, r=>r.x.kind);
     $('.kchips').innerHTML = [['', 'All', vis.length], ...[...ACT_KINDS.map(([k])=>k), 'other'].filter(k=>kc.get(k)).map(k=>[k, ACT_LABEL[k], kc.get(k)])]
@@ -1144,7 +1194,7 @@ function renderActivity(all, header){
 }
 
 function billsUpdate(){
-  const V = BL.view, rows = billFilter(), terms = parseQuery(BL.q);
+  const V = BL.view, rows = billFilter(), terms = compileQuery(BL.q);
   const forTop = billFilter(true).filter(isPol);
   if (V==='committee'){
     const base = billsOf(BL.ga).filter(r=>isBillT(r) && isPol(r)), intro = count(base, r=>r.major), adv = count(base.filter(r=>r.x.stage>=2), r=>r.major);
@@ -1165,7 +1215,7 @@ function billsUpdate(){
   $('#b-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> ${V==='law'?'laws':'bills'} match`; $('#b-dl').disabled = !rows.length;
   const PS=PHONE()?20:40, pages=Math.ceil(rows.length/PS); BL.page=Math.min(BL.page,Math.max(0,pages-1));
   if (V==='law') rows.sort((a,b)=>(b.x.pa||'').localeCompare(a.x.pa||'')); else rows.sort((a,b)=>b.date.localeCompare(a.date)||a.id-b.id);
-  const desc = r => `<a class="rl" href="${href(r)}" style="font-weight:600">${hl(r.x.short,terms)}</a><div class="muted" style="font-size:12.5px">${chiefOf(r)?spLink(chiefOf(r)):''}${(r.sp||[]).length>1?' and others':''}</div>${terms.length && !r.x.short.toLowerCase().includes(terms[0])?`<div class="ink2" style="font-size:12.5px">${hl(snippet(r.x.synopsis,terms),terms)}</div>`:''}`;
+  const desc = r => `<a class="rl" href="${href(r)}" style="font-weight:600">${hl(r.x.short,terms)}</a><div class="muted" style="font-size:12.5px">${chiefOf(r)?spLink(chiefOf(r)):''}${(r.sp||[]).length>1?' and others':''}</div>${terms.n && terms.find(r.x.short)<0?`<div class="ink2" style="font-size:12.5px">${hl(snippet(r.x.synopsis,terms),terms)}</div>`:''}`;
   const billCell = r => `<a class="mono" href="${href(r)}" style="white-space:nowrap">${esc(r.x.bill)}</a>`;
   $('#b-tb').innerHTML = rows.slice(BL.page*PS, BL.page*PS+PS).map(r=>{ const x=r.x;
     const cells = V==='intro' ? [billCell(r), `<span class="num" style="white-space:nowrap">${x.intro}</span>`, desc(r), `<div style="min-width:190px">${subChip(r.sub)}</div>`,
@@ -1179,7 +1229,7 @@ function billsUpdate(){
   $$('#b-tb tr.row').forEach(tr=>tr.addEventListener('click', e=>{ if (e.target.closest('a')) return; nav(tr.dataset.h.slice(1)); }));
   pager($('#b-pg'), BL.page, pages, p=>{ BL.page=p; billsUpdate(); $('#b-tb').closest('.tscroll').scrollIntoView({block:'start'}); });
 }
-function snippet(text, terms){ const t=String(text||''), i=t.toLowerCase().indexOf(terms[0]); if (i<0) return t.slice(0,140)+'…'; const a=Math.max(0,i-60); return (a?'…':'')+t.slice(a, i+100)+'…'; }
+function snippet(text, terms){ const t=String(text||''), i=terms.find ? terms.find(t) : t.toLowerCase().indexOf(terms[0]); if (i<0) return t.slice(0,140)+'…'; const a=Math.max(0,i-60); return (a?'…':'')+t.slice(a, i+100)+'…'; }
 
 /* =================== SPEECHES =================== */
 const SP = { major:'all', codes:false, focus:null, allTopics:false };   // topic highlighted on the tab and on speech pages ('all' colors every sentence by its topic on the tab)
@@ -1243,7 +1293,7 @@ function renderSpeeches(){
 
 /* =================== THINK TANKS =================== */
 const TT = { q:'', org:'', major:null, y0:1991, y1:2026, page:0 };
-function ttFilter(skipOrg){ const t=parseQuery(TT.q); return byDs('tt').filter(r=>(skipOrg || !TT.org || r.x.org===TT.org) && (TT.major==null || r.major===TT.major) && (r.year==null || (r.year>=TT.y0 && r.year<=TT.y1)) && t.every(w=>r.hay.includes(w))); }
+function ttFilter(skipOrg){ const t=compileQuery(TT.q); return byDs('tt').filter(r=>(skipOrg || !TT.org || r.x.org===TT.org) && (TT.major==null || r.major===TT.major) && (r.year==null || (r.year>=TT.y0 && r.year<=TT.y1)) && (!t.n || t.test(r.hay))); }
 function renderThinkTanks(){
   const all = byDs('tt'); const orgs = [...count(all,r=>r.x.org)].sort((a,b)=>b[1]-a[1]);
   const tops = [...count(all.filter(isPol), r=>r.major)].sort((a,b)=>b[1]-a[1]).slice(0,9).map(d=>d[0]);
@@ -1291,7 +1341,7 @@ function renderThinkTanks(){
   ttUpdate();
 }
 function ttUpdate(){
-  const rows = ttFilter(), terms = parseQuery(TT.q);
+  const rows = ttFilter(), terms = compileQuery(TT.q);
   const yrs = range(2006,2026), yc = count(rows, r=>r.year);
   $('#t-yl').textContent = rows.length < byDs('tt').length ? 'Matching reports' : 'All reports';
   columns($('#t-yr'), yrs.map(String), [{label:'Reports', cls:'ds-tt', color:'--s-tt', values:yrs.map(y=>yc.get(y)||0)}], {height:180});
@@ -1399,15 +1449,64 @@ function topicList(inM){
 }
 
 /* =================== SEARCH =================== */
-const SR = { q:'', ds:new Set(DSK), major:null, y0:1991, y1:2026, page:0, sort:'new', gas:'latest' };
-function srFilter(){ const t=parseQuery(SR.q); if (!t.length) return [];
-  return R.filter(r=>SR.ds.has(r.ds) && (r.ds!=='bills' || SR.gas==='all' || r.x.ga===LATEST) && (SR.major==null || r.major===SR.major) && (r.year==null || (r.year>=SR.y0 && r.year<=SR.y1)) && t.every(w=>r.hay.includes(w))); }
+const SR = { q:'', ds:new Set(DSK), major:null, y0:1991, y1:2026, page:0, sort:'new', gas:'latest', applied:undefined };
+/* the search lives in the address, so a search can be linked to and Back returns to it:
+   #search?q=minimum+wage&in=bills,tt&topic=5&from=2010&to=2020&ga=all&sort=old (only what differs from the defaults) */
+function srToken(){ const p = new URLSearchParams();
+  if (SR.q.trim()) p.set('q', SR.q.trim());
+  if (SR.ds.size < DSK.length) p.set('in', DSK.filter(k=>SR.ds.has(k)).join(','));
+  if (SR.major != null) p.set('topic', SR.major);
+  if (SR.y0 !== 1991) p.set('from', SR.y0); if (SR.y1 !== 2026) p.set('to', SR.y1);
+  if (SR.gas === 'all') p.set('ga', 'all'); if (SR.sort === 'old') p.set('sort', 'old');
+  const q = p.toString(); return q ? 'search?' + q : 'search'; }
+function srApply(qs){ if (qs === SR.applied) return; SR.applied = qs; const p = new URLSearchParams(qs || '');
+  const ins = (p.get('in')||'').split(',').filter(k=>DSK.includes(k)), m = p.get('topic');
+  Object.assign(SR, { q:p.get('q')||'', ds:new Set(ins.length ? ins : DSK), major: m!=null && m!=='' && !isNaN(+m) ? +m : null,
+    y0:+p.get('from')||1991, y1:+p.get('to')||2026, gas:p.get('ga')==='all' ? 'all' : 'latest', sort:p.get('sort')==='old' ? 'old' : 'new', page:0 }); }
+function srSync(){ if (ROUTE.view !== 'search') return; const t = srToken(); if (t === CUR) return;
+  CUR = t; ROUTE = parseRoute(t); SR.applied = ROUTE.params; try { history.replaceState(null, '', '#' + t); localStorage.setItem('ilpa2-view', t); } catch {} }
+function srFilter(){ const t=compileQuery(SR.q); if (!t.n) return [];
+  return R.filter(r=>SR.ds.has(r.ds) && (r.ds!=='bills' || SR.gas==='all' || r.x.ga===LATEST) && (SR.major==null || r.major===SR.major) && (r.year==null || (r.year>=SR.y0 && r.year<=SR.y1)) && t.test(r.hay)); }
+/* "go straight to": legislators, committees, think tanks, topics and bill numbers whose names match what was typed */
+const foldName = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+function srJump(){
+  const el = $('#sr-jump'); if (!el) return;
+  const raw = SR.q.replace(/(^|\s)-("[^"]*"?|\S+)/g,' ').replace(/\b(or|and)\b|\|/gi,' ').replace(/["*]/g,' ').replace(/\s+/g,' ').trim();
+  const words = foldName(raw).split(' ').filter(Boolean), rows = [];
+  const named = name => { const n = foldName(name); return words.every(w=>new RegExp('(^|[^a-z0-9])' + reEsc(w)).test(n)); };
+  const bn = raw.replace(BILLNO, '$1$2').match(/^(hb|sb|hr|sr|hjr|sjr|hjrca|sjrca|eo)(\d+)$/i);
+  if (bn){ const key = bn[1].toUpperCase() + bn[2];
+    const hits = SESSIONS.map(x=>BILLKEY.get(`${x.ga}-${key}`)).filter(Boolean).reverse().slice(0,4);
+    if (hits.length) rows.push(['Bills', hits.map(r=>`<a href="${href(r)}"><b>${esc(r.x.bill)}</b> <span class="muted">${esc(gaName(r.x.ga))} · ${esc(r.x.short)}</span></a>`)]); }
+  else if (words.length && raw.length >= 3){
+    const leg = SPON.filter(p=>named(p.name)).sort((a,b)=>b.bills.length-a.bills.length).slice(0,6);
+    if (leg.length) rows.push(['Legislators', leg.map(p=>`<a href="#sponsor-${p.slug}">${esc(p.title)}${p.party?` <span class="muted">${esc(p.party[0])}</span>`:''}</a>`)]);
+    const cms = CMDATA[LATEST];
+    if (!cms) ensureCm(LATEST).then(()=>{ if (ROUTE.view==='search') srJump(); }).catch(()=>{});
+    const cm = (cms||[]).filter(c=>named(c.name)).sort((a,b)=>b.bills.length-a.bills.length).slice(0,4);
+    if (cm.length) rows.push(['Committees', cm.map(c=>`<a href="#committee-${c.key}">${esc(c.name)} <span class="muted">${esc(c.ch)}</span></a>`)]);
+    const og = orgs().filter(o=>named(o.name) || named(ORGPROF[o.name]?.official_name)).slice(0,4);
+    if (og.length) rows.push(['Think tanks', og.map(o=>`<a href="#org-${o.slug}">${esc(o.name)}</a>`)]);
+  }
+  if (!bn && words.length){
+    const code = /^\d{1,4}$/.test(raw) ? +raw : null;
+    const tm = MAJORS().filter(m=>code!=null ? m===code : raw.length>=3 && named(CB.majors[m])).map(m=>({m, s:null, label:CB.majors[m]}));
+    const ts = Object.keys(CB.subs).map(Number).filter(c=>MAJORS().includes(Math.floor(c/100)) && (code!=null ? c===code : raw.length>=3 && named(CB.subs[c]))).map(c=>({m:Math.floor(c/100), s:c, label:CB.subs[c]}));
+    const tp = [...tm, ...ts].slice(0,6);
+    if (tp.length) rows.push(['Topics', tp.map(t=>`<a href="#topics" data-tm="${t.m}" data-ts="${t.s??''}">${esc(t.label)} <span class="muted num">${t.s??t.m}</span></a>`)]);
+  }
+  el.hidden = !rows.length;
+  el.innerHTML = rows.length ? `<div class="jh">Go straight to</div>` + rows.map(([l, xs])=>`<div class="jr"><span class="jl">${l}</span>${xs.join('')}</div>`).join('') : '';
+  $$('[data-tm]', el).forEach(a=>a.addEventListener('click', ()=>Object.assign(TP, {major:+a.dataset.tm, sub:a.dataset.ts ? +a.dataset.ts : null, ds:'all', page:0})));
+}
 function renderSearch(){
   $('#view').innerHTML = `
   <div class="phead"><div><div class="eyebrow">Keyword search · all datasets</div><h1>Search</h1>
-    <p>Find every bill, speech sentence and report that mentions a word or phrase. Put phrases in quotes. All words must appear.</p></div></div>
+    <p>Find every bill, speech sentence and report that mentions a word or phrase. All words must appear.</p></div></div>
   <div class="bigsearch"><input type="search" id="q" placeholder='e.g. "minimum wage", pension, transit' value="${esc(SR.q)}" aria-label="Keyword search"></div>
-  <div class="sugg">Try: ${['"property tax"','pension','medicaid','transit','"minimum wage"','cannabis','broadband','"climate"'].map(s=>`<button data-s='${s}'>${esc(s.replace(/"/g,''))}</button>`).join('')}</div>
+  <div class="jump" id="sr-jump" hidden></div>
+  <p class="sr-help">Words match whole words and their common endings: <code>tax</code> finds taxes and taxed, not taxi. Use <code>"quotes"</code> for a phrase, <code>OR</code> for either word (<code>cannabis OR marijuana</code>), a minus to leave a word out (<code>transit -chicago</code>) and <code>*</code> for any ending (<code>child*</code>).</p>
+  <div class="sugg">Try: ${['"property tax"','pension','medicaid','cannabis OR marijuana','"minimum wage"','transit -chicago','broadband','climate'].map(s=>`<button data-s='${s}'>${esc(s.replace(/"/g,''))}</button>`).join('')}</div>
   <div class="fbar" style="margin-top:16px">
     ${DSK.map(k=>`<label class="check ${DS[k].cls}"><input type="checkbox" data-ds="${k}" ${SR.ds.has(k)?'checked':''}><i class="dot"></i>${DS[k].name} <span class="muted num" id="sc-${k}"></span></label>`).join('')}
     ${SESSIONS.length>1?`<select id="sr-ga" aria-label="Bill sessions"><option value="latest">Bills: ${gaName(LATEST)} only</option><option value="all" ${SR.gas==='all'?'selected':''}>Bills: all ${SESSIONS.length} sessions (larger download)</option></select>`:''}
@@ -1425,8 +1524,9 @@ function renderSearch(){
   srUpdate();
 }
 function srUpdate(){
-  const body = $('#sr-body'), terms = parseQuery(SR.q);
-  if (!terms.length){ DSK.forEach(k=>$('#sc-'+k).textContent=''); body.innerHTML = `<div class="panel" style="align-items:flex-start"><h3>Start with a keyword</h3><p class="ink2" style="margin:0">Results show up here with a chart of how often the term appears in each source over time, the topics it is coded under, and a CSV download of every match.</p></div>`; return; }
+  srSync(); srJump();
+  const body = $('#sr-body'), terms = compileQuery(SR.q);
+  if (!terms.n){ DSK.forEach(k=>$('#sc-'+k).textContent=''); body.innerHTML = `<div class="panel" style="align-items:flex-start"><h3>Start with a keyword</h3><p class="ink2" style="margin:0">Results show up here with a chart of how often the term appears in each source over time, the topics it is coded under, and a CSV download of every match.</p></div>`; return; }
   const rows = srFilter(); const c = count(rows, r=>r.ds);
   DSK.forEach(k=>$('#sc-'+k).textContent = `(${fmt(c.get(k)||0)})`);
   body.innerHTML = `
@@ -1437,7 +1537,7 @@ function srUpdate(){
   </div>
   <div class="fbar"><div class="count" style="margin-left:0"><span><b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> matches</span>
     <select id="sr-sort" aria-label="Sort"><option value="new">Newest first</option><option value="old">Oldest first</option></select>
-    <button class="btn primary" id="sr-dl" ${rows.length?'':'disabled'}>Download ${fmt(rows.length)} matches (CSV)</button></div></div>
+    <button class="btn primary" id="sr-dl" ${rows.length?'':'disabled'}>Download ${fmt(rows.length)} matches (CSV)</button><button class="btn" id="sr-link">Copy link to this search</button></div></div>
   <div class="results" id="sr-res"></div><div class="pager" id="sr-pg"></div>`;
   const xs = range(Math.max(2005,SR.y0), Math.min(2026,SR.y1));
   if (xs.length > 1) lines($('#sr-ln'), xs, DSK.filter(k=>SR.ds.has(k)).map(k=>{ const all=byDs(k).filter(r=>(SR.major==null||r.major===SR.major) && (k!=='bills' || SR.gas==='all' || r.x.ga===LATEST)); const tot=count(all,r=>r.year), hit=count(rows.filter(r=>r.ds===k),r=>r.year);
@@ -1448,6 +1548,7 @@ function srUpdate(){
     tip: DSK.map(d=>tipRow(DS[d].cls, DS[d].short, fmt(rows.filter(r=>r.ds===d&&r.major===k).length))).join(''), onclick:()=>{ SR.major = SR.major===k?null:k; $('#sr-m').value=SR.major??''; SR.page=0; srUpdate(); }}));
   if (items.length) hbars($('#sr-tp'), items, {labelW:190, rowH:24}); else $('#sr-tp').innerHTML = '<p class="muted">No coded matches.</p>';
   $('#sr-sort').value = SR.sort; $('#sr-sort').addEventListener('change', e=>{ SR.sort=e.target.value; SR.page=0; srUpdate(); });
+  $('#sr-link').addEventListener('click', ()=>{ const u = location.href; (navigator.clipboard?.writeText(u) || Promise.reject()).then(()=>toast('Link copied'), ()=>prompt('Copy this link', u)); });
   $('#sr-dl').addEventListener('click', ()=>save(`ipap-search-${slug(SR.q)||'results'}.csv`, csvFor(rows)));
   const dk = r => r.date || String(r.year||0);
   rows.sort((a,b)=> SR.sort==='new' ? dk(b).localeCompare(dk(a)) || a.id-b.id : dk(a).localeCompare(dk(b)) || a.id-b.id);
@@ -2090,8 +2191,8 @@ SECTIONS.org.push(
           <select id="og-m" aria-label="Topic">${majorOptions(OG.major)}</select></div>
         <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="og-n"></span><button class="btn primary" id="og-dl">Download these reports</button></div></div>
         <div class="results" id="og-res"></div><div class="pager" id="og-pg"></div>`;
-      const draw = ()=>{ const t = parseQuery(OG.q);
-        const rows = newest(o.reports.filter(r=>(OG.major==null || r.major===OG.major) && t.every(w=>r.hay.includes(w))));
+      const draw = ()=>{ const t = compileQuery(OG.q);
+        const rows = newest(o.reports.filter(r=>(OG.major==null || r.major===OG.major) && (!t.n || t.test(r.hay))));
         $('#og-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> reports`; $('#og-dl').disabled = !rows.length;
         $('#og-dl').onclick = ()=>save(`ipap-${o.slug}-reports.csv`, csvFor(rows));
         const PS=10, pages=Math.ceil(rows.length/PS); OG.page=Math.min(OG.page, Math.max(0,pages-1));
@@ -2711,6 +2812,7 @@ function parseRoute(t){
   if ((m = /^committee-(\d+)-([a-z0-9-]+)$/.exec(t))) return {view:'committee', ga:+m[1], key:`${m[1]}-${m[2]}`};
   if ((m = /^codebook-(m?)(\d+)$/.exec(t))) return m[1] ? {view:'codebook', major:+m[2]} : {view:'codebook', code:+m[2]};
   if ((m = /^speech-(\d{4})(?:-s(\d+))?$/.exec(t))) return {view:'speech', year:+m[1], sid:m[2]?+m[2]:null};
+  if ((m = /^search\?(.*)$/.exec(t))) return {view:'search', params:m[1]};
   return null;
 }
 const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees'})[rt.view] || rt.view;
@@ -2731,7 +2833,7 @@ function nav(token, {record=true, keep=false}={}){
   if (!parseRoute(token)) token = 'bills';
   if (record && CUR && CUR !== token){ STACK.push({token:CUR, y:scrollY}); if (STACK.length > 60) STACK.shift(); try { history.pushState(null,'','#'+token); } catch {} }
   else { try { history.replaceState(null,'','#'+token); } catch {} }
-  CUR = token; ROUTE = parseRoute(token); drawNav(); hideTip(); try { localStorage.setItem('ilpa2-view', token); } catch {}
+  CUR = token; ROUTE = parseRoute(token); if (ROUTE.params != null) srApply(ROUTE.params); drawNav(); hideTip(); try { localStorage.setItem('ilpa2-view', token); } catch {}
   if (!R.length) return;
   const want = needsFor(ROUTE), me = ++navSeq;
   const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || (ROUTE.view==='committee' ? renderCommitteePage : renderRecord))(); if (!keep) scrollTo({top:0}); countView(CUR); };
@@ -2746,7 +2848,7 @@ let navSeq = 0;
 let GC_LAST = null, GC_WAIT = null;
 function countView(token){
   const code = MAN?.goatcounter; if (!code || token === GC_LAST || /^(localhost|127\.|\[::1\])/.test(location.hostname)) return;
-  GC_LAST = token; const hit = {path: '/' + token, title: document.title};
+  GC_LAST = token; const hit = {path: '/' + token.replace(/\?.*/, ''), title: document.title};
   if (window.goatcounter?.count) return window.goatcounter.count(hit);
   if (GC_WAIT) { GC_WAIT = hit; return; }
   GC_WAIT = hit; const sc = document.createElement('script'); sc.async = true; sc.src = 'https://gc.zgo.at/count.js';
