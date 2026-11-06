@@ -1600,6 +1600,7 @@ function renderContact(){
   const from = ROUTE.params ? new URLSearchParams(ROUTE.params).get('from') : (STACK.length ? STACK[STACK.length-1].token : null);
   CT.from = from && parseRoute(from) && !/^contact/.test(from) ? from : null; CT.t0 = Date.now();
   const pageUrl = CT.from ? `${location.origin}${location.pathname}#${CT.from}` : '';
+  const need = new Set(viaForm ? C.required || [] : []), opt = (k, more='') => need.has(k) ? '<span class="req">(required)</span>' : `<span class="muted">(optional${more})</span>`;
   const kinds = C.kinds?.length ? C.kinds : ['A data or coding error', 'A question about the data', 'A suggestion for the site', 'Something else'];
   $('#view').innerHTML = `
   <div class="phead"><div><div class="eyebrow">Contact</div><h1>Contact us</h1>
@@ -1613,8 +1614,8 @@ function renderContact(){
       <form id="ct-form" class="ct-form" novalidate>
         <label><span class="lt">What is this about?</span><select name="kind">${kinds.map(k=>`<option>${esc(k)}</option>`).join('')}</select></label>
         <label><span class="lt">Message <span class="req">(required)</span></span><textarea name="message" rows="7" required aria-required="true" placeholder="If you found an error, tell us the bill, speech or report and what looks wrong."></textarea></label>
-        <div class="ct-two"><label><span class="lt">Your name <span class="muted">(optional)</span></span><input type="text" name="name" autocomplete="name"></label>
-          <label><span class="lt">Your email <span class="muted">(optional, if you would like a reply)</span></span><input type="email" name="email" autocomplete="email"></label></div>
+        <div class="ct-two"><label><span class="lt">Your name ${opt('name')}</span><input type="text" name="name" autocomplete="name" ${need.has('name')?'required aria-required="true"':''}></label>
+          <label><span class="lt">Your email ${opt('email', ', if you would like a reply')}</span><input type="email" name="email" autocomplete="email" ${need.has('email')?'required aria-required="true"':''}></label></div>
         <label><span class="lt">Page <span class="muted">(optional)</span></span><input type="url" name="page" value="${esc(pageUrl)}" placeholder="Link to the page this is about"></label>
         <label class="ct-hp" aria-hidden="true"><span>Leave this empty</span><input type="text" name="website" tabindex="-1" autocomplete="off"></label>
         <div class="ct-actions"><button class="btn primary" type="submit">${viaForm ? 'Send feedback' : 'Send by email'}</button>
@@ -1628,12 +1629,16 @@ function renderContact(){
   const f = $('#ct-form');
   f.addEventListener('submit', async e=>{ e.preventDefault(); const v = Object.fromEntries(new FormData(f)), err = $('#ct-err'); err.hidden = true;
     if (!v.message.trim()){ err.textContent = 'Please write a message.'; err.hidden = false; f.message.focus(); return; }
+    for (const [k, what] of [['name','your name'], ['email','your email address']]) if (need.has(k) && !v[k].trim()){ err.textContent = `Please add ${what}.`; err.hidden = false; f[k].focus(); return; }
     if (v.email && !f.email.checkValidity()){ err.textContent = 'That email address does not look right.'; err.hidden = false; f.email.focus(); return; }
     if (v.website || Date.now() - CT.t0 < 2500) return;   // filled the hidden field, or too fast for a person: a bot
     if (!viaForm){
       const body = `${v.message}\n\n${v.kind ? 'About: ' + v.kind + '\n' : ''}${v.page ? 'Page: ' + v.page + '\n' : ''}${v.name ? 'From: ' + v.name + '\n' : ''}`;
       location.href = `mailto:${email}?subject=${encodeURIComponent('IPAP website: ' + (v.kind || 'feedback'))}&body=${encodeURIComponent(body)}`; return; }
-    const out = new URLSearchParams(); for (const k of ['message','name','email','kind','page']) if (C.fields[k] && v[k]) out.append(C.fields[k], v[k]);
+    // what the form has no question for goes at the end of the message
+    const extra = [['kind','About'], ['page','Page']].filter(([k])=>!C.fields[k] && v[k]).map(([k,l])=>`${l}: ${v[k]}`);
+    const vals = {...v, message: v.message.trim() + (extra.length ? '\n\n' + extra.join('\n') : '')};
+    const out = new URLSearchParams(); for (const k of ['message','name','email','kind','page']) if (C.fields[k] && vals[k]) out.append(C.fields[k], vals[k]);
     const b = $('button[type=submit]', f); b.disabled = true; b.textContent = 'Sending…';
     try { await fetch(C.action, {method:'POST', mode:'no-cors', body:out}); f.hidden = true; $('#ct-done').hidden = false; $('#ct-done').focus(); f.reset(); }
     catch { err.innerHTML = `The message could not be sent. Please email <a href="mailto:${esc(email)}">${esc(email)}</a> instead.`; err.hidden = false; }

@@ -63,5 +63,5 @@ intro = "Questions about the data, a coding error you spotted, or an idea for th
 # The form needs these questions, matched by their titles: "Message" (paragraph, required), and optionally
 # "Name", "Email", "What is this about?" (dropdown with the choices below) and "Page" (the page they were on).
 # Leave it blank and the form opens the visitor's email app with the message filled in instead.
-form = ""
+form = "https://docs.google.com/forms/d/e/1FAIpQLSc-LnVUeX71L1IPmsiJXbqDxV9bftQAxl5CWS2G8Vpcp117FQ/viewform"
 kinds = ["A data or coding error", "A question about the data", "A suggestion for the site", "Something else"]

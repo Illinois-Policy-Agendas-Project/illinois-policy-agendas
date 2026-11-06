@@ -1115,22 +1115,29 @@ def contact_form(c, rep, ds):
     except Exception as e:  # noqa: BLE001
         rep.warn(ds, f'Could not read the contact form ({e}); the Contact page uses email until it can. Check that the form accepts responses and does not require sign-in.')
         return c
-    want = [('message', ('message', 'feedback', 'comment')), ('email', ('email', 'e-mail')), ('name', ('name',)),
-            ('kind', ('about', 'type', 'kind', 'topic')), ('page', ('page', 'link', 'url'))]
-    fields = {}
+    # a paragraph question is the message box whatever its title; the others are matched by title.
+    # Google rejects a response missing a required answer, so the site makes those fields required too.
+    want = [('email', ('email', 'e-mail')), ('name', ('name',)), ('kind', ('about', 'type', 'kind', 'topic')), ('page', ('page', 'link', 'url')),
+            ('message', ('message', 'feedback', 'comment'))]
+    fields, required = {}, []
     for it in items:
         if not (isinstance(it, list) and len(it) > 4 and it[4]):
             continue
-        title = (it[1] or '').lower()
-        for key, words in want:
-            if key not in fields and any(w in title for w in words):
-                fields[key] = f'entry.{it[4][0][0]}'
-                break
+        title, kind, entry = (it[1] or '').lower(), it[3], it[4][0]
+        key = 'message' if kind == 1 and 'message' not in fields else next((k for k, words in want if k not in fields and any(w in title for w in words)), None)
+        if not key:
+            if len(entry) > 2 and entry[2]:
+                rep.warn(ds, f'The contact form has a required question the site cannot fill ("{it[1]}"); messages would be rejected, so the Contact page uses email. Make it optional or remove it.')
+                return c
+            continue
+        fields[key] = f'entry.{entry[0]}'
+        if len(entry) > 2 and entry[2]:
+            required.append(key)
     if 'message' not in fields:
-        rep.warn(ds, 'The contact form has no question titled "Message"; the Contact page uses email until it does.')
+        rep.warn(ds, 'The contact form has no paragraph question for the message; the Contact page uses email until it does.')
         return c
-    c['action'], c['fields'] = m.group(1) + '/formResponse', fields
-    rep.note(ds, f'Contact form connected: {", ".join(sorted(fields))}.')
+    c['action'], c['fields'], c['required'] = m.group(1) + '/formResponse', fields, required
+    rep.note(ds, f'Contact form connected: {", ".join(sorted(fields))} ({", ".join(required) or "none"} required).')
     return c
 
 
