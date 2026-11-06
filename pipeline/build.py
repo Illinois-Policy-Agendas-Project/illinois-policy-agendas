@@ -1095,6 +1095,45 @@ def build_profiles(cfg, tt, rep):
 
 
 # ------------------------------------------------------------------ home page
+def contact_form(c, rep, ds):
+    """Find the Google Form's field ids so the Contact page can send messages to it. The questions are matched by title:
+    message, name, email, what it is about, and the page. Without a working form the page falls back to email."""
+    url = (c.get('form') or '').strip()
+    if not url:
+        rep.note(ds, 'The Contact page form opens the visitor\'s email app; add a Google Form link under [contact] form in home.toml to collect messages in a sheet.')
+        return c
+    m = re.match(r'(https://docs\.google\.com/forms/(?:u/\d+/)?d/e/[\w-]+)/', url + '/')
+    if not m:
+        rep.warn(ds, f'The contact form link is not a Google Forms link ({url}). Use the link from Send → the link icon; it starts with https://docs.google.com/forms/d/e/.')
+        return c
+    import urllib.request
+    try:
+        req = urllib.request.Request(m.group(1) + '/viewform', headers={'User-Agent': 'Mozilla/5.0 (IPAP site build)'})
+        page = urllib.request.urlopen(req, timeout=30).read().decode('utf-8', 'replace')
+        data = json.loads(re.search(r'FB_PUBLIC_LOAD_DATA_ = (.*?);</script>', page, re.S).group(1))
+        items = data[1][1]
+    except Exception as e:  # noqa: BLE001
+        rep.warn(ds, f'Could not read the contact form ({e}); the Contact page uses email until it can. Check that the form accepts responses and does not require sign-in.')
+        return c
+    want = [('message', ('message', 'feedback', 'comment')), ('email', ('email', 'e-mail')), ('name', ('name',)),
+            ('kind', ('about', 'type', 'kind', 'topic')), ('page', ('page', 'link', 'url'))]
+    fields = {}
+    for it in items:
+        if not (isinstance(it, list) and len(it) > 4 and it[4]):
+            continue
+        title = (it[1] or '').lower()
+        for key, words in want:
+            if key not in fields and any(w in title for w in words):
+                fields[key] = f'entry.{it[4][0][0]}'
+                break
+    if 'message' not in fields:
+        rep.warn(ds, 'The contact form has no question titled "Message"; the Contact page uses email until it does.')
+        return c
+    c['action'], c['fields'] = m.group(1) + '/formResponse', fields
+    rep.note(ds, f'Contact form connected: {", ".join(sorted(fields))}.')
+    return c
+
+
 def build_home(cfg, rep):
     """Home page text, sponsors and people from content/home/home.toml (see the comments in that file)."""
     ds, path = 'Home page', cfg.get('site', {}).get('home')
@@ -1152,6 +1191,8 @@ def build_home(cfg, rep):
     else:
         rep.note(ds, 'No codebook yet; the home page shows "Codebook (coming soon)". Add it under `codebook` in home.toml.')
     h.pop('visualization', None)
+    if h.get('contact'):
+        h['contact'] = contact_form(h['contact'], rep, ds)
     blank = [p.get('name', '?') for p in h.get('people', []) if not (p.get('bio') or '').strip()]
     if blank:
         rep.note(ds, f'{pl(len(blank), "person has", "people have")} no bio yet in {path.name}.', blank)

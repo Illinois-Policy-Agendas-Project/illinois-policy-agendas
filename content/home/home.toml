@@ -53,3 +53,15 @@ role = "Research assistant"
 bio = "Saraf Wasima is a PhD student in the Department of Political Science at UIC."
 url = ""
 photo = ""
+
+# The Contact page (#contact), linked from the footer and the Project team section.
+[contact]
+email = "ejfagan@uic.edu"
+intro = "Questions about the data, a coding error you spotted, or an idea for the site? We would like to hear from you."
+# The feedback form sends each message to a Google Form, so responses land in its Google Sheet.
+# Paste the form's link here (in Google Forms: Send → the link icon), e.g. "https://docs.google.com/forms/d/e/1FAIpQL.../viewform".
+# The form needs these questions, matched by their titles: "Message" (paragraph, required), and optionally
+# "Name", "Email", "What is this about?" (dropdown with the choices below) and "Page" (the page they were on).
+# Leave it blank and the form opens the visitor's email app with the message filled in instead.
+form = ""
+kinds = ["A data or coding error", "A question about the data", "A suggestion for the site", "Something else"]
