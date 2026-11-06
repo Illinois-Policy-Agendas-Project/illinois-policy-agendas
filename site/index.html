@@ -962,7 +962,7 @@ function renderHome(){
     <div><h2>Project team</h2><div class="people">${(H.people||[]).map(p=>`<div class="person">
       ${p.photo ? `<img class="avatar" src="data/${esc(p.photo)}" alt="">` : `<span class="avatar mono" aria-hidden="true">${esc(initials(p.name||''))}</span>`}
       <div style="min-width:0"><div class="pname">${p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}</div>
-      <div class="ptitle">${esc(p.title||p.role||'')}</div>${p.bio?`<p class="pbio">${esc(p.bio)}</p>`:''}</div></div>`).join('')}</div></div>
+      <div class="ptitle">${esc(p.title||p.role||'')}</div>${p.bio?`<p class="pbio">${esc(p.bio).replace(/\*([^*]+)\*/g,'<em>$1</em>')}</p>`:''}</div></div>`).join('')}</div></div>
   </section>
   ${(H.sponsors||[]).length ? `<section class="home-sponsors">${H.sponsors.map(sp=>`<div class="sponsor"><span class="eyebrow">${esc(sp.role||'')}</span>
       <a href="${esc(sp.url||'#')}" target="_blank" rel="noopener" class="sp-mark">${sp.logo ? `<img src="data/${esc(sp.logo)}" alt="${esc(sp.name)}">` : `<span class="sp-name">${esc(sp.name)}</span>`}</a></div>`).join('')}</section>` : ''}`;
