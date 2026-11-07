@@ -326,7 +326,7 @@ a.fstep:hover{border-color:var(--s-bills)} .fstep.on{border-color:var(--s-bills)
 .home-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:22px}
 .hcard{display:flex;flex-direction:column;gap:3px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:var(--ink);background:var(--surface)}
 .hcard:hover{border-color:var(--line-2);background:var(--sunk)}
-.hcard.ds-bills,.hcard.ds-sots,.hcard.ds-tt{border-top:3px solid var(--c)}
+.hcard.ds-bills,.hcard.ds-sots,.hcard.ds-tt,.hcard.nd-leg,.hcard.nd-topics,.hcard.nd-search{border-top:3px solid var(--c)}
 .hc-t{font-weight:600;display:flex;align-items:center;gap:7px} .hc-n{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums} .hc-d{font-size:13.5px;color:var(--ink-2)}
 .home-members{border:1px solid var(--line);border-top:3px solid var(--navy);border-radius:var(--r);background:var(--surface);padding:18px 20px 20px;margin-bottom:22px}
 .hm-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px 20px;flex-wrap:wrap;margin-bottom:16px}
@@ -978,9 +978,9 @@ function renderHome(){
     ['bills', 'ds-bills', 'Bills', `${fmt(byDs('bills').length)} substantive bills`, `What was introduced, what got out of committee, and the ${fmt(byDs('bills').filter(r=>r.x.stage>=5).length)} bills that became law.`],
     ['speeches', 'ds-sots', 'Speeches', `${fmt(new Set(yrs).size)} addresses`, `Every State of the State address from ${Math.min(...yrs)} to ${Math.max(...yrs)}, readable sentence by sentence.`],
     ['thinktanks', 'ds-tt', 'Think tanks', `${fmt(byDs('tt').length)} reports`, `Reports from ${fmt(orgs().length)} Illinois think tanks and policy institutes.`],
-    ['topics', '', 'Topics', '20 major topics', 'Follow one policy area across bills, speeches and reports, down to the subtopic.'],
-    ['sponsors', '', 'Legislators', `${fmt(SPON.length)} legislators`, 'What each legislator introduced, signed onto and saw become law.'],
-    ['search', '', 'Search', 'All texts', 'Find any word or phrase in every bill synopsis, speech sentence and report.']];
+    ['topics', 'nd-topics', 'Topics', '20 major topics', 'Follow one policy area across bills, speeches and reports, down to the subtopic.'],
+    ['sponsors', 'nd-leg', 'Legislators', `${fmt(SPON.length)} legislators`, 'What each legislator introduced, signed onto and saw become law.'],
+    ['search', 'nd-search', 'Search', 'All texts', 'Find any word or phrase in every bill synopsis, speech sentence and report.']];
   $('#view').innerHTML = `
   <section class="home-hero">${H.notice ? `<p class="home-notice" role="note">${H.notice_label ? `<b>${esc(H.notice_label)}</b>` : ''}<span>${esc(H.notice)}</span></p>` : ''}
     <div class="eyebrow">${esc(H.tagline || 'Illinois policy attention, coded by topic')}</div>
