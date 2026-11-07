@@ -13,7 +13,7 @@ notice = "This site is in beta. We are still checking the data and adding featur
 
 overview = """The Illinois Policy Agendas Project (IPAP) tracks the attention Illinois government and its policy community give to every area of public policy. It brings together {bills} substantive bills introduced in the {sessions}, {sentences} sentences from {addresses} State of the State addresses delivered since 2005, and {reports} reports from {thinktanks} Illinois think tanks and policy institutes. Every record is coded by policy topic, so the same subject can be followed from a think tank report to a governor's speech to a bill. You can browse each collection, follow a topic across all three, look up a bill's history or a legislator's record, search every text, and download any view as a spreadsheet."""
 
-methods = """Records are coded by hand using the project's Illinois subtopic index, adapted from the Comparative Agendas Project (CAP) codebook, which sorts policy into 20 major topics and their subtopics. Each record receives one subtopic for its main policy content; speeches are coded one quasi-sentence at a time, bills from their ILGA synopsis, and reports from their title and abstract. Items with no policy content, such as memorials and ceremonial remarks, are coded −555, and bills still awaiting coding are marked "Not yet coded." Bill text, sponsors and legislative histories come from the Illinois General Assembly website; a bill's furthest stage (committee, chamber passage, law) is read from its action history. Data were last updated {updated}."""
+methods = """Records are coded by hand using the project's Illinois subtopic index, adapted from the Comparative Agendas Project (CAP) codebook, which sorts policy into 20 major topics and their subtopics. Each record receives one subtopic for its main policy content; speeches are coded one quasi-sentence at a time, bills from their ILGA synopsis, and reports from their title and abstract. Data were last updated {updated}."""
 
 # Codebook link on the home page. Put the file in this folder (content/home/) and give its name,
 # e.g. "codebook.pdf" (PDF, Word, Excel or CSV), or give a full web address.
@@ -32,7 +32,7 @@ codebook_label = "Codebook"
 # People. `photo` is optional (a file in content/home/photos/); without one, initials are shown. In a bio, *asterisks* make italics.
 [[people]]
 name = "EJ Fagan"
-title = "Associate Professor of Political Science, University of Illinois Chicago"
+title = "Director and Associate Professor of Political Science, University of Illinois Chicago"
 role = "Principal investigator"
 bio = "EJ Fagan is an associate professor of political science at the University of Illinois Chicago. He is the director of the Illinois Policy Agendas Project and a co-director of the U.S. Policy Agendas Project. His research examines the role of academics, think tanks and other experts in the policymaking process, policy agenda setting and punctuated equilibrium theory. He is the author of *The Thinkers: The Rise of Partisan Think Tanks and the Polarization of American Politics*."
 url = ""
@@ -70,13 +70,12 @@ kinds = ["A data or coding error", "A question about the data", "A suggestion fo
 # The page also uses `overview`, `methods` and `people` above. {year} in a citation is the current year, {accessed} today's date.
 [about]
 sources = """Bill text, sponsors, committee referrals and action histories come from the Illinois General Assembly (ilga.gov), as do legislators' photos. State of the State addresses are the governors' delivered texts, coded one quasi-sentence at a time. Think tank reports are collected from each organization's website; the site links to the original report and, where the link has broken, to an archived copy."""
-support = "The Illinois Policy Agendas Project is sponsored by the Institute of Government and Public Affairs, University of Illinois System, and based in the Department of Political Science at the University of Illinois Chicago."
+support = "The Illinois Policy Agendas Project is supported by the Institute of Government and Public Affairs, University of Illinois System, and based in the Department of Political Science at the University of Illinois Chicago. We are looking for long term funding sources to continue to maintain the existing datasets and add more."
 license_name = "CC BY 4.0"
 license_url = "https://creativecommons.org/licenses/by/4.0/"
 license = """The project's data, including its topic codes, the compiled datasets you can download from this site and the codebook, are released under a Creative Commons Attribution 4.0 International license (CC BY 4.0). You may copy, share and adapt them for any purpose, including commercial use, as long as you credit the Illinois Policy Agendas Project, link to the license and say if you made changes."""
 license_note = """The license covers the project's own work. Bill text and histories are public records of the Illinois General Assembly. Report titles, abstracts and logos belong to the organizations that published them, and are shown here to identify and describe their work."""
 citation = "Fagan, E.J., Annika Ness, and Saraf Wasima. {year}. Illinois Policy Agendas Project [data set]. University of Illinois Chicago. https://www.illinoisagendas.org. Accessed {accessed}."
-codebook_citation = "Fagan, E.J., and Annika Ness. 2025. Illinois Policy Agendas Project: Codebook. University of Illinois Chicago."
 bibtex = """@misc{ipap{year},
   author = {Fagan, E.J. and Ness, Annika and Wasima, Saraf},
   title = {Illinois Policy Agendas Project},
