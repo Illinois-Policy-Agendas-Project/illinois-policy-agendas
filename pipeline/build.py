@@ -1258,6 +1258,9 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
     if out.exists():
         shutil.rmtree(out)
     shutil.copytree(ROOT / cfg['build']['site_template'], out)
+    sm = out / 'sitemap.xml'   # tell search engines when the data last changed
+    if sm.exists():
+        sm.write_text(sm.read_text(encoding='utf-8').replace('<changefreq>', f'<lastmod>{dt.date.today().isoformat()}</lastmod><changefreq>', 1), encoding='utf-8')
     d = out / 'data'
     files = {}
     files['codebook'] = dump(d / 'codebook.json', {'majors': codebook['majors'], 'subs': codebook['subs']})

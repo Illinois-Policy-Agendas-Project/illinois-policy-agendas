@@ -65,3 +65,23 @@ intro = "Questions about the data, a coding error you spotted, or an idea for th
 # Leave it blank and the form opens the visitor's email app with the message filled in instead.
 form = "https://docs.google.com/forms/d/e/1FAIpQLSc-LnVUeX71L1IPmsiJXbqDxV9bftQAxl5CWS2G8Vpcp117FQ/viewform"
 kinds = ["A data or coding error", "A question about the data", "A suggestion for the site", "Something else"]
+
+# The About page (#about): what the project is, its sources, the team, the license and how to cite it.
+# The page also uses `overview`, `methods` and `people` above. {year} in a citation is the current year, {accessed} today's date.
+[about]
+sources = """Bill text, sponsors, committee referrals and action histories come from the Illinois General Assembly (ilga.gov), as do legislators' photos. State of the State addresses are the governors' delivered texts, coded one quasi-sentence at a time. Think tank reports are collected from each organization's website; the site links to the original report and, where the link has broken, to an archived copy."""
+support = "The Illinois Policy Agendas Project is sponsored by the Institute of Government and Public Affairs, University of Illinois System, and based in the Department of Political Science at the University of Illinois Chicago."
+license_name = "CC BY 4.0"
+license_url = "https://creativecommons.org/licenses/by/4.0/"
+license = """The project's data, including its topic codes, the compiled datasets you can download from this site and the codebook, are released under a Creative Commons Attribution 4.0 International license (CC BY 4.0). You may copy, share and adapt them for any purpose, including commercial use, as long as you credit the Illinois Policy Agendas Project, link to the license and say if you made changes."""
+license_note = """The license covers the project's own work. Bill text and histories are public records of the Illinois General Assembly. Report titles, abstracts and logos belong to the organizations that published them, and are shown here to identify and describe their work."""
+citation = "Fagan, E.J., and Annika Ness. {year}. Illinois Policy Agendas Project [data set]. University of Illinois Chicago. https://www.illinoisagendas.org. Accessed {accessed}."
+codebook_citation = "Fagan, E.J., and Annika Ness. 2025. Illinois Agendas Project: Codebook. University of Illinois Chicago."
+bibtex = """@misc{ipap{year},
+  author = {Fagan, E.J. and Ness, Annika},
+  title = {Illinois Policy Agendas Project},
+  year = {{year}},
+  publisher = {University of Illinois Chicago},
+  howpublished = {\\url{https://www.illinoisagendas.org}},
+  note = {Data set. Accessed {accessed}}
+}"""
