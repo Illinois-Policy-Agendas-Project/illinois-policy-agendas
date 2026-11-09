@@ -240,6 +240,7 @@ table.dt tr.det td{background:var(--sel);padding-top:0;color:var(--ink-2)}
 .ab-det summary{cursor:pointer;font-size:14px}
 .ab-bib{margin:8px 0 0;padding:12px;background:var(--sunk);border-radius:var(--r);font-size:12.5px;overflow-x:auto;white-space:pre}
 .jump[hidden]{display:none}
+#view:focus{outline:none}
 .chart .hb:focus{outline:none} .chart .hb:focus-visible > rect:first-child{fill:var(--sel)!important;stroke:var(--navy,#13294b);stroke-width:2}
 .skip{position:absolute;left:8px;top:-60px;z-index:100;background:#fff;color:#13294b;padding:8px 14px;font-weight:700;border:2px solid #13294b}
 .skip:focus{top:8px}
@@ -615,7 +616,7 @@ footer.foot .fcopy{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.18);p
   </div>
 </header>
 <div class="shell">
-  <main class="wrap" id="view"><div class="loading">Loading 19,656 coded records…</div></main>
+  <main class="wrap" id="view" tabindex="-1"><div class="loading">Loading 19,656 coded records…</div></main>
   <footer class="foot"><div class="wrap">
     <div><b class="fname">Illinois Policy Agendas Project</b>
       <div>Supported by the <a href="https://igpa.uillinois.edu" target="_blank" rel="noopener">Institute of Government and Public Affairs</a>, University of Illinois System. Based in the Department of Political Science, University of Illinois Chicago.</div></div>
@@ -1381,7 +1382,7 @@ function renderThinkTanks(){
   let deb; $('#t-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ TT.q=e.target.value; upd(); },160); });
   $('#t-o').addEventListener('change', e=>{ TT.org=e.target.value; upd(); });
   $('#t-m').addEventListener('change', e=>{ TT.major=e.target.value===''?null:+e.target.value; upd(); });
-  const yr=()=>{ const a=+$('#t-y0').value||1991, b=+$('#t-y1').value||2026; TT.y0=Math.min(a,b); TT.y1=Math.max(a,b); upd(); };
+  const yr=()=>{ const a=yrClamp($('#t-y0').value, 1991), b=yrClamp($('#t-y1').value, 2026); TT.y0=Math.min(a,b); TT.y1=Math.max(a,b); $('#t-y0').value=TT.y0; $('#t-y1').value=TT.y1; upd(); };
   $('#t-y0').addEventListener('change', yr); $('#t-y1').addEventListener('change', yr);
   $('#t-all').addEventListener('click', ()=>save('ipap-think-tank-reports.csv', csvFor(all)));
   $('#t-dl').addEventListener('click', ()=>{ const rows=ttFilter(); save(`ipap-think-tank-reports-${rows.length}-filtered.csv`, csvFor(rows)); });
@@ -1496,6 +1497,7 @@ function topicList(inM){
 }
 
 /* =================== SEARCH =================== */
+const yrClamp = (v, dflt) => Math.min(2026, Math.max(1991, Math.round(+v) || dflt));   // a year typed in a filter box, kept inside the data
 const SR = { q:'', ds:new Set(DSK), major:null, y0:1991, y1:2026, page:0, sort:'new', gas:'latest', applied:undefined };
 /* the search lives in the address, so a search can be linked to and Back returns to it:
    #search?q=minimum+wage&in=bills,tt&topic=5&from=2010&to=2020&ga=all&sort=old (only what differs from the defaults) */
@@ -1509,7 +1511,7 @@ function srToken(){ const p = new URLSearchParams();
 function srApply(qs){ if (qs === SR.applied) return; SR.applied = qs; const p = new URLSearchParams(qs || '');
   const ins = (p.get('in')||'').split(',').filter(k=>DSK.includes(k)), m = p.get('topic');
   Object.assign(SR, { q:p.get('q')||'', ds:new Set(ins.length ? ins : DSK), major: m!=null && m!=='' && !isNaN(+m) ? +m : null,
-    y0:+p.get('from')||1991, y1:+p.get('to')||2026, gas:p.get('ga')==='all' ? 'all' : 'latest', sort:p.get('sort')==='old' ? 'old' : 'new', page:0 }); }
+    y0:yrClamp(p.get('from'), 1991), y1:yrClamp(p.get('to'), 2026), gas:p.get('ga')==='all' ? 'all' : 'latest', sort:p.get('sort')==='old' ? 'old' : 'new', page:0 }); }
 function srSync(){ if (ROUTE.view !== 'search') return; const t = srToken(); if (t === CUR) return;
   CUR = t; ROUTE = parseRoute(t); SR.applied = ROUTE.params; try { history.replaceState(null, '', '#' + t); localStorage.setItem('ilpa2-view', t); } catch {} }
 function srFilter(){ const t=compileQuery(SR.q); if (!t.n) return [];
@@ -1566,11 +1568,12 @@ function renderSearch(){
   $$('[data-ds]').forEach(c=>c.addEventListener('change', e=>{ e.target.checked?SR.ds.add(e.target.dataset.ds):SR.ds.delete(e.target.dataset.ds); SR.page=0; srUpdate(); }));
   $('#sr-ga')?.addEventListener('change', async e=>{ SR.gas=e.target.value; SR.page=0; await withLoading(need(needsFor({view:'search'}))); srUpdate(); });
   $('#sr-m').addEventListener('change', e=>{ SR.major=e.target.value===''?null:+e.target.value; SR.page=0; srUpdate(); });
-  const yr=()=>{ const a=+$('#sr-y0').value||1991, b=+$('#sr-y1').value||2026; SR.y0=Math.min(a,b); SR.y1=Math.max(a,b); SR.page=0; srUpdate(); };
+  const yr=()=>{ const a=yrClamp($('#sr-y0').value, 1991), b=yrClamp($('#sr-y1').value, 2026); SR.y0=Math.min(a,b); SR.y1=Math.max(a,b); $('#sr-y0').value=SR.y0; $('#sr-y1').value=SR.y1; SR.page=0; srUpdate(); };
   $('#sr-y0').addEventListener('change', yr); $('#sr-y1').addEventListener('change', yr);
   srUpdate();
 }
 function srUpdate(){
+  if (!$('#sr-body')) return;   // a delayed update after leaving the page
   srSync(); srJump();
   const body = $('#sr-body'), terms = compileQuery(SR.q);
   if (!terms.n){ DSK.forEach(k=>$('#sc-'+k).textContent=''); body.innerHTML = `<div class="panel" style="align-items:flex-start"><h2 class="hs">Start with a keyword</h2><p class="ink2" style="margin:0">Results show up here with a chart of how often the term appears in each source over time, the topics it is coded under, and a CSV download of every match.</p></div>`; return; }
@@ -1627,7 +1630,7 @@ function renderAbout(){
     ${sec('license', `License${A.license_name?` <span class="ab-badge">${esc(A.license_name)}</span>`:''}`, `<p class="prose">${esc(A.license || '')}</p>${A.license_note?`<p class="prose muted">${esc(A.license_note)}</p>`:''}${lic?`<p class="prose">Read the license: ${lic}</p>`:''}`)}
     ${sec('cite', 'How to cite', `<p class="prose">If you use the data, please cite the project:</p>
       <blockquote class="ab-cite" id="ab-c1">${esc(cite)}</blockquote><div class="ab-btns">${copyBtn('ab-c1','Copy citation')}${bib?copyBtn('ab-bib','Copy BibTeX'):''}</div>
-      ${bib?`<details class="ab-det"><summary>BibTeX</summary><pre class="ab-bib" id="ab-bib">${esc(bib)}</pre></details>`:''}
+      ${bib?`<details class="ab-det"><summary>BibTeX</summary><pre class="ab-bib" id="ab-bib" tabindex="0" aria-label="BibTeX entry">${esc(bib)}</pre></details>`:''}
       ${A.codebook_citation?`<p class="prose">For the coding scheme, cite the codebook:</p><blockquote class="ab-cite" id="ab-c2">${esc(fill(A.codebook_citation))}</blockquote><div class="ab-btns">${copyBtn('ab-c2','Copy citation')}</div>`:''}
       <p class="prose muted">The topic scheme is adapted from the Comparative Agendas Project (comparativeagendas.net); please cite it as well when you compare with other Policy Agendas datasets.</p>`)}
   </div>`;
@@ -1731,7 +1734,7 @@ const recFile = (kind, rec) => kind==='committee' ? `ipap-${rec.ga}-${rec.slug}-
 
 function renderRecord(){
   const found = recordFor(ROUTE);
-  if (!found){ $('#view').innerHTML = `<div class="panel" style="max-width:640px"><h2>Record not found</h2><p class="ink2" style="margin:0">Nothing in the data matches <span class="mono">#${esc(CUR)}</span>. The link may have a typo.</p><div><a class="btn" href="#${tabOf(ROUTE)}">Back to ${esc(TABLABEL[tabOf(ROUTE)] || TABS.find(t=>t&&t[0]===tabOf(ROUTE))?.[1] || 'the site')}</a></div></div>`; return; }
+  if (!found){ $('#view').innerHTML = `<div class="panel" style="max-width:640px"><h1 style="font-size:24px">Page not found</h1><p class="ink2" style="margin:0">Nothing in the data matches <span class="mono">#${esc(CUR)}</span>. The link may have a typo.</p><div><a class="btn" href="#${tabOf(ROUTE)}">Back to ${esc(TABLABEL[tabOf(ROUTE)] || TABS.find(t=>t&&t[0]===tabOf(ROUTE))?.[1] || 'the site')}</a></div></div>`; return; }
   const {kind, rec} = found, h = HEADS[kind](rec, found);
   const secs = SECTIONS[kind].filter(s=>!s.show || s.show(rec, found));
   $('#view').innerHTML = `
@@ -2963,7 +2966,8 @@ function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
     <button class="menu-btn" aria-expanded="false" aria-controls="menu-panel"><span class="burger" aria-hidden="true"></span>${here?`${here[2]?`<i class="dot ${here[2]}"></i>`:''}${here[1]}`:'Menu'}<span class="muted" style="margin-left:auto;font-weight:400">Menu</span></button>
     <div class="menu-panel" id="menu-panel" hidden>${groups.map((ts,i)=>`${labels[i]?`<div class="menu-lbl">${labels[i]}</div>`:''}${ts.map(btn).join('')}`).join('')}</div>`; }
 function drawNav(){ const n = $('nav.tabs'); n.innerHTML = navHTML(); $$('[data-v]', n).forEach(b=>b.addEventListener('click', ()=>nav(b.dataset.v)));
-  const mb = $('.menu-btn', n), mp = $('#menu-panel'); mb.addEventListener('click', ()=>{ const open = mp.hidden; mp.hidden = !open; mb.setAttribute('aria-expanded', open); }); }
+  const mb = $('.menu-btn', n), mp = $('#menu-panel'); mb.addEventListener('click', ()=>{ const open = mp.hidden; mp.hidden = !open; mb.setAttribute('aria-expanded', open); });
+  n.onkeydown = e=>{ if (e.key === 'Escape' && !mp.hidden){ mp.hidden = true; mb.setAttribute('aria-expanded', false); mb.focus(); } }; }
 /* nav(token): go to a tab or record page, remembering where we came from */
 function nav(token, {record=true, keep=false}={}){
   if (!parseRoute(token)) token = 'bills';
@@ -2972,13 +2976,17 @@ function nav(token, {record=true, keep=false}={}){
   CUR = token; ROUTE = parseRoute(token); if (ROUTE.view === 'search' && ROUTE.params != null) srApply(ROUTE.params); drawNav(); hideTip(); try { localStorage.setItem('ilpa2-view', token); } catch {}
   if (!R.length) return;
   const want = needsFor(ROUTE), me = ++navSeq;
-  const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || (ROUTE.view==='committee' ? renderCommitteePage : renderRecord))(); if (!keep) scrollTo({top:0}); countView(CUR); };
+  const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || (ROUTE.view==='committee' ? renderCommitteePage : renderRecord))(); if (!keep) scrollTo({top:0});
+    // the browser tab, history and screen readers name the page by its heading; focus follows the navigation (the menu and the old page were redrawn)
+    const h = ROUTE.view === 'home' ? '' : ($('#view h1')?.textContent || '').replace(/\s+/g,' ').trim(); document.title = (h ? h + ' · ' : '') + SITE_TITLE;
+    const ae = document.activeElement; if (!keep && me > 1 && (!ae || ae === document.body || !document.contains(ae))) $('#view').focus({preventScroll:true});   // not on first load
+    countView(CUR); };
   const pending = [...want.details.filter(g=>!LOADED.details.has(g)), ...want.links.filter(g=>!LOADED.links.has(g)),
                    ...(want.text||[]).filter(r=>r?.ds==='bills' && !LOADED.details.has(r.x.ga) && !LOADED.slices.has(`${r.x.ga}/${billSlice(r)}`))];
   if (!pending.length) return draw();
   withLoading(need(want)).then(draw);
 }
-let navSeq = 0;
+let navSeq = 0; const SITE_TITLE = document.title;
 /* page views with GoatCounter (no cookies, no personal data) when config.toml [analytics] goatcounter is set. Each
    view is counted as its own path (/bill-104-HB35, /speeches), since GoatCounter ignores the part after # by itself. */
 let GC_LAST = null, GC_WAIT = null;
