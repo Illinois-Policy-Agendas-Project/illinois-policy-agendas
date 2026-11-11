@@ -1,0 +1,32 @@
+# Portraits of the governors whose State of the State addresses are in the data, shown on the Speeches page and on
+# each address. Photos are in photos/, cropped to 3:4 (360 x 480). The name must match the governor's name in the
+# speeches data. The credit is shown under the photos; keep it when replacing a photo with one under another license.
+
+[[governor]]
+name = "Rod Blagojevich"
+photo = "blagojevich.jpg"
+credit = "Daniel X. O'Neil, 2008"
+license = "CC BY 2.0"
+license_url = "https://creativecommons.org/licenses/by/2.0/"
+source = "https://commons.wikimedia.org/wiki/File:Rod_Blagojevich_(2911120436)_3x4.jpg"
+
+[[governor]]
+name = "Pat Quinn"
+photo = "quinn.jpg"
+credit = "Jon Micheal Connor, U.S. Army, 2013"
+license = "Public domain"
+source = "https://commons.wikimedia.org/wiki/File:ASC_hosts_governor,_AMC_leadership,_DoD_logistician_(3)_(cropped3).jpg"
+
+[[governor]]
+name = "Bruce Rauner"
+photo = "rauner.jpg"
+credit = "Staff Sgt. Robert Adams, Illinois National Guard, 2017"
+license = "Public domain"
+source = "https://commons.wikimedia.org/wiki/File:Bruce_Rauner_(Crop1).jpg"
+
+[[governor]]
+name = "J.B. Pritzker"
+photo = "pritzker.jpg"
+credit = "Official portrait, 2019, via the Illinois National Guard"
+license = "Public domain"
+source = "https://commons.wikimedia.org/wiki/File:Governor_JB_Pritzker_official_portrait_2019_(crop).jpg"

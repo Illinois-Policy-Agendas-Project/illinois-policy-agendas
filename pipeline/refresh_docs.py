@@ -4,7 +4,7 @@
     python pipeline/refresh_docs.py
 
 For changes to the site's design (site/index.html) or its content (content/home/home.toml,
-content/thinktanks/profiles.toml, content/legislators/members.csv, logos and photos) when the data hasn't changed. It copies the page into docs/,
+content/thinktanks/profiles.toml, content/legislators/members.csv, content/governors/governors.toml, logos and photos) when the data hasn't changed. It copies the page into docs/,
 rebuilds docs/data/home.json and orgs.json and their images from content/, and refreshes their version stamps in
 docs/data/manifest.json. Bills, speeches and reports in docs/ are left exactly as last published from the lab.
 """
@@ -28,10 +28,12 @@ def main():
     profiles, copies = B.build_profiles(cfg, tt, rep)
     home, home_media = B.build_home(cfg, rep)
     legislators, leg_photos = B.build_legislators(cfg, rep)
-    for sub in ('logos', 'site', 'legislators'):
+    sots = json.loads((d / 'sots.json').read_text(encoding='utf-8'))['rows']
+    govphotos, gov_photos = B.build_governor_photos(sots, rep)
+    for sub in ('logos', 'site', 'legislators', 'governors'):
         if (d / sub).exists():
             shutil.rmtree(d / sub)
-    for src, dest in list(copies) + list(home_media) + list(leg_photos):
+    for src, dest in list(copies) + list(home_media) + list(leg_photos) + list(gov_photos):
         (d / dest).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, d / dest)
     man = json.loads((d / 'manifest.json').read_text(encoding='utf-8'))
@@ -48,6 +50,10 @@ def main():
         man['v']['legislators'] = B.dump(d / 'legislators.json', legislators)
     else:
         man['v'].pop('legislators', None)
+    if govphotos:
+        man['v']['govphotos'] = B.dump(d / 'govphotos.json', govphotos)
+    else:
+        man['v'].pop('govphotos', None)
     B.dump(d / 'manifest.json', man)
     for f in (ROOT / 'site').iterdir():   # index.html, the favicon and the link-preview image
         if f.is_file():

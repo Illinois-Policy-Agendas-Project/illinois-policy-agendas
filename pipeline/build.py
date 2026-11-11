@@ -1141,6 +1141,34 @@ def contact_form(c, rep, ds):
     return c
 
 
+def build_governor_photos(sots, rep):
+    """Portraits of the governors who gave the addresses, from content/governors/governors.toml and photos/."""
+    ds = 'Governors'
+    path = ROOT / 'content' / 'governors' / 'governors.toml'
+    if not path.exists():
+        return {}, []
+    key = lambda n: re.sub(r'[^a-z]', '', (n or '').lower())
+    names = {key(g): g for _, g, _, _, _ in sots}
+    out, copies, problems = {}, [], []
+    for g in tomllib.loads(path.read_text(encoding='utf-8')).get('governor', []):
+        name, photo = (g.get('name') or '').strip(), (g.get('photo') or '').strip()
+        f = path.parent / 'photos' / photo
+        if key(name) not in names:
+            problems.append(f'{name}: no State of the State address under this name')
+            continue
+        if not photo or not f.exists() or f.suffix.lower() not in LOGO_TYPES:
+            problems.append(f'{name}: photo {photo or "(none)"} is missing or not .jpg, .png or .webp')
+            continue
+        copies.append((f, f'governors/{photo}'))
+        out[names[key(name)]] = {'photo': f'governors/{photo}', **{k: str(g[k]).strip() for k in ('credit', 'license', 'license_url', 'source') if g.get(k)}}
+    if problems:
+        rep.warn(ds, f'{pl(len(problems), "governor portrait was", "governor portraits were")} skipped. Edit {show(path)}.', problems)
+    missing = sorted(set(names.values()) - set(out))
+    if missing:
+        rep.note(ds, f'No portrait for {", ".join(missing)}; the Speeches page shows initials.')
+    return out, copies
+
+
 def build_home(cfg, rep):
     """Home page text, sponsors and people from content/home/home.toml (see the comments in that file)."""
     ds, path = 'Home page', cfg.get('site', {}).get('home')
@@ -1253,7 +1281,7 @@ def bill_slice(b):
 CM_LINE = re.compile(r'^(Arrived? in |(?:Re-)?[Aa]ssigned to |Do Pass|Recommends Be Adopted|Recommends Do (?:Adopt|Consent))')
 
 
-def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=None, logo_copies=(), governors=(), home=None, legislators=None):
+def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=None, logo_copies=(), governors=(), home=None, legislators=None, govphotos=None):
     out = ROOT / cfg['build']['output'] / 'site'
     if out.exists():
         shutil.rmtree(out)
@@ -1306,6 +1334,8 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
     if legislators:
         files['legislators'] = dump(d / 'legislators.json', legislators)
     files['governors'] = dump(d / 'governors.json', list(governors))
+    if govphotos:
+        files['govphotos'] = dump(d / 'govphotos.json', govphotos)
     if home:
         doc = home.pop('codebook_doc', None)
         if doc:
@@ -1420,6 +1450,7 @@ def main(argv=None):
     print('Reading think tank reports…', flush=True)
     tt = build_tt(cfg, valid, rep)
     governors = load_governors(cfg, sots, rep)
+    govphotos, gov_photos = build_governor_photos(sots, rep)
     home, home_media = build_home(cfg, rep)
     legislators, leg_photos = build_legislators(cfg, rep)
     profiles, logo_copies = build_profiles(cfg, tt, rep)
@@ -1427,7 +1458,7 @@ def main(argv=None):
         write_worksheet(a.worksheet, sessions, rep)
     state, snapshot = compare_with_last(cfg, sessions, sots, tt, rep)
     print('Writing the site…', flush=True)
-    out, manifest = write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles, list(logo_copies) + home_media + leg_photos, governors, home, legislators)
+    out, manifest = write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles, list(logo_copies) + home_media + leg_photos + gov_photos, governors, home, legislators, govphotos)
     report = ROOT / cfg['build']['output'] / 'report.html'
     write_coding_queue(cfg, codebook, sessions, ROOT / cfg['build']['output'] / 'coding_queue.json')
     # what still needs coders' attention, for the control panel: uncoded bills, new reports without a code, and each
