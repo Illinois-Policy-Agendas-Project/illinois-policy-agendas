@@ -455,6 +455,11 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 @media (max-width:1100px){ .orglist{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media (max-width:560px){ .orglist{grid-template-columns:minmax(0,1fr)} }
 /* address cards on the Speeches tab */
+.govs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px 24px;margin:12px 0 4px}
+.gov-c{display:flex;gap:14px;align-items:flex-start} .gov-c .gov-n{font-family:var(--f-display);font-weight:500;font-size:18px;display:block;margin-bottom:2px}
+.gov-photo{width:78px;height:104px} .gov-photo .gov-ini{display:grid;place-items:center;height:100%;font:600 22px var(--f-display);color:var(--muted)}
+.gov-yrs{display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:6px;font-size:13px} .gov-yrs a{font-variant-numeric:tabular-nums}
+.gov-credit{font-size:11.5px;color:var(--muted);margin:14px 0 0;line-height:1.5} .gov-credit a{color:inherit}
 .addrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
 .addr{display:flex;flex-direction:column;gap:5px;padding:12px;border:1px solid var(--line);border-radius:var(--r);text-decoration:none;color:var(--ink)}
 .addr:hover{border-color:var(--s-sots);background:var(--sunk)}
@@ -702,9 +707,12 @@ const BILLTABS = [['bills','All bills'], ['bills-activity','Recent activity'], .
 const TABLABEL = {sponsors:'Legislators', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
-let GOV = {}, USED_MAJORS = new Set();   // year -> {governor, party}; major topics that have records
+let GOV = {}, GOVPH = {}, USED_MAJORS = new Set();   // GOVPH: governor -> {photo, credit, license, license_url, source}   // year -> {governor, party}; major topics that have records
 const partyAbbr = p => p ? p[0].toUpperCase() : '';
 const govLabel = (name, year) => { const g = GOV[year]; const n = name || g?.governor || ''; return g && g.governor===n && g.party ? `${n} (${partyAbbr(g.party)})` : n; };
+const govPhotoCredit = g => { const p = GOVPH[g]; return p ? `Photo: ${p.credit || ''}${p.license ? ` (${p.license})` : ''}` : ''; };
+const govPhoto = (g, tag = 'span', attrs = '') => { const p = GOVPH[g];
+  return `<${tag} class="leg-photo gov-photo" ${attrs}>${p ? `<img src="data/${esc(p.photo)}" alt="${esc(g)}" title="${esc(govPhotoCredit(g))}" loading="lazy">` : `<span class="gov-ini" aria-hidden="true">${esc(initials(g))}</span>`}</${tag}>`; };
 /* consecutive years under one governor, for shading trend charts */
 function govBands(x0, x1){ const out = []; for (let y=x0; y<=x1; y++){ const g = GOV[y]; if (!g) continue; const l = out[out.length-1];
   if (l && l.governor===g.governor && l.to===y-1) l.to = y; else out.push({governor:g.governor, party:g.party, from:y, to:y}); } return out; }
@@ -835,8 +843,8 @@ async function load(){
   MAN = await fetch('data/manifest.json?t='+Date.now()).then(r=>{ if (!r.ok) throw new Error('manifest'); return r.json(); });
   /* SESSIONS: sessions with bills. ALL_SESSIONS also has placeholders for sessions that haven't started (shown only in the Bills session menu). */
   ALL_SESSIONS = MAN.sessions.slice().sort((a,b)=>a.ga-b.ga); SESSIONS = ALL_SESSIONS.filter(s=>!s.upcoming); LATEST = SESSIONS[SESSIONS.length-1]?.ga;
-  const [cb,b,s,t,pp,op,gv,hm,lg] = await Promise.all(['codebook','bills/summary','sots','thinktanks','people', MAN.v?.orgs ? 'orgs' : null, MAN.v?.governors ? 'governors' : null, MAN.v?.home ? 'home' : null, MAN.v?.legislators ? 'legislators' : null].map(f=>f ? get(f).catch(()=>null) : null));
-  HOME = hm; ORGPROF = op || {}; GOV = Object.fromEntries((gv||[]).map(g=>[g.year, g]));
+  const [cb,b,s,t,pp,op,gv,hm,lg,gp] = await Promise.all(['codebook','bills/summary','sots','thinktanks','people', MAN.v?.orgs ? 'orgs' : null, MAN.v?.governors ? 'governors' : null, MAN.v?.home ? 'home' : null, MAN.v?.legislators ? 'legislators' : null, MAN.v?.govphotos ? 'govphotos' : null].map(f=>f ? get(f).catch(()=>null) : null));
+  HOME = hm; ORGPROF = op || {}; GOV = Object.fromEntries((gv||[]).map(g=>[g.year, g])); GOVPH = gp || {};
   CB = cb; RAW = {bills:b, sots:s, tt:t};
   const obj = d => d.rows.map(r => Object.fromEntries(d.cols.map((c,i)=>[c,r[i]])));
   const start = Object.fromEntries(SESSIONS.map(s=>[s.ga, parseInt(s.years) || null]));
@@ -1397,6 +1405,13 @@ function renderSpeeches(){
     <div class="kpi"><span class="l">Coded sentences</span><span class="v">${fmt(all.length)}</span><span class="s">${fmt(pol.length)} with policy content</span></div>
     <div class="kpi"><span class="l">Most-mentioned topic</span><span class="v" style="font-size:19px;padding-block:4px">${esc(CB.majors[topM[0]])}</span><span class="s">${pct(topM[1]/pol.length)} of policy sentences</span></div>
   </div>
+  <div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs">The governors</h2></div>
+    <div class="govs">${spans.map((sp,i)=>{ const y0 = years[spans.slice(0,i).reduce((a,x)=>a+x.n,0)], ys = years.filter(y=>govOf(y)===sp.g), party = GOV[y0]?.party;
+      return `<div class="gov-c">${govPhoto(sp.g, 'a', `href="#speech-${ys[ys.length-1]}" tabindex="-1" aria-hidden="true"`)}<div><b class="gov-n">${esc(sp.g)}</b>
+        <div class="muted" style="font-size:12.5px">${party ? esc(party) + ' · ' : ''}${pl(ys.length, 'address', 'addresses')}</div>
+        <div class="gov-yrs" aria-label="${esc(sp.g)}'s addresses">${ys.map(y=>`<a href="#speech-${y}">${y}</a>`).join('')}</div></div></div>`; }).join('')}</div>
+    ${Object.keys(GOVPH).length ? `<p class="gov-credit">Photos: ${spans.filter(sp=>GOVPH[sp.g]).map(sp=>{ const p = GOVPH[sp.g], lic = p.license_url ? `<a href="${esc(p.license_url)}" target="_blank" rel="noopener">${esc(p.license)}</a>` : esc(p.license || '');
+      return `${esc(sp.g.split(' ').slice(-1)[0])}, ${p.source ? `<a href="${esc(p.source)}" target="_blank" rel="noopener">${esc(p.credit || 'source')}</a>` : esc(p.credit || '')}${lic ? ` (${lic})` : ''}`; }).join('; ')}.</p>` : ''}</div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs">The addresses</h2></div>
     <div class="fbar" style="margin:8px 0 12px;justify-content:flex-start"><label class="ink2" for="s-major" style="font-size:13px">Mark sentences on</label><select id="s-major"><option value="all" ${SP.major==='all'?'selected':''}>All topics</option>${majorOptions(spMajor(),'No topic').replace(/^<option value="">No topic<\/option>/,'')}</select></div>
     <div class="addrs">${years.map(y=>{ const ss=all.filter(r=>r.year===y).sort((a,b)=>a.id-b.id); const M=spMajor(), n=M==null?ss.filter(isPol).length:ss.filter(r=>r.major===M).length;
@@ -1915,7 +1930,7 @@ const HEADS = {
       eyebrow:[p.ch==='Rep'?'State Representative':'State Senator', p.party && esc(p.party), p.district && `District ${esc(p.district)}`, esc(p.gas().map(gaName).join(', '))].filter(Boolean).join(' · '), title:esc(p.title), sub:'',
       chips:'', actions: p.ilga ? `<a class="btn" href="${esc(p.ilga)}" target="_blank" rel="noopener">Member page on ilga.gov ↗</a>` : '' }),
   speech: (s) => { const yrs = range(2005,2025);
-    return { crumb:['speeches','Speeches'], eyebrow:`State of the State address${GOV[s.year]?.party ? ' · ' + esc(GOV[s.year].party) + ' governor' : ''}`, title:`${s.year} · ${esc(s.gov)}`, sub:'',
+    return { crumb:['speeches','Speeches'], logo: govPhoto(s.gov), eyebrow:`State of the State address${GOV[s.year]?.party ? ' · ' + esc(GOV[s.year].party) + ' governor' : ''}`, title:`${s.year} · ${esc(s.gov)}`, sub:'',
       chips:'', actions:`${s.year>yrs[0]?`<a class="btn" href="#speech-${s.year-1}">← ${s.year-1}</a>`:''}${s.year<yrs[yrs.length-1]?`<a class="btn" href="#speech-${s.year+1}">${s.year+1} →</a>`:''}` }; }
 };
 const recRows = (kind, rec) => kind==='committee' ? newest(rec.bills.map(b=>b.r)) : kind==='org' ? newest(rec.reports) : kind==='speech' ? rec.sent : kind==='sponsor' ? newest(rec.bills.map(b=>b.r)) : [rec];
