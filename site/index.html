@@ -1392,7 +1392,6 @@ function drawSpeechStack({years, pol, tot, cell, share}){
 }
 function renderSpeeches(){
   const {all, years, pol, tot, cell, share, govOf} = speechData();
-  const mx = Math.max(...MAJORS().flatMap(m=>years.map(y=>share(m,y))));
   const spans = []; years.forEach(y=>{ const g=govOf(y); const l=spans[spans.length-1]; if (l && l.g===g) l.n++; else spans.push({g, n:1}); });
   const topM = [...count(pol,r=>r.major)].sort((a,b)=>b[1]-a[1])[0];
   $('#view').innerHTML = `
@@ -1420,14 +1419,7 @@ function renderSpeeches(){
         <span class="muted num" style="font-size:12px">${fmt(ss.length)} sentences · ${M==null?`${fmt(n)} on policy`:`${fmt(n)} on ${esc(CB.majors[M].split(/,| and /)[0])}`}</span></a>`; }).join('')}</div></div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs">Share of attention by topic</h2><span class="muted" style="font-size:12px">Each column is one address: its policy sentences split by major topic. Click a topic below to bring it to the baseline.</span></div>
     <div class="fbar" style="margin:8px 0 10px;justify-content:flex-start"><label class="ink2" for="s-stk" style="font-size:13px">Show</label><select id="s-stk"><option value="top" ${SP.allTopics?'':'selected'}>8 largest topics and other</option><option value="all" ${SP.allTopics?'selected':''}>All topics</option></select></div>
-    <div id="s-stack"></div><div class="stk-leg" id="s-stkleg" role="group" aria-label="Topics"></div></div>
-  <div class="panel"><div class="chead"><h2 class="hs">Topic share of each address</h2><span class="muted" style="font-size:12px">Share of the year's policy sentences. Click a cell to open that address with the topic marked.</span></div>
-    <div class="hscroll"><table class="heat"><thead><tr class="gov"><th><span class="vh">Governor</span></th>${spans.map((s,i)=>`<th colspan="${s.n}">${esc(govLabel(s.g, years[spans.slice(0,i).reduce((a,x)=>a+x.n,0)]))}</th>`).join('')}</tr><tr><th><span class="vh">Topic</span></th>${years.map(y=>`<th>'${String(y).slice(2)}</th>`).join('')}</tr></thead>
-    <tbody>${MAJORS().map(m=>`<tr><th class="rh">${majChip(m)}</th>${years.map(y=>{ const v=share(m,y); return `<td data-m="${m}" data-y="${y}" style="${heatBg(v,mx)}">${v>=0.005?Math.round(v*100):v>0?'<1':'·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
-    <div class="muted" style="font-size:12px">Values are percentages. Darker cells mean a larger share.</div></div>`;
-  $$('table.heat td').forEach(td=>{ const m=+td.dataset.m, y=+td.dataset.y;
-    bindTip(td, ()=>`<div class="t">${y} · ${esc(govOf(y))}</div><div>${esc(CB.majors[m])}</div><div class="r"><span>Share of policy sentences</span><b class="num">${pct(share(m,y))}</b></div><div class="muted">${fmt(cell.get(m+':'+y)||0)} of ${fmt(tot.get(y)||0)} sentences</div>`);
-    td.addEventListener('click', ()=>{ SP.major=m; nav('speech-'+y); }); });
+    <div id="s-stack"></div><div class="stk-leg" id="s-stkleg" role="group" aria-label="Topics"></div></div>`;
   drawSpeechStack({years, pol, tot, cell, share});
   $('#s-stk').addEventListener('change', e=>{ SP.allTopics = e.target.value==='all'; drawSpeechStack({years, pol, tot, cell, share}); });
   $('#s-major').addEventListener('change', e=>{ SP.major=e.target.value==='all'?'all':+e.target.value; renderSpeeches(); });
