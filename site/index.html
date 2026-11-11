@@ -1368,7 +1368,7 @@ function billsUpdate(){
 function snippet(text, terms){ const t=String(text||''), i=terms.find ? terms.find(t) : t.toLowerCase().indexOf(terms[0]); if (i<0) return t.slice(0,140)+'…'; const a=Math.max(0,i-60); return (a?'…':'')+t.slice(a, i+100)+'…'; }
 
 /* =================== SPEECHES =================== */
-const SP = { major:'all', codes:false, focus:null, allTopics:false };   // topic highlighted on the tab and on speech pages ('all' colors every sentence by its topic on the tab)
+const SP = { major:'all', codes:false, focus:null, allTopics:true };   // topic highlighted on the tab and on speech pages ('all' colors every sentence by its topic on the tab)
 const spMajor = () => typeof SP.major === 'number' ? SP.major : null;
 function speechData(){
   const all = byDs('sots'); const years = range(2005,2025); const pol = all.filter(isPol);
