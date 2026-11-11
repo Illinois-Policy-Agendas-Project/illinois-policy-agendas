@@ -239,7 +239,17 @@ table.dt tr.det td{background:var(--sel);padding-top:0;color:var(--ink-2)}
 .ab-btns{display:flex;gap:8px;flex-wrap:wrap}
 .ab-det summary{cursor:pointer;font-size:14px}
 .ab-bib{margin:8px 0 0;padding:12px;background:var(--sunk);border-radius:var(--r);font-size:12.5px;overflow-x:auto;white-space:pre}
+/* trends */
+.trgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.trcard{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:10px 12px;display:grid;gap:4px;min-width:0}
+.trcard svg{width:100%;height:auto;display:block}
+.trcard .base{stroke:var(--line-2)} .tr-ax{font-size:10.5px;fill:var(--muted)}
+.tr-t{font-weight:700;font-size:14px;color:var(--ink);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .tr-t:hover{text-decoration:underline}
+.tr-ch{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)} .tr-ch span{display:inline-flex;gap:5px;align-items:center}
+.tr-ch b,.trtab b{font-weight:700} .tr-ch .up,.trtab .up{color:#1a6b3c} .tr-ch .dn,.trtab .dn{color:#a3231c}
+.trtab td.r,.trtab th.r{text-align:right} .trtab tfoot td{font-weight:700;border-top:2px solid var(--line-2)}
 .jump[hidden]{display:none}
+#view:focus{outline:none}
 .chart .hb:focus{outline:none} .chart .hb:focus-visible > rect:first-child{fill:var(--sel)!important;stroke:var(--navy,#13294b);stroke-width:2}
 .skip{position:absolute;left:8px;top:-60px;z-index:100;background:#fff;color:#13294b;padding:8px 14px;font-weight:700;border:2px solid #13294b}
 .skip:focus{top:8px}
@@ -615,10 +625,10 @@ footer.foot .fcopy{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.18);p
   </div>
 </header>
 <div class="shell">
-  <main class="wrap" id="view"><div class="loading">Loading 19,656 coded records…</div></main>
+  <main class="wrap" id="view" tabindex="-1"><div class="loading">Loading 19,656 coded records…</div></main>
   <footer class="foot"><div class="wrap">
     <div><b class="fname">Illinois Policy Agendas Project</b>
-      <div>Sponsored by the <a href="https://igpa.uillinois.edu" target="_blank" rel="noopener">Institute of Government and Public Affairs</a>, University of Illinois System. Based in the Department of Political Science, University of Illinois Chicago.</div></div>
+      <div>Supported by the <a href="https://igpa.uillinois.edu" target="_blank" rel="noopener">Institute of Government and Public Affairs</a>, University of Illinois System. Based in the Department of Political Science, University of Illinois Chicago.</div></div>
     <div><div class="fh">Data</div><ul><li><a href="#bills">Bills</a></li><li><a href="#sponsors">Legislators</a></li><li><a href="#speeches">State of the State speeches</a></li><li><a href="#thinktanks">Think tank reports</a></li></ul></div>
     <div><div class="fh">Explore</div><ul><li><a href="#topics">Topics</a></li><li><a href="#search">Search</a></li><li><a href="#bills-activity">Recent activity</a></li><li><a href="#codebook">Codebook</a></li></ul></div>
     <div><div class="fh">Project</div><ul><li><a href="#about">About</a></li><li><a href="#about-cite">How to cite</a></li><li><a href="#about-license">License (CC BY 4.0)</a></li><li><a href="#contact">Contact</a></li></ul></div>
@@ -1381,7 +1391,7 @@ function renderThinkTanks(){
   let deb; $('#t-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ TT.q=e.target.value; upd(); },160); });
   $('#t-o').addEventListener('change', e=>{ TT.org=e.target.value; upd(); });
   $('#t-m').addEventListener('change', e=>{ TT.major=e.target.value===''?null:+e.target.value; upd(); });
-  const yr=()=>{ const a=+$('#t-y0').value||1991, b=+$('#t-y1').value||2026; TT.y0=Math.min(a,b); TT.y1=Math.max(a,b); upd(); };
+  const yr=()=>{ const a=yrClamp($('#t-y0').value, 1991), b=yrClamp($('#t-y1').value, 2026); TT.y0=Math.min(a,b); TT.y1=Math.max(a,b); $('#t-y0').value=TT.y0; $('#t-y1').value=TT.y1; upd(); };
   $('#t-y0').addEventListener('change', yr); $('#t-y1').addEventListener('change', yr);
   $('#t-all').addEventListener('click', ()=>save('ipap-think-tank-reports.csv', csvFor(all)));
   $('#t-dl').addEventListener('click', ()=>{ const rows=ttFilter(); save(`ipap-think-tank-reports-${rows.length}-filtered.csv`, csvFor(rows)); });
@@ -1427,6 +1437,7 @@ function renderTopics(){
   <div class="phead"><div><div class="eyebrow">Browse by Policy Agendas topic</div><h1>Topics</h1>
     <p>Pick a major topic, then one of its subtopics, to see how much attention each source gives it, how that changes over time, and the records behind the numbers.</p></div>
     <div class="legend">${DSK.map(k=>`<span class="${DS[k].cls}"><i class="dot"></i>${DS[k].short}</span>`).join('')}</div></div>
+  <nav class="vtabs" aria-label="Topic views"><a href="#topics" class="vtab" aria-current="page">Explore a topic</a><a href="#trends" class="vtab" aria-current="false">Trends over time</a></nav>
   <div class="tp-pick"><select id="tp-pm" aria-label="Major topic">${MAJORS().map(t=>`<option value="${t}" ${t===m?'selected':''}>${t} · ${esc(CB.majors[t])}</option>`).join('')}</select>
     <select id="tp-ps" aria-label="Subtopic"><option value="">All subtopics</option>${subsOf(m).map(x=>`<option value="${x}" ${sub===x?'selected':''}>${x} · ${esc(CB.subs[x])}</option>`).join('')}</select></div>
   <div class="tp">
@@ -1496,6 +1507,7 @@ function topicList(inM){
 }
 
 /* =================== SEARCH =================== */
+const yrClamp = (v, dflt) => Math.min(2026, Math.max(1991, Math.round(+v) || dflt));   // a year typed in a filter box, kept inside the data
 const SR = { q:'', ds:new Set(DSK), major:null, y0:1991, y1:2026, page:0, sort:'new', gas:'latest', applied:undefined };
 /* the search lives in the address, so a search can be linked to and Back returns to it:
    #search?q=minimum+wage&in=bills,tt&topic=5&from=2010&to=2020&ga=all&sort=old (only what differs from the defaults) */
@@ -1509,7 +1521,7 @@ function srToken(){ const p = new URLSearchParams();
 function srApply(qs){ if (qs === SR.applied) return; SR.applied = qs; const p = new URLSearchParams(qs || '');
   const ins = (p.get('in')||'').split(',').filter(k=>DSK.includes(k)), m = p.get('topic');
   Object.assign(SR, { q:p.get('q')||'', ds:new Set(ins.length ? ins : DSK), major: m!=null && m!=='' && !isNaN(+m) ? +m : null,
-    y0:+p.get('from')||1991, y1:+p.get('to')||2026, gas:p.get('ga')==='all' ? 'all' : 'latest', sort:p.get('sort')==='old' ? 'old' : 'new', page:0 }); }
+    y0:yrClamp(p.get('from'), 1991), y1:yrClamp(p.get('to'), 2026), gas:p.get('ga')==='all' ? 'all' : 'latest', sort:p.get('sort')==='old' ? 'old' : 'new', page:0 }); }
 function srSync(){ if (ROUTE.view !== 'search') return; const t = srToken(); if (t === CUR) return;
   CUR = t; ROUTE = parseRoute(t); SR.applied = ROUTE.params; try { history.replaceState(null, '', '#' + t); localStorage.setItem('ilpa2-view', t); } catch {} }
 function srFilter(){ const t=compileQuery(SR.q); if (!t.n) return [];
@@ -1566,11 +1578,12 @@ function renderSearch(){
   $$('[data-ds]').forEach(c=>c.addEventListener('change', e=>{ e.target.checked?SR.ds.add(e.target.dataset.ds):SR.ds.delete(e.target.dataset.ds); SR.page=0; srUpdate(); }));
   $('#sr-ga')?.addEventListener('change', async e=>{ SR.gas=e.target.value; SR.page=0; await withLoading(need(needsFor({view:'search'}))); srUpdate(); });
   $('#sr-m').addEventListener('change', e=>{ SR.major=e.target.value===''?null:+e.target.value; SR.page=0; srUpdate(); });
-  const yr=()=>{ const a=+$('#sr-y0').value||1991, b=+$('#sr-y1').value||2026; SR.y0=Math.min(a,b); SR.y1=Math.max(a,b); SR.page=0; srUpdate(); };
+  const yr=()=>{ const a=yrClamp($('#sr-y0').value, 1991), b=yrClamp($('#sr-y1').value, 2026); SR.y0=Math.min(a,b); SR.y1=Math.max(a,b); $('#sr-y0').value=SR.y0; $('#sr-y1').value=SR.y1; SR.page=0; srUpdate(); };
   $('#sr-y0').addEventListener('change', yr); $('#sr-y1').addEventListener('change', yr);
   srUpdate();
 }
 function srUpdate(){
+  if (!$('#sr-body')) return;   // a delayed update after leaving the page
   srSync(); srJump();
   const body = $('#sr-body'), terms = compileQuery(SR.q);
   if (!terms.n){ DSK.forEach(k=>$('#sc-'+k).textContent=''); body.innerHTML = `<div class="panel" style="align-items:flex-start"><h2 class="hs">Start with a keyword</h2><p class="ink2" style="margin:0">Results show up here with a chart of how often the term appears in each source over time, the topics it is coded under, and a CSV download of every match.</p></div>`; return; }
@@ -1604,6 +1617,101 @@ function srUpdate(){
   pager($('#sr-pg'), SR.page, pages, p=>{ SR.page=p; srUpdate(); $('#sr-res').scrollIntoView({block:'start'}); });
 }
 
+/* =================== TRENDS ===================
+   #trends: one small chart per major topic of its share of each source's agenda by year, with the change between the last five
+   years and the five before, and a table of the bills of each General Assembly (a column per session as each one is coded). */
+const TR = { sort:'topic', same:false };   // each chart on its own scale unless asked: one topic at 59% flattens the rest
+function trendData(){
+  const xs = range(2005, 2026), out = {};
+  const base = Object.fromEntries(DSK.map(k=>[k, byDs(k).filter(isPol)]));
+  for (const k of DSK){ const tot = count(base[k], r=>r.year), hit = new Map(); for (const r of base[k]){ const key = r.major + ':' + r.year; hit.set(key, (hit.get(key)||0) + 1); }
+    const ys = xs.filter(y=>(tot.get(y)||0) >= (k==='tt' ? 8 : 20));   // years with enough records to give a share
+    for (const m of MAJORS()){ const pts = ys.map(y=>[y, (hit.get(m+':'+y)||0)/tot.get(y), hit.get(m+':'+y)||0, tot.get(y)]);
+      const late = pts.slice(-5), early = pts.slice(-10, -5), avg = a => a.reduce((x,d)=>x+d[1],0)/a.length;
+      (out[m] ??= {})[k] = { pts, all: base[k].filter(r=>r.major===m).length/Math.max(1, base[k].length), change: late.length===5 && early.length>=3 ? avg(late) - avg(early) : null }; } }
+  return {xs, by:out, base};
+}
+function renderTrends(){
+  const D = trendData(), xs = D.xs, W = 280, H = 104, m = {l:6, r:6, t:8, b:18}, iw = W-m.l-m.r, ih = H-m.t-m.b;
+  const X = y => m.l + (y - xs[0])/(xs[xs.length-1] - xs[0])*iw;
+  const allMax = Math.max(...MAJORS().flatMap(t=>DSK.flatMap(k=>D.by[t][k].pts.map(d=>d[1]))));
+  const order = MAJORS().slice().sort((a,b)=> TR.sort==='share' ? DSK.reduce((x,k)=>x+D.by[b][k].all,0) - DSK.reduce((x,k)=>x+D.by[a][k].all,0)
+    : TR.sort==='sots' || TR.sort==='tt' ? (D.by[b][TR.sort].change ?? -9) - (D.by[a][TR.sort].change ?? -9) : a - b);
+  const chg = v => v == null ? '<span class="muted">n/a</span>' : Math.abs(v) < 0.005 ? '<span class="muted">steady</span>' : `<b class="${v>0?'up':'dn'}">${v>0?'▲':'▼'} ${Math.abs(v*100).toFixed(1)} pts</b>`;
+  const card = t => { const d = D.by[t], top = TR.same ? allMax : Math.max(0.02, ...DSK.flatMap(k=>d[k].pts.map(p=>p[1]))), Y = v => m.t + ih - v/top*ih;
+    const line = k => { const pts = d[k].pts; if (!pts.length) return '';
+      return (pts.length > 1 ? `<path d="${pts.map((p,i)=>`${i?'L':'M'}${X(p[0]).toFixed(1)} ${Y(p[1]).toFixed(1)}`).join('')}" fill="none" style="stroke:var(--s-${k})" stroke-width="${k==='bills'?2.5:1.75}" stroke-linejoin="round"/>` : '')
+        + (k==='bills' ? pts.map(p=>`<circle cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}" r="3" style="fill:var(--s-bills)"/>`).join('') : ''); };
+    const label = `${CB.majors[t]}: ` + DSK.map(k=>`${DS[k].short} ${pct(d[k].all)} of its agenda overall${d[k].change!=null?`, ${d[k].change>=0?'up':'down'} ${Math.abs(d[k].change*100).toFixed(1)} points`:''}`).join('; ');
+    return `<div class="trcard" data-m="${t}"><a class="tr-t" href="#topics" data-tm="${t}"><span class="code">${t}</span> ${esc(CB.majors[t])}</a>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}"><line x1="${m.l}" x2="${W-m.r}" y1="${m.t+ih}" y2="${m.t+ih}" class="base"/>
+        <text x="${m.l}" y="${m.t+4}" class="tr-ax">${pct(top,0)}</text>${[2005,2015,2025].map(y=>`<text x="${X(y)}" y="${H-4}" text-anchor="${y===2005?'start':y===2025?'end':'middle'}" class="tr-ax">${y}</text>`).join('')}
+        ${line('tt')}${line('sots')}${line('bills')}
+        ${xs.map(y=>`<rect class="hit" data-y="${y}" x="${(X(y)-iw/(xs.length-1)/2).toFixed(1)}" y="0" width="${(iw/(xs.length-1)).toFixed(1)}" height="${H}" fill="transparent"/>`).join('')}</svg>
+      <div class="tr-ch">${['sots','tt'].map(k=>`<span class="${DS[k].cls}"><i class="dot"></i>${DS[k].short} ${chg(d[k].change)}</span>`).join('')}</div></div>`; };
+  // bills by General Assembly: share of the session's policy bills, and of its laws
+  const ses = SESSIONS.map(x=>{ const b = D.base.bills.filter(r=>r.x.ga===x.ga), laws = b.filter(r=>r.x.stage>=5); return {ga:x.ga, years:x.years, n:b.length, nl:laws.length, c:count(b, r=>r.major), cl:count(laws, r=>r.major)}; });
+  const lastS = ses[ses.length-1], prevS = ses[ses.length-2], next = ALL_SESSIONS.find(x=>x.upcoming);
+  const rows = MAJORS().slice().sort((a,b)=>(lastS.c.get(b)||0) - (lastS.c.get(a)||0));
+  $('#view').innerHTML = `
+  <div class="phead"><div><div class="eyebrow">Topics</div><h1>Trends over time</h1>
+    <p>How much of each source's agenda goes to each major topic, year by year. Each chart shows the topic's share of that year's policy sentences in State of the State addresses, think tank reports and bills introduced.</p></div>
+    <div class="legend">${DSK.map(k=>`<span class="${DS[k].cls}"><i class="dot"></i>${DS[k].short}</span>`).join('')}</div></div>
+  <nav class="vtabs" aria-label="Topic views"><a href="#topics" class="vtab" aria-current="false">Explore a topic</a><a href="#trends" class="vtab" aria-current="page">Trends over time</a></nav>
+  <div class="fbar"><label class="ink2" for="tr-sort" style="font-size:13.5px">Order</label><select id="tr-sort">
+      <option value="topic">By topic number</option><option value="share">Largest share first</option><option value="sots">Rising most in speeches</option><option value="tt">Rising most in think tank reports</option></select>
+    <label class="check"><input type="checkbox" id="tr-same" ${TR.same?'checked':''}>Same scale on every chart</label></div>
+  <p class="muted" style="font-size:12.5px;margin:-4px 0 12px">The percentage at the top left of each chart is the top of its scale. Arrows compare a topic's average share in the last five years of data with the five years before, in percentage points. Years with fewer than 20 speech sentences or 8 reports are left out. Click a topic to explore it.</p>
+  <div class="trgrid">${order.map(card).join('')}</div>
+  <div class="panel" style="margin-top:16px"><div class="chead"><h2 class="hs">Bills by General Assembly</h2><span class="muted" style="font-size:12px">Share of each session's policy-coded bills, and of the bills that became law</span></div>
+    <div class="tscroll"><table class="dt trtab"><thead><tr><th>Topic</th>${ses.map(x=>`<th class="r">${x.ga}th: introduced</th><th class="r">${x.ga}th: became law</th>`).join('')}${prevS?'<th class="r">Change in introduced</th>':''}</tr></thead>
+      <tbody>${rows.map(t=>`<tr><td><a href="#topics" data-tm="${t}"><span class="code">${t}</span> ${esc(CB.majors[t])}</a></td>${ses.map(x=>`<td class="r num">${pct((x.c.get(t)||0)/Math.max(1,x.n))} <span class="muted">(${fmt(x.c.get(t)||0)})</span></td><td class="r num">${x.nl?pct((x.cl.get(t)||0)/x.nl):'—'} <span class="muted">(${fmt(x.cl.get(t)||0)})</span></td>`).join('')}${prevS?`<td class="r num">${chg((lastS.c.get(t)||0)/Math.max(1,lastS.n) - (prevS.c.get(t)||0)/Math.max(1,prevS.n))}</td>`:''}</tr>`).join('')}</tbody>
+      <tfoot><tr><td>All policy-coded bills</td>${ses.map(x=>`<td class="r num">${fmt(x.n)}</td><td class="r num">${fmt(x.nl)}</td>`).join('')}${prevS?'<td></td>':''}</tr></tfoot></table></div>
+    <p class="muted" style="margin:0;font-size:12.5px">${ses.length>1 ? 'One pair of columns per General Assembly in the data.' : `The data holds one General Assembly so far (${esc(lastS.years)}). ${next ? `A column for the ${gaName(next.ga)} appears here once its bills are coded, with the change between sessions.` : 'Each further session adds a pair of columns, with the change between sessions.'}`}</p></div>`;
+  $('#tr-sort').value = TR.sort;
+  $('#tr-sort').addEventListener('change', e=>{ TR.sort = e.target.value; renderTrends(); });
+  $('#tr-same').addEventListener('change', e=>{ TR.same = e.target.checked; renderTrends(); });
+  $$('#view [data-tm]').forEach(a=>a.addEventListener('click', ()=>Object.assign(TP, {major:+a.dataset.tm, sub:null, ds:'all', page:0})));
+  $$('.trcard').forEach(c=>{ const t = +c.dataset.m, d = D.by[t];
+    $$('.hit', c).forEach(h=>bindTip(h, ()=>{ const y = +h.dataset.y; const rowsT = DSK.map(k=>{ const p = d[k].pts.find(p=>p[0]===y); return p ? tipRow(DS[k].cls, DS[k].short, `${pct(p[1])} <span class="muted">(${fmt(p[2])} of ${fmt(p[3])})</span>`) : ''; }).join('');
+      return `<div class="t">${esc(CB.majors[t])} · ${y}</div>${rowsT || '<div class="muted">No data this year</div>'}`; })); });
+}
+
+/* =================== FILTERS IN THE ADDRESS ===================
+   The filters of the Bills pages, Think tanks, Topics and Trends live in the address like a search does, so a filtered view can be
+   linked to and Back returns to it: #bills?topic=3&sub=325, #thinktanks?org=Illinois+Policy&from=2020, #topics?m=3&s=325.
+   Only what differs from the defaults is written. to() reads the page's state into params; from() sets the state from a link. */
+const qNum = v => v != null && v !== '' && !isNaN(+v) ? +v : null;
+const billsSync = {
+  to(){ const p = new URLSearchParams(); if (BL.ga && BL.ga !== LATEST) p.set('ga', BL.ga); if (BL.q.trim()) p.set('q', BL.q.trim()); if (BL.type) p.set('type', BL.type);
+    if (BL.major != null) p.set('topic', BL.major); if (BL.sub != null) p.set('sub', BL.sub); if (BL.status) p.set('status', BL.status); if (BL.cmte && ROUTE.view === 'bills-committee') p.set('cmte', BL.cmte); return p; },
+  from(p){ const ga = qNum(p.get('ga')); Object.assign(BL, { ga: ALL_SESSIONS.some(x=>x.ga===ga) ? ga : LATEST, q: p.get('q') || '', type: ['HB','SB'].includes(p.get('type')) ? p.get('type') : '',
+    major: qNum(p.get('topic')), sub: qNum(p.get('sub')), status: ['R','A'].includes(p.get('status')) ? p.get('status') : '', cmte: p.get('cmte') || '', page: 0 }); } };
+const SYNC = {
+  bills: billsSync, 'bills-introduced': billsSync, 'bills-committee': billsSync, 'bills-law': billsSync,
+  'bills-activity': {
+    to(){ const p = new URLSearchParams(); if (BL.ga && BL.ga !== LATEST) p.set('ga', BL.ga); if (ACT.q.trim()) p.set('q', ACT.q.trim()); if (ACT.type) p.set('type', ACT.type);
+      if (ACT.major != null) p.set('topic', ACT.major); if (ACT.kind) p.set('kind', ACT.kind); if (ACT.routine) p.set('routine', 1); return p; },
+    from(p){ const ga = qNum(p.get('ga')); BL.ga = ALL_SESSIONS.some(x=>x.ga===ga) ? ga : LATEST;
+      Object.assign(ACT, { q: p.get('q') || '', type: ['HB','SB'].includes(p.get('type')) ? p.get('type') : '', major: qNum(p.get('topic')), kind: /^[a-z]+$/.test(p.get('kind') || '') ? p.get('kind') : '', routine: p.get('routine') === '1', shown: 120 }); } },
+  thinktanks: {
+    to(){ const p = new URLSearchParams(); if (TT.q.trim()) p.set('q', TT.q.trim()); if (TT.org) p.set('org', TT.org); if (TT.major != null) p.set('topic', TT.major);
+      if (TT.y0 !== 1991) p.set('from', TT.y0); if (TT.y1 !== 2026) p.set('to', TT.y1); return p; },
+    from(p){ const og = p.get('org') || ''; Object.assign(TT, { q: p.get('q') || '', org: orgs().some(o=>o.name===og) ? og : '', major: qNum(p.get('topic')), y0: yrClamp(p.get('from'), 1991), y1: yrClamp(p.get('to'), 2026), page: 0 }); } },
+  topics: {
+    to(){ const p = new URLSearchParams(); p.set('m', TP.major); if (TP.sub != null) p.set('s', TP.sub); if (TP.ds !== 'all') p.set('src', TP.ds); return p; },
+    from(p){ const m = qNum(p.get('m')), sub = qNum(p.get('s')); Object.assign(TP, { major: MAJORS().includes(m) ? m : 5, sub: sub != null && CB.subs[sub] ? sub : null, ds: DSK.includes(p.get('src')) ? p.get('src') : 'all', page: 0 }); } },
+  trends: {
+    to(){ const p = new URLSearchParams(); if (TR.sort !== 'topic') p.set('sort', TR.sort); if (TR.same) p.set('scale', 'same'); return p; },
+    from(p){ Object.assign(TR, { sort: ['topic','share','sots','tt'].includes(p.get('sort')) ? p.get('sort') : 'topic', same: p.get('scale') === 'same' }); } } };
+const APPLIED = {};
+/* applied once the data is loaded: links name sessions and topics */
+function applyParams(rt){ const y = SYNC[rt.view]; if (!y || !R.length || rt.params == null || APPLIED[rt.view] === rt.params) return; APPLIED[rt.view] = rt.params; y.from(new URLSearchParams(rt.params)); }
+/* after anything on the page changes, write its filters to the address (replacing, not adding to, the history) */
+function urlSync(){ const y = SYNC[ROUTE.view]; if (!y || !R.length || !CUR) return; const q = y.to().toString(), t = q ? ROUTE.view + '?' + q : ROUTE.view;
+  if (t === CUR) return; const rt = parseRoute(t); if (!rt) return;
+  CUR = t; ROUTE = rt; APPLIED[rt.view] = rt.params; try { history.replaceState(null, '', '#' + t); localStorage.setItem('ilpa2-view', t); } catch {} }
+
 /* =================== ABOUT ===================
    #about, with #about-data, #about-team, #about-license and #about-cite opening at that section. Text from [about] in home.toml,
    plus the home page's overview, methods and people. */
@@ -1627,7 +1735,7 @@ function renderAbout(){
     ${sec('license', `License${A.license_name?` <span class="ab-badge">${esc(A.license_name)}</span>`:''}`, `<p class="prose">${esc(A.license || '')}</p>${A.license_note?`<p class="prose muted">${esc(A.license_note)}</p>`:''}${lic?`<p class="prose">Read the license: ${lic}</p>`:''}`)}
     ${sec('cite', 'How to cite', `<p class="prose">If you use the data, please cite the project:</p>
       <blockquote class="ab-cite" id="ab-c1">${esc(cite)}</blockquote><div class="ab-btns">${copyBtn('ab-c1','Copy citation')}${bib?copyBtn('ab-bib','Copy BibTeX'):''}</div>
-      ${bib?`<details class="ab-det"><summary>BibTeX</summary><pre class="ab-bib" id="ab-bib">${esc(bib)}</pre></details>`:''}
+      ${bib?`<details class="ab-det"><summary>BibTeX</summary><pre class="ab-bib" id="ab-bib" tabindex="0" aria-label="BibTeX entry">${esc(bib)}</pre></details>`:''}
       ${A.codebook_citation?`<p class="prose">For the coding scheme, cite the codebook:</p><blockquote class="ab-cite" id="ab-c2">${esc(fill(A.codebook_citation))}</blockquote><div class="ab-btns">${copyBtn('ab-c2','Copy citation')}</div>`:''}
       <p class="prose muted">The topic scheme is adapted from the Comparative Agendas Project (comparativeagendas.net); please cite it as well when you compare with other Policy Agendas datasets.</p>`)}
   </div>`;
@@ -1731,7 +1839,7 @@ const recFile = (kind, rec) => kind==='committee' ? `ipap-${rec.ga}-${rec.slug}-
 
 function renderRecord(){
   const found = recordFor(ROUTE);
-  if (!found){ $('#view').innerHTML = `<div class="panel" style="max-width:640px"><h2>Record not found</h2><p class="ink2" style="margin:0">Nothing in the data matches <span class="mono">#${esc(CUR)}</span>. The link may have a typo.</p><div><a class="btn" href="#${tabOf(ROUTE)}">Back to ${esc(TABLABEL[tabOf(ROUTE)] || TABS.find(t=>t&&t[0]===tabOf(ROUTE))?.[1] || 'the site')}</a></div></div>`; return; }
+  if (!found){ $('#view').innerHTML = `<div class="panel" style="max-width:640px"><h1 style="font-size:24px">Page not found</h1><p class="ink2" style="margin:0">Nothing in the data matches <span class="mono">#${esc(CUR)}</span>. The link may have a typo.</p><div><a class="btn" href="#${tabOf(ROUTE)}">Back to ${esc(TABLABEL[tabOf(ROUTE)] || TABS.find(t=>t&&t[0]===tabOf(ROUTE))?.[1] || 'the site')}</a></div></div>`; return; }
   const {kind, rec} = found, h = HEADS[kind](rec, found);
   const secs = SECTIONS[kind].filter(s=>!s.show || s.show(rec, found));
   $('#view').innerHTML = `
@@ -2933,7 +3041,7 @@ function bindReplay(tl){
   recolor(); setPlay(RP.playing); requestAnimationFrame(frame);
 }
 
-const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch, contact:renderContact, about:renderAbout};
+const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch, contact:renderContact, about:renderAbout, trends:renderTrends};
 let CUR = null, ROUTE = {view:'bills'}; const STACK = [];
 function parseRoute(t){
   if (RENDER[t]) return {view:t};
@@ -2947,11 +3055,12 @@ function parseRoute(t){
   if ((m = /^codebook-(m?)(\d+)$/.exec(t))) return m[1] ? {view:'codebook', major:+m[2]} : {view:'codebook', code:+m[2]};
   if ((m = /^speech-(\d{4})(?:-s(\d+))?$/.exec(t))) return {view:'speech', year:+m[1], sid:m[2]?+m[2]:null};
   if ((m = /^search\?(.*)$/.exec(t))) return {view:'search', params:m[1]};
+  if ((m = /^(bills|bills-introduced|bills-committee|bills-law|bills-activity|thinktanks|topics|trends)\?(.*)$/.exec(t))) return {view:m[1], params:m[2]};
   if ((m = /^contact\?(.*)$/.exec(t))) return {view:'contact', params:m[1]};
   if ((m = /^about-(data|team|license|cite)$/.exec(t))) return {view:'about', sec:m[1]};
   return null;
 }
-const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees'})[rt.view] || rt.view;
+const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees', trends:'topics'})[rt.view] || rt.view;
 const sectionOf = rt => { const t = tabOf(rt); return LEGTABS.some(([k])=>k===t) ? 'bills' : t; };
 function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
   const btn = t => `<button data-v="${t[0]}" ${key(t)===cur?'aria-current="page"':''}>${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>`;
@@ -2963,22 +3072,27 @@ function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
     <button class="menu-btn" aria-expanded="false" aria-controls="menu-panel"><span class="burger" aria-hidden="true"></span>${here?`${here[2]?`<i class="dot ${here[2]}"></i>`:''}${here[1]}`:'Menu'}<span class="muted" style="margin-left:auto;font-weight:400">Menu</span></button>
     <div class="menu-panel" id="menu-panel" hidden>${groups.map((ts,i)=>`${labels[i]?`<div class="menu-lbl">${labels[i]}</div>`:''}${ts.map(btn).join('')}`).join('')}</div>`; }
 function drawNav(){ const n = $('nav.tabs'); n.innerHTML = navHTML(); $$('[data-v]', n).forEach(b=>b.addEventListener('click', ()=>nav(b.dataset.v)));
-  const mb = $('.menu-btn', n), mp = $('#menu-panel'); mb.addEventListener('click', ()=>{ const open = mp.hidden; mp.hidden = !open; mb.setAttribute('aria-expanded', open); }); }
+  const mb = $('.menu-btn', n), mp = $('#menu-panel'); mb.addEventListener('click', ()=>{ const open = mp.hidden; mp.hidden = !open; mb.setAttribute('aria-expanded', open); });
+  n.onkeydown = e=>{ if (e.key === 'Escape' && !mp.hidden){ mp.hidden = true; mb.setAttribute('aria-expanded', false); mb.focus(); } }; }
 /* nav(token): go to a tab or record page, remembering where we came from */
 function nav(token, {record=true, keep=false}={}){
   if (!parseRoute(token)) token = 'bills';
   if (record && CUR && CUR !== token){ STACK.push({token:CUR, y:scrollY}); if (STACK.length > 60) STACK.shift(); try { history.pushState(null,'','#'+token); } catch {} }
   else { try { history.replaceState(null,'','#'+token); } catch {} }
-  CUR = token; ROUTE = parseRoute(token); if (ROUTE.view === 'search' && ROUTE.params != null) srApply(ROUTE.params); drawNav(); hideTip(); try { localStorage.setItem('ilpa2-view', token); } catch {}
+  CUR = token; ROUTE = parseRoute(token); if (ROUTE.view === 'search' && ROUTE.params != null) srApply(ROUTE.params); applyParams(ROUTE); drawNav(); hideTip(); try { localStorage.setItem('ilpa2-view', token); } catch {}
   if (!R.length) return;
   const want = needsFor(ROUTE), me = ++navSeq;
-  const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || (ROUTE.view==='committee' ? renderCommitteePage : renderRecord))(); if (!keep) scrollTo({top:0}); countView(CUR); };
+  const draw = ()=>{ if (me !== navSeq) return; (RENDER[ROUTE.view] || (ROUTE.view==='committee' ? renderCommitteePage : renderRecord))(); if (!keep) scrollTo({top:0});
+    // the browser tab, history and screen readers name the page by its heading; focus follows the navigation (the menu and the old page were redrawn)
+    const h = ROUTE.view === 'home' ? '' : ($('#view h1')?.textContent || '').replace(/\s+/g,' ').trim(); document.title = (h ? h + ' · ' : '') + SITE_TITLE;
+    const ae = document.activeElement; if (!keep && me > 1 && (!ae || ae === document.body || !document.contains(ae))) $('#view').focus({preventScroll:true});   // not on first load
+    countView(CUR); };
   const pending = [...want.details.filter(g=>!LOADED.details.has(g)), ...want.links.filter(g=>!LOADED.links.has(g)),
                    ...(want.text||[]).filter(r=>r?.ds==='bills' && !LOADED.details.has(r.x.ga) && !LOADED.slices.has(`${r.x.ga}/${billSlice(r)}`))];
   if (!pending.length) return draw();
   withLoading(need(want)).then(draw);
 }
-let navSeq = 0;
+let navSeq = 0; const SITE_TITLE = document.title;
 /* page views with GoatCounter (no cookies, no personal data) when config.toml [analytics] goatcounter is set. Each
    view is counted as its own path (/bill-104-HB35, /speeches), since GoatCounter ignores the part after # by itself. */
 let GC_LAST = null, GC_WAIT = null;
@@ -3032,7 +3146,7 @@ function phonePass(root){
 }
 function labelTables(root){ for (const t of root.querySelectorAll('table.dt')){ const hs = [...t.querySelectorAll('thead th')].map(th=>th.textContent.replace(/[▲▼]/g,'').trim());
   for (const tr of t.querySelectorAll('tbody tr')) [...tr.children].forEach((td,i)=>{ if (td.tagName==='TD' && !td.hasAttribute('data-l') && td.colSpan===1) td.setAttribute('data-l', hs[i]||''); }); } }
-new MutationObserver(()=>{ labelTables(document); phonePass(document); }).observe(document.getElementById('view'), {childList:true, subtree:true});
+new MutationObserver(()=>{ labelTables(document); phonePass(document); urlSync(); }).observe(document.getElementById('view'), {childList:true, subtree:true});
 document.getElementById('fyear').textContent = new Date().getFullYear();
 let start = location.hash.slice(1); if (!parseRoute(start||'')) start='home';
 nav(start, {record:false});
