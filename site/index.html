@@ -1429,6 +1429,8 @@ function renderSpeeches(){
 /* =================== THINK TANKS =================== */
 const TT = { q:'', org:'', major:null, y0:1991, y1:2026, page:0 };
 function ttFilter(skipOrg){ const t=compileQuery(TT.q); return byDs('tt').filter(r=>(skipOrg || !TT.org || r.x.org===TT.org) && (TT.major==null || r.major===TT.major) && (r.year==null || (r.year>=TT.y0 && r.year<=TT.y1)) && (!t.n || t.test(r.hay))); }
+const TTTABS = [['thinktanks','Overview'],['thinktanks-reports','Reports']];
+const ttTabs = cur => `<nav class="vtabs" aria-label="Think tank views">${TTTABS.map(([k,l])=>`<a href="#${k}" class="vtab" aria-current="${k===cur?'page':'false'}">${l}</a>`).join('')}</nav>`;
 function renderThinkTanks(){
   const all = byDs('tt'); const orgs = [...count(all,r=>r.x.org)].sort((a,b)=>b[1]-a[1]);
   const tops = [...count(all.filter(isPol), r=>r.major)].sort((a,b)=>b[1]-a[1]).slice(0,9).map(d=>d[0]);
@@ -1438,6 +1440,7 @@ function renderThinkTanks(){
   <div class="phead"><div><div class="eyebrow">Dataset · 2006–2026</div><h1>Think tank reports</h1>
     <p>Policy reports from eight Illinois think tanks and university institutes, coded from each report's title and abstract.</p></div>
     <button class="btn primary dl" id="t-all">Download all ${fmt(all.length)} reports (CSV)</button></div>
+  ${ttTabs('thinktanks')}
   <section class="orglist" aria-label="Think tanks in the data">${orgList().map(o=>{ const P = ORGPROF[o.name]||{}, web = orgWebsite(o), ys = o.reports.map(r=>r.year).filter(Boolean);
     return `<div class="orgcard">${orgLogo(o,'md')}<div style="min-width:0"><a class="oc-name" href="#org-${o.slug}">${esc(o.name)}</a>
       <div class="oc-meta num">${pl(o.reports.length,'report')}${ys.length?` · ${Math.min(...ys)}–${Math.max(...ys)}`:''}${P.based?` · ${esc(P.based)}`:''}</div>
@@ -1454,8 +1457,24 @@ function renderThinkTanks(){
   </div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs">What each organization writes about</h2><span class="muted" style="font-size:12px">Share of the organization's reports in each of the nine most common topics</span></div>
     <div class="hscroll"><table class="heat"><thead><tr><th><span class="vh">Organization</span></th>${tops.map(m=>`<th title="${esc(CB.majors[m])}" style="white-space:normal;max-width:90px;vertical-align:bottom">${esc(CB.majors[m].split(/,| and /)[0])}</th>`).join('')}</tr></thead>
-    <tbody>${orgs.map(([o,n])=>`<tr><th class="rh"><span class="rh-org">${orgLogo(orgOf(o),'xs')}${orgLink(o)} <span class="muted">(${n})</span></span></th>${tops.map(m=>{ const v=osh(o,m); return `<td data-o="${esc(o)}" data-m="${m}" style="${heatBg(v,mx)};min-width:64px">${v>0?Math.round(v*100)+'%':'·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div></div>
-  <div class="fbar">
+    <tbody>${orgs.map(([o,n])=>`<tr><th class="rh"><span class="rh-org">${orgLogo(orgOf(o),'xs')}${orgLink(o)} <span class="muted">(${n})</span></span></th>${tops.map(m=>{ const v=osh(o,m); return `<td data-o="${esc(o)}" data-m="${m}" style="${heatBg(v,mx)};min-width:64px">${v>0?Math.round(v*100)+'%':'·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+  $$('table.heat td').forEach(td=>{ bindTip(td, ()=>`<div class="t">${esc(td.dataset.o)}</div><div>${esc(CB.majors[td.dataset.m])}</div><div class="r"><span>Share of its reports</span><b class="num">${pct(osh(td.dataset.o, +td.dataset.m))}</b></div>`);
+    td.addEventListener('click', ()=>{ Object.assign(TT, {org:td.dataset.o, major:+td.dataset.m, q:'', y0:1991, y1:2026, page:0}); nav('thinktanks-reports'); }); });
+  $('#t-all').addEventListener('click', ()=>save('ipap-think-tank-reports.csv', csvFor(all)));
+  // the charts show every report; the Reports tab filters
+  const yrs = range(2006,2026), yc = count(all, r=>r.year);
+  $('#t-yl').textContent = 'All reports';
+  columns($('#t-yr'), yrs.map(String), [{label:'Reports', cls:'ds-tt', color:'--s-tt', values:yrs.map(y=>yc.get(y)||0)}], {height:180});
+  hbars($('#t-org'), orgs.map(([o,v])=>({label:o, value:v, color:'--s-tt', onclick:()=>nav('org-'+orgOf(o).slug)})), {labelW:270, rowH:23});
+}
+/* the Reports tab: search titles and abstracts, filter, and read the feed */
+function renderTtReports(){
+  const orgs = [...count(byDs('tt'),r=>r.x.org)].sort((a,b)=>b[1]-a[1]);
+  $('#view').innerHTML = `
+  <div class="phead"><div><div class="eyebrow">Dataset · 2006–2026</div><h1>Search think tank reports</h1>
+    <p>Search report titles and abstracts, or narrow the list by organization, topic and year. Newest first.</p></div></div>
+  ${ttTabs('thinktanks-reports')}
+  <div class="fbar" style="margin-top:4px">
     <input type="search" id="t-q" placeholder="Search titles and abstracts" value="${esc(TT.q)}" aria-label="Search reports">
     <select id="t-o" aria-label="Organization"><option value="">All organizations</option>${orgs.map(([o])=>`<option ${TT.org===o?'selected':''}>${esc(o)}</option>`).join('')}</select>
     <select id="t-m" aria-label="Topic">${majorOptions(TT.major)}</select>
@@ -1463,25 +1482,18 @@ function renderThinkTanks(){
   </div>
   <div class="fbar"><div class="count" style="margin-left:0"><span id="t-n"></span><button class="btn primary dl" id="t-dl">Download these reports</button></div></div>
   <div class="results" id="t-res"></div><div class="pager" id="t-pg"></div>`;
-  $$('table.heat td').forEach(td=>{ bindTip(td, ()=>`<div class="t">${esc(td.dataset.o)}</div><div>${esc(CB.majors[td.dataset.m])}</div><div class="r"><span>Share of its reports</span><b class="num">${pct(osh(td.dataset.o, +td.dataset.m))}</b></div>`);
-    td.addEventListener('click', ()=>{ TT.org=td.dataset.o; TT.major=+td.dataset.m; TT.page=0; renderThinkTanks(); $('#t-res').scrollIntoView({behavior:'smooth'}); }); });
   const upd = ()=>{ TT.page=0; ttUpdate(); };
   let deb; $('#t-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ TT.q=e.target.value; upd(); },160); });
   $('#t-o').addEventListener('change', e=>{ TT.org=e.target.value; upd(); });
   $('#t-m').addEventListener('change', e=>{ TT.major=e.target.value===''?null:+e.target.value; upd(); });
   const yr=()=>{ const a=yrClamp($('#t-y0').value, 1991), b=yrClamp($('#t-y1').value, 2026); TT.y0=Math.min(a,b); TT.y1=Math.max(a,b); $('#t-y0').value=TT.y0; $('#t-y1').value=TT.y1; upd(); };
   $('#t-y0').addEventListener('change', yr); $('#t-y1').addEventListener('change', yr);
-  $('#t-all').addEventListener('click', ()=>save('ipap-think-tank-reports.csv', csvFor(all)));
   $('#t-dl').addEventListener('click', ()=>{ const rows=ttFilter(); save(`ipap-think-tank-reports-${rows.length}-filtered.csv`, csvFor(rows)); });
   ttUpdate();
 }
 function ttUpdate(){
   const rows = ttFilter(), terms = compileQuery(TT.q);
-  const yrs = range(2006,2026), yc = count(rows, r=>r.year);
-  $('#t-yl').textContent = rows.length < byDs('tt').length ? 'Matching reports' : 'All reports';
-  columns($('#t-yr'), yrs.map(String), [{label:'Reports', cls:'ds-tt', color:'--s-tt', values:yrs.map(y=>yc.get(y)||0)}], {height:180});
-  const oc = count(ttFilter(true), r=>r.x.org);
-  hbars($('#t-org'), [...oc].sort((a,b)=>b[1]-a[1]).map(([o,v])=>({label:o, value:v, color:'--s-tt', on:TT.org===o, onclick:()=>nav('org-'+orgOf(o).slug)})), {labelW:270, rowH:23});
+  if (!$('#t-res')) return;
   $('#t-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> reports match`; $('#t-dl').disabled=!rows.length;
   rows.sort((a,b)=>(b.date||String(b.year||0)).localeCompare(a.date||String(a.year||0)));
   const PS=20, pages=Math.ceil(rows.length/PS); TT.page=Math.min(TT.page,Math.max(0,pages-1));
@@ -1770,7 +1782,7 @@ function renderTrends(){
 
 /* =================== FILTERS IN THE ADDRESS ===================
    The filters of the Bills pages, Think tanks, Topics and Trends live in the address like a search does, so a filtered view can be
-   linked to and Back returns to it: #bills?topic=3&sub=325, #thinktanks?org=Illinois+Policy&from=2020, #topics?m=3&s=325.
+   linked to and Back returns to it: #bills?topic=3&sub=325, #thinktanks-reports?org=Illinois+Policy&from=2020, #topics?m=3&s=325.
    Only what differs from the defaults is written. to() reads the page's state into params; from() sets the state from a link. */
 const qNum = v => v != null && v !== '' && !isNaN(+v) ? +v : null;
 const billsSync = {
@@ -1785,7 +1797,7 @@ const SYNC = {
       if (ACT.major != null) p.set('topic', ACT.major); if (ACT.kind) p.set('kind', ACT.kind); if (ACT.routine) p.set('routine', 1); return p; },
     from(p){ const ga = qNum(p.get('ga')); BL.ga = ALL_SESSIONS.some(x=>x.ga===ga) ? ga : LATEST;
       Object.assign(ACT, { q: p.get('q') || '', type: ['HB','SB'].includes(p.get('type')) ? p.get('type') : '', major: qNum(p.get('topic')), kind: /^[a-z]+$/.test(p.get('kind') || '') ? p.get('kind') : '', routine: p.get('routine') === '1', shown: 120 }); } },
-  thinktanks: {
+  'thinktanks-reports': {
     to(){ const p = new URLSearchParams(); if (TT.q.trim()) p.set('q', TT.q.trim()); if (TT.org) p.set('org', TT.org); if (TT.major != null) p.set('topic', TT.major);
       if (TT.y0 !== 1991) p.set('from', TT.y0); if (TT.y1 !== 2026) p.set('to', TT.y1); return p; },
     from(p){ const og = p.get('org') || ''; Object.assign(TT, { q: p.get('q') || '', org: orgs().some(o=>o.name===og) ? og : '', major: qNum(p.get('topic')), y0: yrClamp(p.get('from'), 1991), y1: yrClamp(p.get('to'), 2026), page: 0 }); } },
@@ -3131,7 +3143,7 @@ function bindReplay(tl){
   recolor(); setPlay(RP.playing); requestAnimationFrame(frame);
 }
 
-const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch, contact:renderContact, about:renderAbout, trends:renderTrends};
+const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, 'thinktanks-reports':renderTtReports, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch, contact:renderContact, about:renderAbout, trends:renderTrends};
 let CUR = null, ROUTE = {view:'bills'}; const STACK = [];
 function parseRoute(t){
   if (RENDER[t]) return {view:t};
@@ -3145,12 +3157,13 @@ function parseRoute(t){
   if ((m = /^codebook-(m?)(\d+)$/.exec(t))) return m[1] ? {view:'codebook', major:+m[2]} : {view:'codebook', code:+m[2]};
   if ((m = /^speech-(\d{4})(?:-s(\d+))?$/.exec(t))) return {view:'speech', year:+m[1], sid:m[2]?+m[2]:null};
   if ((m = /^search\?(.*)$/.exec(t))) return {view:'search', params:m[1]};
-  if ((m = /^(bills|bills-introduced|bills-committee|bills-law|bills-activity|thinktanks|topics|trends)\?(.*)$/.exec(t))) return {view:m[1], params:m[2]};
+  if ((m = /^thinktanks(?:-reports)?\?(.*)$/.exec(t))) return {view:'thinktanks-reports', params:m[1]};   // older links put the filters on #thinktanks
+  if ((m = /^(bills|bills-introduced|bills-committee|bills-law|bills-activity|topics|trends)\?(.*)$/.exec(t))) return {view:m[1], params:m[2]};
   if ((m = /^contact\?(.*)$/.exec(t))) return {view:'contact', params:m[1]};
   if ((m = /^about-(data|team|license|cite)$/.exec(t))) return {view:'about', sec:m[1]};
   return null;
 }
-const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees', trends:'topics'})[rt.view] || rt.view;
+const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', 'thinktanks-reports':'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees', trends:'topics'})[rt.view] || rt.view;
 const sectionOf = rt => { const t = tabOf(rt); return LEGTABS.some(([k])=>k===t) ? 'bills' : t; };
 function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
   const btn = t => `<button data-v="${t[0]}" ${key(t)===cur?'aria-current="page"':''}>${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>`;
