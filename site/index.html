@@ -248,6 +248,9 @@ table.dt tr.det td{background:var(--sel);padding-top:0;color:var(--ink-2)}
 .tr-ch{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)} .tr-ch span{display:inline-flex;gap:5px;align-items:center}
 .tr-ch b,.trtab b{font-weight:700} .tr-ch .up,.trtab .up{color:#1a6b3c} .tr-ch .dn,.trtab .dn{color:#a3231c}
 .trtab td.r,.trtab th.r{text-align:right} .trtab tfoot td{font-weight:700;border-top:2px solid var(--line-2)}
+.rec-raw{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);margin-left:8px;white-space:nowrap}
+.steps-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px}
+ol.steps.keyonly li.minor{display:none}
 .jump[hidden]{display:none}
 #view:focus{outline:none}
 .chart .hb:focus{outline:none} .chart .hb:focus-visible > rect:first-child{fill:var(--sel)!important;stroke:var(--navy,#13294b);stroke-width:2}
@@ -539,7 +542,7 @@ main{overflow-x:clip}
 .btn{border-radius:var(--r);font-weight:700;font-size:13.5px}
 .btn.primary{background:var(--navy);color:#fff;border-color:var(--navy);padding:9px 16px}
 .btn.primary:hover{background:var(--navy-3);border-color:var(--navy-3)}
-.btn.primary::after{content:"→";font-weight:700}
+.btn.primary::after{content:"→";font-weight:700} .btn.primary.dl::after{content:"↓"}
 .seg button[aria-pressed="true"]{background:var(--navy);color:#fff} .seg button[aria-pressed="true"] .muted{color:rgba(255,255,255,.82)}
 .vtab[aria-current="page"]{color:var(--navy-2);font-weight:700;border-bottom-color:var(--navy)}
 .chip{border-radius:3px}
@@ -687,6 +690,35 @@ function toast(m){ const t=$('#toast'); t.textContent=m; t.hidden=false; clearTi
 function count(a, f){ const m = new Map(); for (const r of a){ const k=f(r); m.set(k,(m.get(k)||0)+1); } return m; }
 const range = (a,b) => Array.from({length:b-a+1}, (_,i)=>a+i);
 function parseQuery(q){ const t=[]; q.toLowerCase().replace(/"([^"]+)"|(\S+)/g,(_,a,b)=>{ const x=(a||b).trim(); if (x) t.push(x); }); return t; }
+/* ILGA gives bills a short all-caps title in its own shorthand (VEH CD-PLATES-REGISTRATION). For reading, the site shows it in
+   ordinary capitals with the commonest abbreviations spelled out (Vehicle Code-Plates-Registration); the original stays in
+   x.short0 for downloads, search and the bill page. Agency names and other initials in BT_UP stay in capitals. */
+const BT_UP = new Set(('DHS DCEO EPA IL FOIA DHFS IDOT DCFS AI ID FOID DNR IEMA TIF ISBE IDPH CMS IMRF DFPR SURS CDB SNAP GA DPH ISAC ISP DOC SOS TRS MHDD EMS OMA SERS OHS DD IHDA PTELL SLF IG ICC ICCB PFAS SIU DUI AIDS DJJ BIPA DOIT NEIU IMDMA CILA CPI MCO IDFPR IDNR CTPF HIV GOMB ISU CSU EV PMP MWRD EIU GSU GAC NIU LGDF WIU DSP GM TNC IFA IMSA IDOR II III CDL VA HFS JCAR CEI CCR PTSD PRB MIA BEP GATA SLEP DC SWCD CIL PTAB CNA MFTD GARS ICJIA GHG UST OCE FY UIC UIUC RTA CTA LLC DNA HMO PBM APRN RN LPN ADA IEP FAFSA LIHEAP TANF WIC STEM THC CBD ATV US USA AG TV CPR AED LGBTQ ESL GED ACA CHIP DCEO IEPA IPA ISTHA ILETSB LIS CPA CME EMT DMV OSHA IRS FBI HUD SSI SSDI MAP PACE IPLRA IELRA IMSA OEIG ARDC IDVA ICE DOI IDOL IDES ABLE ISAC IBHE UI').split(' '));
+const BT_FULL = {TECH:'Technical', CD:'Code', TX:'Tax', SCH:'School', PROP:'Property', CRIM:'Criminal', VEH:'Vehicle', INS:'Insurance', ED:'Education', EDUC:'Education', PEN:'Pension', CORR:'Corrections',
+  MUNI:'Municipal', GOV:'Government', GOVT:'Government', BD:'Board', DEPT:'Department', CT:'Court', JUV:'Juvenile', HLTH:'Health', LOC:'Local', CHI:'Chicago', DIST:'District', CTY:'County', CNTY:'County',
+  TWP:'Township', HWY:'Highway', HGWY:'Highway', PUB:'Public', UTIL:'Utilities', UNIV:'University', MGMT:'Management', ASSN:'Association', ATTY:'Attorney', HOSP:'Hospital', CTR:'Center', PROG:'Program',
+  PGRAM:'Program', PRGM:'Program', SRVCS:'Services', NATL:'National', MTGS:'Meetings', YRS:'Years', AMT:'Amount', ACCT:'Account', CIV:'Civil', AGR:'Agriculture', AGRIC:'Agriculture', ECON:'Economic',
+  PENCD:'Pension Code', SCHCD:'School Code', HIGHR:'Higher', DEV:'Development', ADMIN:'Administration', GEN:'General', OCC:'Occupation'};
+const BT_SMALL = new Set(['OF','TO','IN','FOR','AND','BY','ON','THE','A','AN','AT','WITH','OR','PER']);
+function billTitle(t){
+  t = String(t || ''); if (!t || t !== t.toUpperCase()) return t;   // already in mixed case
+  const parts = t.split(/([A-Z0-9$'’.]+)/); let first = true;
+  return parts.map((w, i) => { if (!/[A-Z0-9]/.test(w)) return w;
+    const was = first; first = false; const dollar = w.startsWith('$') ? '$' : '', core = w.slice(dollar.length), key = core.replace(/\.$/, ''), nextW = (parts[i+2] || '').replace(/\.$/, '');
+    if (/\d/.test(key)) return w;
+    if (key === 'ELEC') return dollar + (nextW === 'CD' ? 'Election' : 'Elec');
+    if (key === 'INC') return dollar + (nextW === 'TX' || nextW === 'TAX' ? 'Income' : 'Inc');
+    if (BT_FULL[key]) return dollar + BT_FULL[key];
+    if (BT_UP.has(key) || key.length === 1 || (key.length > 2 && !/[AEIOUY]/.test(key))) return w;   // initials: listed, or no vowel to say them with
+    if (!was && BT_SMALL.has(key)) return w.toLowerCase();
+    return dollar + core[0] + core.slice(1).toLowerCase(); }).join('');
+}
+/* a date as people write it: 2026-08-26 → Aug 26, 2026 (anything that is not a full date is shown as it is) */
+const FD = new Map(), MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fd(d){ if (!d) return ''; let v = FD.get(d); if (v === undefined){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d); v = m && MON[+m[2]-1] ? `${MON[+m[2]-1]} ${+m[3]}, ${m[1]}` : String(d); FD.set(d, v); } return v; }
+/* ILGA pads some actions with dotted leaders: "Public Act . . . . . . . . . 104-0162" */
+const noDots = t => String(t || '').replace(/\s*(?:\.\s+){2,}\.?\s*/g, ' ').trim();
+
 const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 /* the keyword language of every search box but the name finders: words match whole words and their common endings
    (tax → taxes, taxed; policy → policies; rate → rating), a trailing * matches any ending (child* → children),
@@ -768,7 +800,7 @@ async function load(){
   CB = cb; RAW = {bills:b, sots:s, tt:t};
   const obj = d => d.rows.map(r => Object.fromEntries(d.cols.map((c,i)=>[c,r[i]])));
   const start = Object.fromEntries(SESSIONS.map(s=>[s.ga, parseInt(s.years) || null]));
-  obj(b).forEach((x,i)=>{ x.synopsis=''; R.push({ds:'bills', id:i, key:x.key, year:Math.max(start[x.ga]||0, +(x.intro||'0').slice(0,4)), date:x.intro||'', sub:x.sub, title:x.bill+' · '+x.short, text:'', x, sp:[]}); });
+  obj(b).forEach((x,i)=>{ x.synopsis=''; x.short0 = x.short; x.short = billTitle(x.short); x.last_action = noDots(x.last_action); R.push({ds:'bills', id:i, key:x.key, year:Math.max(start[x.ga]||0, +(x.intro||'0').slice(0,4)), date:x.intro||'', sub:x.sub, title:x.bill+' · '+x.short, text:'', x, sp:[]}); });
   for (const x of obj(s)) R.push({ds:'sots', id:x.id, year:x.year, date:null, sub:x.sub, title:x.governor+', '+x.year, text:x.text, x});
   for (const x of obj(t)) R.push({ds:'tt', id:x.id, year:x.year, date:x.date, sub:x.sub, title:x.title, text:x.abstract, x});
   for (const r of R) BYDS[r.ds].push(r);
@@ -781,7 +813,7 @@ async function load(){
   if (u) u.textContent = `Data updated ${new Date(MAN.updated.replace(' ','T')).toLocaleDateString('en-US',{month:'long', day:'numeric', year:'numeric'})}${bits.length?' ('+bits.join(', ')+')':''}`;
   await need({details:[], links:[LATEST]});
 }
-function setHay(r){ r.hay = (r.title+' '+r.text+' '+(r.ds==='bills' ? r.sp.map(([i])=>SPON[i].name).join(' ')+' '+r.x.bill.replace(' ','') : r.ds==='tt' ? r.x.org : r.x.governor)).toLowerCase(); }
+function setHay(r){ r.hay = (r.title+' '+r.text+' '+(r.ds==='bills' ? r.sp.map(([i])=>SPON[i].name).join(' ')+' '+r.x.bill.replace(' ','')+' '+(r.x.short0||'') : r.ds==='tt' ? r.x.org : r.x.governor)).toLowerCase(); }
 /* fetch whatever per-session files a view needs; resolves at once if they are already here */
 async function need({details=[], links=[], text=[]}){
   const live = new Set(SESSIONS.map(s=>s.ga));
@@ -950,7 +982,7 @@ const HEAD = {
 };
 const labels = r => [r.sub, r.sub==null?'':subName(r.sub), r.major ?? '', r.major==null?'':majorName(r.major)];
 const ROW = {
-  bills: r => { const x=r.x; return [x.ga,x.bill,x.type,x.chamber,x.short,sponsorText(r),x.intro,x.last_date,x.last_action,x.synopsis,...labels(r),[...x.flags].map(f=>FLAGS[f]).join('; '),ilga(x),STAGES[(x.stage||1)-1],x.cmte||'',x.pa||'',x.law_date||'']; },
+  bills: r => { const x=r.x; return [x.ga,x.bill,x.type,x.chamber,x.short0,sponsorText(r),x.intro,x.last_date,x.last_action,x.synopsis,...labels(r),[...x.flags].map(f=>FLAGS[f]).join('; '),ilga(x),STAGES[(x.stage||1)-1],x.cmte||'',x.pa||'',x.law_date||'']; },
   sots: r => [r.x.id,r.x.governor,r.year,r.text,...labels(r)],
   tt: r => { const x=r.x; return [x.id,x.org,x.date,x.year,x.title,x.abstract,x.url,x.pdf,...labels(r)]; }
 };
@@ -972,13 +1004,13 @@ function pager(el, page, pages, onGo){ el.innerHTML = pages>1 ? `<button class="
   $$('[data-p]', el).forEach(b=>b.addEventListener('click', ()=>onGo(page + +b.dataset.p))); }
 function card(r, terms){
   const x=r.x; let top=dsChip(r.ds), body='', meta='';
-  if (r.ds==='bills'){ top += `<span class="mono">${esc(x.bill)}</span><span>${esc(BILLTYPE[x.type]||x.type)}</span><span>Introduced ${x.intro}</span>`;
+  if (r.ds==='bills'){ top += `<span class="mono">${esc(x.bill)}</span><span>${esc(BILLTYPE[x.type]||x.type)}</span><span>Introduced ${fd(x.intro)}</span>`;
     body = `<a class="ttl rl" href="${href(r)}">${hl(x.short,terms)}</a><div class="body">${hl(x.synopsis,terms,360)}</div>`;
-    meta = `<span>${chiefOf(r)?spLink(chiefOf(r)):''}</span><span>${esc(x.last_action)} · ${x.last_date}</span>${x.flags.includes('L')?'<span class="chip">Became law / adopted</span>':''}<a href="${href(r)}">Bill page →</a>`; }
+    meta = `<span>${chiefOf(r)?spLink(chiefOf(r)):''}</span><span>${esc(x.last_action)} · ${fd(x.last_date)}</span>${x.flags.includes('L')?'<span class="chip">Became law / adopted</span>':''}<a href="${href(r)}">Bill page →</a>`; }
   else if (r.ds==='sots'){ top += `<span>${esc(x.governor)}</span><span>${x.year} State of the State</span>`;
     body = `<div class="ctx">${r.prev?`<p class="ctx-side">${hl(r.prev.text,terms)}</p>`:'<p class="ctx-edge">Start of address</p>'}<p class="quote">${hl(r.text,terms)}</p>${r.next?`<p class="ctx-side">${hl(r.next.text,terms)}</p>`:'<p class="ctx-edge">End of address</p>'}</div>`;
     meta = `<a href="${href(r)}">Read the full ${x.year} address →</a>`; }
-  else { top += `<span>${orgLink(x.org)}</span><span>${x.date||x.year||'Undated'}</span>`; body = `<a class="ttl rl" href="${href(r)}">${hl(r.title,terms)}</a>${r.text?`<div class="body">${hl(r.text,terms,360)}</div>`:''}`;
+  else { top += `<span>${orgLink(x.org)}</span><span>${fd(x.date)||x.year||'Undated'}</span>`; body = `<a class="ttl rl" href="${href(r)}">${hl(r.title,terms)}</a>${r.text?`<div class="body">${hl(r.text,terms,360)}</div>`:''}`;
     meta = `<a href="${href(r)}">Report page →</a>${ttLinks(x, '', 'Original').join('')}`; }
   return `<article class="res"><div class="top">${top}</div>${body}<div class="meta"><span>${subChip(r.sub)}</span>${meta}</div></article>`;
 }
@@ -1112,7 +1144,7 @@ function renderBills(){
   <div class="phead"><div><div class="eyebrow">Dataset · ${gaName(BL.ga)}, ${esc(gaYears(BL.ga))}</div><h1>Substantive bills</h1>
     <p>Every House and Senate bill introduced in the ${gaName(BL.ga)}: what was introduced, what got out of committee, and what became law. Resolutions, appointments and commemorative measures are left out. Each bill has its ILGA synopsis, sponsors, history and policy subtopic.</p>
     ${ALL_SESSIONS.length>1?`<div class="fbar" style="margin:10px 0 0"><label class="ink2" for="b-ga" style="font-size:13.5px">Session</label><select id="b-ga">${ALL_SESSIONS.slice().reverse().map(s=>`<option value="${s.ga}" ${s.ga===BL.ga?'selected':''}>${gaName(s.ga)} (${esc(s.years)})${s.upcoming?' · not started':''}</option>`).join('')}</select></div>`:''}</div>
-    <button class="btn primary" id="b-all">Download all ${fmt(all.length)} bills (CSV)</button></div>
+    <button class="btn primary dl" id="b-all">Download all ${fmt(all.length)} bills (CSV)</button></div>
   <nav class="vtabs" aria-label="Bills">${BILLTABS.map(([k,l])=>`<a href="#${k}" class="vtab" aria-current="${k===(V==='activity'?'bills-activity':'bills')?'page':'false'}">${l}</a>`).join('')}</nav>
 `;
   if (isUpcoming(BL.ga)){ const sx = ALL_SESSIONS.find(x=>x.ga===BL.ga);
@@ -1138,7 +1170,7 @@ function renderBills(){
     ${V==='committee'?`<select id="b-cmte" aria-label="Committee"><option value="">All committees</option>${[...count(out.filter(r=>r.x.cmte), r=>r.x.cmte)].sort((a,b)=>a[0].localeCompare(b[0])).map(([c,n])=>`<option value="${esc(c)}" ${BL.cmte===c?'selected':''}>${esc(cmText(BL.ga, c))} (${fmt(n)})</option>`).join('')}</select>${BL.cmte && cmKeyOf(BL.ga, BL.cmte)?`<a href="#committee-${cmKeyOf(BL.ga, BL.cmte)}" style="font-size:13.5px">Open the ${esc(cmText(BL.ga, BL.cmte))} committee page →</a>`:''}`:''}
     <select id="b-status" aria-label="Other filters"><option value="">Any bill</option><option value="R">Had a roll-call vote</option><option value="A">Appropriations bills</option></select>
   </div>
-  <div class="fbar"><div class="count" style="margin-left:0"><span id="b-n"></span><button class="btn primary" id="b-dl">Download these rows</button></div></div>
+  <div class="fbar"><div class="count" style="margin-left:0"><span id="b-n"></span><button class="btn primary dl" id="b-dl">Download these rows</button></div></div>
   <div class="tscroll"><table class="dt"><thead><tr>${{intro:['Bill','Introduced','Description','Topic','Latest action'], committee:['Bill','Introduced','Description','Topic','Committee','Furthest stage'], law:['Public Act','Bill','Description','Topic','Became law','Days']}[V].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody id="b-tb"></tbody></table></div>
   <div class="pager" id="b-pg"></div>`;
   if ($('#b-type')) $('#b-type').value = BL.type; if ($('#b-status')) $('#b-status').value = BL.status;
@@ -1163,10 +1195,9 @@ function renderBills(){
     hbars($('#b-cm'), cc.map(([c,n])=>({label:cmText(BL.ga, c), value:n, color:'--s-bills', on:BL.cmte===c, tip:`<div class="r"><span>Bills it approved first</span><b class="num">${fmt(n)}</b></div><div class="muted">Click to filter the table; the committee's own page is linked above the table</div>`, onclick:()=>{ BL.cmte = BL.cmte===c?'':c; BL.page=0; renderBills(); }})), {labelW:260, rowH:22});
   } else {
     charts.innerHTML = `<div class="panel"><div class="chead"><h2 class="hs">Laws by major topic</h2><span class="muted" style="font-size:12px">Click a subtopic in a bar to list its laws</span></div><div id="b-top"></div></div>
-      <div class="panel"><div class="chead"><h2 class="hs">${BL.sub!=null ? `Laws on ${esc(CB.subs[BL.sub])}` : BL.major!=null ? `Laws on ${esc(CB.majors[BL.major])}` : 'Laws by subtopic'}</h2>${BL.major!=null?`<span class="muted num" style="font-size:12px">${fmt(laws.filter(inTopic).length)} laws</span>`:''}</div><div id="b-ll" class="lawlist"></div></div>`;
-    const ll = BL.major==null ? [] : laws.filter(inTopic).sort((a,b)=>(b.x.law_date||'').localeCompare(a.x.law_date||''));
-    $('#b-ll').innerHTML = BL.major==null ? '<p class="muted" style="margin:0;font-size:13.5px">Click a subtopic in a bar of the chart (or a topic name, or pick one from the menus above) to list its laws and their primary sponsors here.</p>'
-      : ll.length ? `<ol>${ll.map(r=>{ const c=chiefOf(r); return `<li><a class="rl" href="${href(r)}">${esc(r.x.short)}</a><div class="muted"><span class="mono">${esc(r.x.bill)}</span>${r.x.pa?` · P.A. ${esc(r.x.pa)}`:''}${c?` · ${spLink(c)}`:''}</div></li>`; }).join('')}</ol>`
+      <div class="panel"><div class="chead"><h2 class="hs">${BL.sub!=null ? `Laws on ${esc(CB.subs[BL.sub])}` : BL.major!=null ? `Laws on ${esc(CB.majors[BL.major])}` : 'Most recent laws'}</h2>${BL.major!=null?`<span class="muted num" style="font-size:12px">${fmt(laws.filter(inTopic).length)} laws</span>`:'<span class="muted" style="font-size:12px">Click a bar for one topic\'s laws</span>'}</div><div id="b-ll" class="lawlist"></div></div>`;
+    const byDate = laws.filter(inTopic).sort((a,b)=>(b.x.law_date||'').localeCompare(a.x.law_date||'')), ll = BL.major==null ? byDate.slice(0,14) : byDate;
+    $('#b-ll').innerHTML = ll.length ? `<ol>${ll.map(r=>{ const c=chiefOf(r); return `<li><a class="rl" href="${href(r)}">${esc(r.x.short)}</a><div class="muted"><span class="mono">${esc(r.x.bill)}</span>${r.x.pa?` · P.A. ${esc(r.x.pa)}`:''}${BL.major==null && r.x.law_date?` · ${fd(r.x.law_date)}`:''}${c?` · ${spLink(c)}`:''}</div></li>`; }).join('')}</ol>`
       : '<p class="muted" style="margin:0">No laws on this topic yet.</p>';
   }
   const go2 = ()=>{ BL.page=0; billsUpdate(); };
@@ -1275,12 +1306,12 @@ function billsUpdate(){
   const desc = r => `<a class="rl" href="${href(r)}" style="font-weight:600">${hl(r.x.short,terms)}</a><div class="muted" style="font-size:12.5px">${chiefOf(r)?spLink(chiefOf(r)):''}${(r.sp||[]).length>1?' and others':''}</div>${terms.n && terms.find(r.x.short)<0?`<div class="ink2" style="font-size:12.5px">${hl(snippet(r.x.synopsis,terms),terms)}</div>`:''}`;
   const billCell = r => `<a class="mono" href="${href(r)}" style="white-space:nowrap">${esc(r.x.bill)}</a>`;
   $('#b-tb').innerHTML = rows.slice(BL.page*PS, BL.page*PS+PS).map(r=>{ const x=r.x;
-    const cells = V==='intro' ? [billCell(r), `<span class="num" style="white-space:nowrap">${x.intro}</span>`, desc(r), `<div style="min-width:190px">${subChip(r.sub)}</div>`,
-        `<div style="min-width:170px"><span class="num">${x.last_date}</span><div class="muted" style="font-size:12.5px">${esc(x.last_action)}</div>${x.stage>=5?'<span class="chip" style="margin-top:4px">Became law</span>':''}</div>`]
-      : V==='committee' ? [billCell(r), `<span class="num" style="white-space:nowrap">${x.intro}</span>`, desc(r), `<div style="min-width:170px">${subChip(r.sub)}</div>`,
+    const cells = V==='intro' ? [billCell(r), `<span class="num" style="white-space:nowrap">${fd(x.intro)}</span>`, desc(r), `<div style="min-width:190px">${subChip(r.sub)}</div>`,
+        `<div style="min-width:170px"><span class="num">${fd(x.last_date)}</span><div class="muted" style="font-size:12.5px">${esc(x.last_action)}</div>${x.stage>=5?'<span class="chip" style="margin-top:4px">Became law</span>':''}</div>`]
+      : V==='committee' ? [billCell(r), `<span class="num" style="white-space:nowrap">${fd(x.intro)}</span>`, desc(r), `<div style="min-width:170px">${subChip(r.sub)}</div>`,
         `<div style="min-width:150px;font-size:13px">${x.cmte?cmLinkOf(x.ga, x.cmte):'—'}</div>`, `<span class="stage s${x.stage}">${STAGES[x.stage-1]}</span>`]
       : [`<span class="mono" style="white-space:nowrap">${esc(x.pa||'—')}</span>`, billCell(r), desc(r), `<div style="min-width:170px">${subChip(r.sub)}</div>`,
-        `<span class="num" style="white-space:nowrap">${x.law_date||'—'}</span>`, `<span class="num">${x.law_date&&x.intro?fmt(daysBetween(x.intro,x.law_date)):'—'}</span>`];
+        `<span class="num" style="white-space:nowrap">${fd(x.law_date)||'—'}</span>`, `<span class="num">${x.law_date&&x.intro?fmt(daysBetween(x.intro,x.law_date)):'—'}</span>`];
     return `<tr class="row" data-h="${href(r)}">${cells.map(c=>`<td>${c}</td>`).join('')}</tr>`; }).join('')
     || `<tr><td colspan="6" class="muted" style="padding:24px">No ${V==='law'?'laws':'bills'} match. Clear a filter or try other words.</td></tr>`;
   $$('#b-tb tr.row').forEach(tr=>tr.addEventListener('click', e=>{ if (e.target.closest('a')) return; nav(tr.dataset.h.slice(1)); }));
@@ -1319,7 +1350,7 @@ function renderSpeeches(){
   $('#view').innerHTML = `
   <div class="phead"><div><div class="eyebrow">Dataset · 2005–2025</div><h1>State of the State speeches</h1>
     <p>Twenty-one annual addresses by four governors, split into quasi-sentences. Each sentence carries one Policy Agendas subtopic. Open any address to read it in full with its topics marked.</p></div>
-    <button class="btn primary" id="s-all">Download all ${fmt(all.length)} sentences (CSV)</button></div>
+    <button class="btn primary dl" id="s-all">Download all ${fmt(all.length)} sentences (CSV)</button></div>
   <div class="kpis">
     <div class="kpi"><span class="l">Addresses</span><span class="v">${years.length}</span><span class="s">2005 to 2025</span></div>
     <div class="kpi"><span class="l">Governors</span><span class="v">${new Set(all.map(r=>r.x.governor)).size}</span><span class="s">${(()=>{ const c = count([...new Set(all.map(r=>r.x.governor))].map(g=>GOV[all.find(r=>r.x.governor===g).year]?.party).filter(Boolean), p=>p); return [...c].map(([p,n])=>pl(n, p==='Democratic'?'Democrat':p==='Republican'?'Republican':p)).join(', ') || 'Blagojevich, Quinn, Rauner, Pritzker'; })()}</span></div>
@@ -1359,7 +1390,7 @@ function renderThinkTanks(){
   $('#view').innerHTML = `
   <div class="phead"><div><div class="eyebrow">Dataset · 2006–2026</div><h1>Think tank reports</h1>
     <p>Policy reports from eight Illinois think tanks and university institutes, coded from each report's title and abstract.</p></div>
-    <button class="btn primary" id="t-all">Download all ${fmt(all.length)} reports (CSV)</button></div>
+    <button class="btn primary dl" id="t-all">Download all ${fmt(all.length)} reports (CSV)</button></div>
   <section class="orglist" aria-label="Think tanks in the data">${orgList().map(o=>{ const P = ORGPROF[o.name]||{}, web = orgWebsite(o), ys = o.reports.map(r=>r.year).filter(Boolean);
     return `<div class="orgcard">${orgLogo(o,'md')}<div style="min-width:0"><a class="oc-name" href="#org-${o.slug}">${esc(o.name)}</a>
       <div class="oc-meta num">${pl(o.reports.length,'report')}${ys.length?` · ${Math.min(...ys)}–${Math.max(...ys)}`:''}${P.based?` · ${esc(P.based)}`:''}</div>
@@ -1383,7 +1414,7 @@ function renderThinkTanks(){
     <select id="t-m" aria-label="Topic">${majorOptions(TT.major)}</select>
     <span class="ink2" style="font-size:13.5px">Years</span><input type="number" id="t-y0" value="${TT.y0}" min="1991" max="2026" style="width:82px" aria-label="From year"><input type="number" id="t-y1" value="${TT.y1}" min="1991" max="2026" style="width:82px" aria-label="To year">
   </div>
-  <div class="fbar"><div class="count" style="margin-left:0"><span id="t-n"></span><button class="btn primary" id="t-dl">Download these reports</button></div></div>
+  <div class="fbar"><div class="count" style="margin-left:0"><span id="t-n"></span><button class="btn primary dl" id="t-dl">Download these reports</button></div></div>
   <div class="results" id="t-res"></div><div class="pager" id="t-pg"></div>`;
   $$('table.heat td').forEach(td=>{ bindTip(td, ()=>`<div class="t">${esc(td.dataset.o)}</div><div>${esc(CB.majors[td.dataset.m])}</div><div class="r"><span>Share of its reports</span><b class="num">${pct(osh(td.dataset.o, +td.dataset.m))}</b></div>`);
     td.addEventListener('click', ()=>{ TT.org=td.dataset.o; TT.major=+td.dataset.m; TT.page=0; renderThinkTanks(); $('#t-res').scrollIntoView({behavior:'smooth'}); }); });
@@ -1450,7 +1481,7 @@ function renderTopics(){
       <div class="panel"><div class="chead"><div>
           <div class="eyebrow">${sub==null ? `Major topic ${m}` : `Subtopic ${sub} · <button class="linkbtn" id="tp-up" style="font-size:inherit;letter-spacing:inherit;text-transform:inherit">${m} ${esc(CB.majors[m])}</button>`}</div>
           <h2>${esc(sub==null ? CB.majors[m] : CB.subs[sub])}</h2>${sub==null ? `<a class="sublink" style="font-size:13px" href="${cbmHref(m)}">Codebook entry →</a>` : `<div class="tp-rule" id="tp-rule" data-s="${sub}"></div>`}</div>
-        <button class="btn primary" id="tp-dl" ${total?'':'disabled'}>Download ${fmt(total)} records</button></div>
+        <button class="btn primary dl" id="tp-dl" ${total?'':'disabled'}>Download ${fmt(total)} records</button></div>
         <div class="kpis tp-k" style="grid-template-columns:repeat(3,minmax(0,1fr));margin:0">${DSK.map(k=>`<div class="kpi ${DS[k].cls}" style="background:var(--ct)"><span class="l" style="display:flex;gap:6px;align-items:center"><i class="dot"></i>${DS[k].name}</span>
           <span class="v">${pct(inF[k].length/base[k].length)}</span><span class="s">${fmt(inF[k].length)} of ${fmt(base[k].length)} policy items${sub!=null && inM[k].length ? ` · ${pct(inF[k].length/inM[k].length,0)} of its ${esc(CB.majors[m].split(/,| and /)[0])} items` : ''}</span></div>`).join('')}</div></div>
       <div class="panel"><div class="chead"><h2 class="hs">Share of each source's agenda, by year</h2><div class="legend">${DSK.map(k=>`<span class="${DS[k].cls}"><i class="dot"></i>${DS[k].short}${k==='bills'?` (${SESSIONS.map(s=>s.years).join(', ')})`:''}</span>`).join('')}</div></div><div id="tp-ln"></div>
@@ -1597,7 +1628,7 @@ function srUpdate(){
   </div>
   <div class="fbar"><div class="count" style="margin-left:0"><span><b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> matches</span>
     <select id="sr-sort" aria-label="Sort"><option value="new">Newest first</option><option value="old">Oldest first</option></select>
-    <button class="btn primary" id="sr-dl" ${rows.length?'':'disabled'}>Download ${fmt(rows.length)} matches (CSV)</button><button class="btn" id="sr-link">Copy link to this search</button></div></div>
+    <button class="btn primary dl" id="sr-dl" ${rows.length?'':'disabled'}>Download ${fmt(rows.length)} matches (CSV)</button><button class="btn" id="sr-link">Copy link to this search</button></div></div>
   <div class="results" id="sr-res"></div><div class="pager" id="sr-pg"></div>`;
   const xs = range(Math.max(2005,SR.y0), Math.min(2026,SR.y1));
   if (xs.length > 1) lines($('#sr-ln'), xs, DSK.filter(k=>SR.ds.has(k)).map(k=>{ const all=byDs(k).filter(r=>(SR.major==null||r.major===SR.major) && (k!=='bills' || SR.gas==='all' || r.x.ga===LATEST)); const tot=count(all,r=>r.year), hit=count(rows.filter(r=>r.ds===k),r=>r.year);
@@ -1818,10 +1849,10 @@ function recordFor(rt){
 }
 const HEADS = {
   bill: (r, page) => { const x=r.x, B=x.type==='HB'||x.type==='SB';
-    return { crumb:['bills','Bills'], eyebrow:`${esc(BILLTYPE[x.type]||x.type)} · ${esc(x.chamber)} · ${gaName(x.ga)}`, title:esc(x.bill), sub:esc(x.short),
+    return { crumb:['bills','Bills'], eyebrow:`${esc(BILLTYPE[x.type]||x.type)} · ${esc(x.chamber)} · ${gaName(x.ga)}`, title:esc(x.bill), sub:`${esc(x.short)}${x.short0 && x.short0.toLowerCase() !== x.short.toLowerCase() ? ` <span class="rec-raw" title="The short title as ILGA writes it">${esc(x.short0)}</span>` : ''}`,
       chips:(x.pa?`<span class="chip">Public Act ${esc(x.pa)}</span>`:'')+[...x.flags].filter(f=>!(f==='L' && x.pa)).map(f=>`<span class="chip">${f==='L' && B ? 'Became law' : FLAGS[f]}</span>`).join(''),
       actions:`<a class="btn" href="${ilga(x)}" target="_blank" rel="noopener">Status on ilga.gov ↗</a>` }; },
-  report: (r) => ({ crumb:['thinktanks','Think tanks'], eyebrow:`${orgLink(r.x.org)} · ${r.x.date||r.x.year||'Undated'}`, title:esc(r.title), sub:'',
+  report: (r) => ({ crumb:['thinktanks','Think tanks'], eyebrow:`${orgLink(r.x.org)} · ${fd(r.x.date)||r.x.year||'Undated'}`, title:esc(r.title), sub:'',
       chips:'', actions:ttLinks(r.x, 'btn').join('') }),
   org: (o) => { const P = ORGPROF[o.name] || {}, web = orgWebsite(o);
     return { crumb:['thinktanks','Think tanks'], logo:orgLogo(o, 'lg'),
@@ -1845,8 +1876,8 @@ function renderRecord(){
   $('#view').innerHTML = `
   <div class="crumbs"><button class="btn ghost" id="r-back">← ${STACK.length?'Back':'All '+h.crumb[1].toLowerCase()}</button><a href="#${h.crumb[0]}">${h.crumb[1]}</a><span>›</span><span class="ink2">${kind==='speech'?rec.year:kind==='bill'?esc(rec.x.bill):kind==='sponsor'?esc(rec.title):kind==='committee'?esc(rec.name):kind==='org'?esc(rec.name):esc(rec.x.org)}</span></div>
   <div class="rec-head ${kind==='bill'||kind==='sponsor'||kind==='committee'?'ds-bills':kind==='report'||kind==='org'?'ds-tt':'ds-sots'}">
-    <div class="rec-title">${h.logo||''}<div style="min-width:0"><div class="eyebrow"><i class="dot"></i> ${h.eyebrow}</div><h1 class="${kind==='bill'?'mono-h':''}">${h.title}</h1>${h.sub?`<div class="rec-sub">${h.sub}</div>`:''}${h.chips?`<div class="chips">${h.chips}</div>`:''}</div></div>
-    <div class="rec-actions">${h.actions}<button class="btn" id="r-copy">Copy link</button><button class="btn primary" id="r-dl">Download ${kind==='speech'?'address':kind==='sponsor'?'all their bills':kind==='committee'?'all its bills':kind==='org'?'all their reports':'record'} (CSV)</button></div>
+    <div class="rec-title">${h.logo||''}<div style="min-width:0"><div class="eyebrow"><i class="dot"></i> ${h.eyebrow}</div><h1>${h.title}</h1>${h.sub?`<div class="rec-sub">${h.sub}</div>`:''}${h.chips?`<div class="chips">${h.chips}</div>`:''}</div></div>
+    <div class="rec-actions">${h.actions}<button class="btn" id="r-copy">Copy link</button><button class="btn primary dl" id="r-dl">Download ${kind==='speech'?'address':kind==='sponsor'?'all their bills':kind==='committee'?'all its bills':kind==='org'?'all their reports':'record'} (CSV)</button></div>
   </div>
   <div class="rec-grid ${kind==='speech'?'sticky':''}"><div class="rec-main">${secs.filter(s=>!s.side).map(sec).join('')}</div><aside class="rec-side">${secs.filter(s=>s.side).map(sec).join('')}</aside></div>`;
   function sec(s){ return `<section class="panel" id="sec-${s.id}">${s.title?`<h2 class="hs sec-t">${s.title}</h2>`:''}<div class="sec-b"></div></section>`; }
@@ -1864,7 +1895,7 @@ function copyLink(token){
 const factList = rows => `<dl class="facts">${rows.filter(Boolean).map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
 function relItem(r){
   const x=r.x;
-  if (r.ds==='bills') return `<a class="rel-i" href="${href(r)}"><span class="mono">${esc(x.bill)}</span> ${esc(x.short)}<span class="muted">${x.intro}${x.flags.includes('L')?' · became law / adopted':''}</span></a>`;
+  if (r.ds==='bills') return `<a class="rel-i" href="${href(r)}"><span class="mono">${esc(x.bill)}</span> ${esc(x.short)}<span class="muted">${fd(x.intro)}${x.flags.includes('L')?' · became law / adopted':''}</span></a>`;
   if (r.ds==='tt') return `<a class="rel-i" href="${href(r)}">${esc(r.title)}<span class="muted">${esc(x.org)} · ${r.x.date||r.year||'Undated'}</span></a>`;
   return `<a class="rel-i" href="${href(r)}"><span class="q">“${esc(r.text.length>170?r.text.slice(0,170).replace(/\s\S*$/,'')+'…':r.text)}”</span><span class="muted">${esc(x.governor)}, ${r.year}</span></a>`;
 }
@@ -1899,14 +1930,19 @@ SECTIONS.bill.push(
       el.innerHTML = '<p class="muted" style="margin:0">Loading history…</p>';
       loadActsFor(r).then(A=>{ const steps = A[r.key] || [];
         const mile = /passed|adopted|public act|sent to the governor|governor approved|effective date|veto|concur|enrolled|signed/i;
-        el.innerHTML = `<ol class="steps mclamp">${steps.map(s=>{ const [t,v] = Array.isArray(s)?s:[s,null]; const [y,n,p] = v ? v.split('-').map(Number) : [];
-          return `<li class="${mile.test(t)?'mile':''}"><span>${esc(t)}</span>${v?`<span class="chip vote" title="Yes–No–Present">Vote ${y}–${n}${p?`–${p}`:''}</span>`:''}</li>`; }).join('')}
-          <li class="mile last"><span>${esc(r.x.last_action)}</span><span class="chip">Latest · ${r.x.last_date}</span></li></ol>
-          <p class="muted" style="margin:0;font-size:12.5px">Steps in the order ILGA records them. Dates for each step are on the <a href="${ilga(r.x)}" target="_blank" rel="noopener">ILGA status page</a>.</p>`; })
+        const keyStep = /^(assigned to|do pass|third reading.*(passed|lost)|arrive[ds]? in|passed both houses|sent to the governor|governor (approved|vetoed|amendatory)|total veto|amendatory veto|item veto|public act|effective date)|override/i;
+        const isKey = (t, i) => i === 0 || keyStep.test(t), minor = steps.filter((s, i)=>!isKey(Array.isArray(s)?s[0]:s, i)).length, fold = steps.length > 14 && minor >= 6;
+        el.innerHTML = `${fold?`<div class="steps-bar"><span class="muted" id="st-n">${steps.length - minor + 1} key steps of ${steps.length + 1}</span><button class="btn" id="st-all" aria-expanded="false">Show all ${steps.length + 1} steps</button></div>`:''}
+          <ol class="steps mclamp ${fold?'keyonly':''}" id="st-ol">${steps.map((s,i)=>{ const [t0,v] = Array.isArray(s)?s:[s,null], t = noDots(t0); const [y,n,p] = v ? v.split('-').map(Number) : [];
+          return `<li class="${mile.test(t)?'mile':''} ${isKey(t,i)?'':'minor'}"><span>${esc(t)}</span>${v?`<span class="chip vote" title="Yes–No–Present">Vote ${y}–${n}${p?`–${p}`:''}</span>`:''}</li>`; }).join('')}
+          <li class="mile last"><span>${esc(r.x.last_action)}</span><span class="chip">Latest · ${fd(r.x.last_date)}</span></li></ol>
+          <p class="muted" style="margin:0;font-size:12.5px">Steps in the order ILGA records them. Dates for each step are on the <a href="${ilga(r.x)}" target="_blank" rel="noopener">ILGA status page</a>.</p>`;
+        $('#st-all', el)?.addEventListener('click', e=>{ const ol = $('#st-ol', el), all = ol.classList.toggle('keyonly') === false; e.target.setAttribute('aria-expanded', all);
+          e.target.textContent = all ? 'Show key steps only' : `Show all ${steps.length + 1} steps`; $('#st-n', el).textContent = all ? `All ${steps.length + 1} steps` : `${steps.length - minor + 1} key steps of ${steps.length + 1}`; }); })
       .catch(()=>{ el.innerHTML = '<p class="muted" style="margin:0">The history file did not load. Reload the page to try again.</p>'; }); } },
   { id:'related', title:'Related records', render(r, el){ crossSection(r, el); } },
   { id:'facts', title:'At a glance', side:true, render(r, el){ const x=r.x;
-      el.innerHTML = factList([['Number',`<span class="mono">${esc(x.bill)}</span>`],['Type',esc(BILLTYPE[x.type]||x.type)],['Chamber',esc(x.chamber)],['Introduced',x.intro],['Latest action',`${esc(x.last_action)}<div class="muted">${x.last_date}</div>`],['Furthest stage',`<span class="stage s${x.stage}">${STAGES[(x.stage||1)-1]}</span>`], x.cmte && ['Approved by', cmLinkOf(x.ga, x.cmte)], x.pa && ['Public Act', `${esc(x.pa)}${x.law_date?`<div class="muted">${x.law_date}</div>`:''}`], ['Session',`${gaName(x.ga)}<div class="muted">${esc(gaYears(x.ga))}</div>`]]); } },
+      el.innerHTML = factList([['Number',`<span class="mono">${esc(x.bill)}</span>`],['Type',esc(BILLTYPE[x.type]||x.type)],['Chamber',esc(x.chamber)],['Introduced',fd(x.intro)],['Latest action',`${esc(x.last_action)}<div class="muted">${fd(x.last_date)}</div>`],['Furthest stage',`<span class="stage s${x.stage}">${STAGES[(x.stage||1)-1]}</span>`], x.cmte && ['Approved by', cmLinkOf(x.ga, x.cmte)], x.pa && ['Public Act', `${esc(x.pa)}${x.law_date?`<div class="muted">${fd(x.law_date)}</div>`:''}`], ['Session',`${gaName(x.ga)}<div class="muted">${esc(gaYears(x.ga))}</div>`]]); } },
   { id:'coding', title:'Policy Agendas coding', side:true, render: codingSection },
   { id:'sponsors', title:'Sponsors', side:true, render(r, el){
       const sp = r.sp || []; if (!sp.length){ el.innerHTML = '<p class="muted" style="margin:0">No sponsors listed.</p>'; return; }
@@ -1929,7 +1965,7 @@ SECTIONS.report.push(
       el.innerHTML = relGroup(`More from ${esc(r.x.org)} on ${esc(majorName(r.major))}`, 'tt', more, ()=>{ Object.assign(OG,{slug:orgOf(r.x.org).slug, q:'', major:r.major, page:0}); nav('org-'+orgOf(r.x.org).slug); }) + `<a class="linkbtn" href="#org-${orgOf(r.x.org).slug}">About ${esc(r.x.org)} →</a>`; } },
   { id:'related', title:'Related records', render(r, el){ crossSection(r, el, 'tt'); } },
   { id:'facts', title:'At a glance', side:true, render(r, el){ const x=r.x;
-      el.innerHTML = factList([['Organization',orgLink(x.org)],['Published',x.date||x.year||'Undated'],['Links',ttLinks(x).join('<br>')],['Row id',`<span class="mono">${r.id}</span>`]]); } },
+      el.innerHTML = factList([['Organization',orgLink(x.org)],['Published',fd(x.date)||x.year||'Undated'],['Links',ttLinks(x).join('<br>')],['Row id',`<span class="mono">${r.id}</span>`]]); } },
   { id:'coding', title:'Policy Agendas coding', side:true, render: codingSection }
 );
 
@@ -2166,7 +2202,7 @@ function renderSponsors(){
   $('#view').innerHTML = `${legBar('sponsors')}
   <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Legislators</h1>
     <p>Every legislator named as a sponsor on a substantive bill in the bills dataset, with what they introduced, what they signed onto and what became law. Open a legislator for their full record.</p></div>
-    <button class="btn primary" id="sn-dl">Download sponsor table (CSV)</button></div>
+    <button class="btn primary dl" id="sn-dl">Download sponsor table (CSV)</button></div>
   <div class="kpis">
     <div class="kpi"><span class="l">Legislators</span><span class="v">${act.length}</span><span class="s">${reps.length} House, ${sens.length} Senate, including members who left or joined mid-term</span></div>
     <div class="kpi"><span class="l">Most bills as primary sponsor</span><span class="v" style="font-size:18px;padding-block:5px">${mc?spLink(mc):'—'}</span><span class="s">${fmt(mcn)} bills</span></div>
@@ -2257,7 +2293,7 @@ function topicNodes(rows, major, col, n=8){
   return {nodes, of: r => keep.has(key(r)) ? (major==null ? 'm'+key(r) : 's'+key(r)) : 'other'};
 }
 const STOP = 'hsl(215 14% 78%)';
-const isPlaceholder = r => /-TECH$/i.test((r.x.short||'').trim()) && (r.x.stage||1) < 3;
+const isPlaceholder = r => /-TECH$/i.test((r.x.short0||'').trim()) && (r.x.stage||1) < 3;
 const keepBill = r => SK.shell || !isPlaceholder(r);   // legislator counts leave out placeholder bills unless asked
 const shellToggle = (id, n) => `<label class="check" style="font-size:13px" title="Technical shell bills (short titles ending in -TECH) that never passed a chamber"><input type="checkbox" id="${id}" ${SK.shell?'checked':''}>Include placeholder bills${n?` <span class="muted num">${fmt(n)}</span>`:''}</label>`;
 const shellNote = (n, id) => n ? `<label class="check" style="font-size:12.5px"><input type="checkbox" id="${id}" ${SK.shell?'checked':''}>Include ${pl(n, 'placeholder bill')}</label>` : '';
@@ -2271,7 +2307,7 @@ function memberSankey(el, rows, {major=null, onNode, height}={}){
   const order = new Map(tp.nodes.map((n,i)=>[n.id, i])), links = [];
   const sorted = rows.slice().sort((a,b)=>order.get(tp.of(a))-order.get(tp.of(b)) || a.x.type.localeCompare(b.x.type) || +a.x.bill.split(' ')[1] - +b.x.bill.split(' ')[1]);
   for (const r of sorted){ const t = tp.of(r), st = r.x.stage||1, n = color.get(t), x = r.x;
-    const tip = `<div class="t"><span class="mono">${esc(x.bill)}</span> ${esc(x.short)}</div><div class="r"><span>Topic</span><b>${esc(subName(r.sub))}</b></div><div class="r"><span>Furthest stage</span><b>${esc(STAGES[st-1])}</b></div><div class="r"><span>Latest action</span><b>${esc(x.last_action)}</b></div><div class="muted">${x.last_date} · click to open the bill</div>`;
+    const tip = `<div class="t"><span class="mono">${esc(x.bill)}</span> ${esc(x.short)}</div><div class="r"><span>Topic</span><b>${esc(subName(r.sub))}</b></div><div class="r"><span>Furthest stage</span><b>${esc(STAGES[st-1])}</b></div><div class="r"><span>Latest action</span><b>${esc(x.last_action)}</b></div><div class="muted">${fd(x.last_date)} · click to open the bill</div>`;
     const add = (a, b) => links.push({s:a, t:b, v:1, color:n.color, group:r.key, tip, href:href(r)});
     add(t, st>=2 ? 'c1' : 'c0');
     if (st>=2) add('c1', st>=3 ? 'f1' : 'f0');
@@ -2306,12 +2342,6 @@ SECTIONS.sponsor.push(
         <div class="kpi"><span class="l">Bills that became law</span><span class="v">${fmt(s.law)}</span><span class="s">${s.bills?pct(s.law/s.bills)+' of their bills':'no bills as primary sponsor'}</span></div>
         <div class="kpi"><span class="l">Original co-sponsor</span><span class="v">${fmt(s.H)}</span><span class="s">co-sponsored at introduction</span></div>
         <div class="kpi"><span class="l">Co-sponsor</span><span class="v">${fmt(s.O)}</span><span class="s">${fmt(s.S+s.T)} more in the other chamber</span></div></div>`; } },
-  { id:'ties', title:'Co-sponsorship ties', side:true, render(p, el){
-      const {signs} = netData(p.ch, null, null);
-      const list = dir => [...signs].filter(([k])=>dir==='in' ? k.endsWith('>'+p.i) : k.startsWith(p.i+'>')).map(([k,n])=>[SPON[+k.split('>')[dir==='in'?0:1]], n]).sort((a,b)=>b[1]-a[1]).slice(0,6);
-      const a = list('in'), b = list('out'), rows = l => l.map(([q,n])=>`<div class="r" style="display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:2px 0">${spLink(q)}<b class="num">${fmt(n)}</b></div>`).join('');
-      el.innerHTML = (a.length||b.length) ? `${a.length?`<div class="eyebrow" style="margin-bottom:4px">Co-sponsor their bills most</div>${rows(a)}`:''}${b.length?`<div class="eyebrow" style="margin:10px 0 4px">They co-sponsor bills by</div>${rows(b)}`:''}
-        <p class="muted" style="margin:8px 0 0;font-size:12px">Within the ${chamberName(p.ch)}, counting shared bills. <a href="#sponsors">See the network</a>.</p>` : '<p class="muted" style="margin:0">No co-sponsorship ties in their chamber.</p>'; } },
   { id:'topics', title:'What they introduce', render(p, el){
       const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r) && keepBill(b.r)).map(b=>b.r);
       if (!mine.length){ el.innerHTML = '<p class="muted" style="margin:0">No policy-coded bills as primary sponsor.</p>'; return; }
@@ -2336,17 +2366,17 @@ SECTIONS.sponsor.push(
       el.innerHTML = `<div class="fbar" style="margin:0">
           <div class="seg" role="group" aria-label="Role">${[['C','Primary sponsor'],['H','Original co-sponsor'],['O','Co-sponsor'],['ST','Other chamber'],['all','All']].map(([k,l])=>{ const n = k==='ST'?(counts.S||0)+(counts.T||0):counts[k]||0; return `<button data-r="${k}" aria-pressed="${SPG.role===k}" ${n?'':'disabled'}>${l} <span class="muted num">${fmt(n)}</span></button>`; }).join('')}</div>
           <select id="sg-m" aria-label="Topic">${majorOptions(SPG.major)}</select><label class="check"><input type="checkbox" id="sg-l" ${SPG.law?'checked':''}>Became law</label>${shells?shellToggle('sg-sh2', shells):''}</div>
-        <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="sg-n"></span><button class="btn primary" id="sg-dl">Download these bills</button></div></div>
+        <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="sg-n"></span><button class="btn primary dl" id="sg-dl">Download these bills</button></div></div>
         <div class="tscroll"><table class="dt" style="min-width:640px"><thead><tr><th>Bill</th><th>Description</th><th>Role</th><th>Topic</th><th>Latest action</th></tr></thead><tbody id="sg-tb"></tbody></table></div><div class="pager" id="sg-pg" style="margin-top:4px"></div>`;
       const draw = ()=>{ const rows = newest(kept.filter(b=>(SPG.role==='all'||b.role===SPG.role||(SPG.role==='ST'&&(b.role==='S'||b.role==='T'))) && (SPG.major==null||b.r.major===SPG.major) && (!SPG.law||b.r.x.stage>=5)).map(b=>Object.assign(Object.create(b.r),{_role:b.role})));
         $('#sg-n').innerHTML = `<b class="num" style="color:var(--ink)">${fmt(rows.length)}</b> bills`; $('#sg-dl').disabled = !rows.length;
         $('#sg-dl').onclick = ()=>save(`ipap-${p.slug}-bills.csv`, csvFor(rows.map(r=>Object.getPrototypeOf(r))));
         const PS=25, pages=Math.ceil(rows.length/PS); SPG.page=Math.min(SPG.page,Math.max(0,pages-1));
         $('#sg-tb').innerHTML = rows.slice(SPG.page*PS, SPG.page*PS+PS).map(r=>{ const x=r.x, ch=chiefOf(r);
-          return `<tr class="row" data-h="${href(r)}"><td><a class="mono" href="${href(r)}" style="white-space:nowrap">${esc(x.bill)}</a><div class="muted num" style="font-size:12px">${x.intro}</div></td>
+          return `<tr class="row" data-h="${href(r)}"><td style="white-space:nowrap"><a class="mono" href="${href(r)}">${esc(x.bill)}</a><div class="muted num" style="font-size:12px">${fd(x.intro)}</div></td>
             <td><a class="rl" href="${href(r)}" style="font-weight:600">${esc(x.short)}</a>${r._role!=='C'&&ch?`<div class="muted" style="font-size:12.5px">Primary: ${spLink(ch)}</div>`:''}</td>
             <td style="white-space:nowrap;font-size:13px">${ROLE[r._role]}</td><td style="min-width:170px">${subChip(r.sub)}</td>
-            <td style="min-width:150px;font-size:13px">${esc(x.last_action)}<div class="muted num">${x.last_date}</div>${x.flags.includes('L')?'<span class="chip">Became law / adopted</span>':''}</td></tr>`; }).join('')
+            <td style="min-width:150px;font-size:13px">${esc(x.last_action)}<div class="muted num">${fd(x.last_date)}</div>${x.flags.includes('L')?'<span class="chip">Became law / adopted</span>':''}</td></tr>`; }).join('')
           || '<tr><td colspan="5" class="muted" style="padding:20px">No bills match these filters.</td></tr>';
         $$('#sg-tb tr.row').forEach(tr=>tr.addEventListener('click', e=>{ if (!e.target.closest('a')) nav(tr.dataset.h.slice(1)); }));
         pager($('#sg-pg'), SPG.page, pages, pg=>{ SPG.page=pg; draw(); $('#sec-bills').scrollIntoView({block:'start'}); }); };
@@ -2356,14 +2386,14 @@ SECTIONS.sponsor.push(
       $('#sg-sh2')?.addEventListener('change', e=>{ SK.shell = e.target.checked; renderRecord(); });
       draw(); } },
   { id:'facts', title:'At a glance', side:true, render(p, el){ const ds = p.bills.map(b=>b.r.x.intro).sort();
-      el.innerHTML = factList([['Chamber',chamberName(p.ch)],['Bills',fmt(p.bills.length)],['First listed',ds[0]||'—'],['Most recent',ds[ds.length-1]||'—']]); } },
+      el.innerHTML = factList([['Chamber',chamberName(p.ch)],['Bills',fmt(p.bills.length)],['First listed',fd(ds[0])||'—'],['Most recent',fd(ds[ds.length-1])||'—']]); } },
   { id:'partners', title:'Frequent collaborators', side:true, render(p, el){
       const tally = (pred) => { const m = new Map(); for (const b of p.bills) if (pred(b) && keepBill(b.r)) for (const [i,ro] of b.r.sp) if (i!==p.i && (b.role==='C' ? true : ro==='C')) m.set(i,(m.get(i)||0)+1); return [...m].sort((a,b)=>b[1]-a[1]).slice(0,6); };
       const on = tally(b=>b.role==='C'), join = tally(b=>b.role!=='C');
       const list = (rows, unit) => rows.length ? rows.map(([i,n])=>`<div class="pr"><span>${spLink(SPON[i])}<span class="muted" style="font-size:12px"> · ${chamberName(SPON[i].ch)}</span></span><span class="muted num">${fmt(n)}</span></div>`).join('') : '<p class="muted" style="margin:0;font-size:13px">None</p>';
       el.innerHTML = `<div><div class="rel-h" style="margin-bottom:4px"><b>Sign onto their bills most</b></div>${list(on)}</div>
         <div><div class="rel-h" style="margin-bottom:4px"><b>Whose bills they join most</b></div>${list(join)}</div>
-        <p class="muted" style="margin:0;font-size:12px">Counts of shared bills, any sponsor role.</p>`; } },
+        <p class="muted" style="margin:0;font-size:12px">Counts of shared bills, any sponsor role. <a href="#sponsors">See the co-sponsorship network</a>.</p>`; } },
   { id:'related', title:'Mentioned in speeches and reports', side:true, render(p, el){
       const mine = p.bills.filter(b=>b.role==='C' && isPol(b.r) && keepBill(b.r)).map(b=>b.r); const subs = [...count(mine, r=>r.sub)].sort((a,b)=>b[1]-a[1]).slice(0,3);
       if (!subs.length){ el.innerHTML = '<p class="muted" style="margin:0;font-size:13px">No policy-coded bills to match on.</p>'; return; }
@@ -2431,7 +2461,7 @@ SECTIONS.org.push(
   { id:'reports', title:'Reports', render(o, el){
       el.innerHTML = `<div class="fbar" style="margin:0"><input type="search" id="og-q" placeholder="Search their titles and abstracts" value="${esc(OG.q)}" aria-label="Search reports">
           <select id="og-m" aria-label="Topic">${majorOptions(OG.major)}</select></div>
-        <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="og-n"></span><button class="btn primary" id="og-dl">Download these reports</button></div></div>
+        <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="og-n"></span><button class="btn primary dl" id="og-dl">Download these reports</button></div></div>
         <div class="results" id="og-res"></div><div class="pager" id="og-pg"></div>`;
       const draw = ()=>{ const t = compileQuery(OG.q);
         const rows = newest(o.reports.filter(r=>(OG.major==null || r.major===OG.major) && (!t.n || t.test(r.hay))));
@@ -2546,7 +2576,7 @@ function renderParties(){
   $('#view').innerHTML = `${legBar('parties')}
   <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset and the General Assembly's member lists</div><h1>Parties</h1>
     <p>Democrats and Republicans in the ${gaName(ga)}: seats, what each party's members introduce and pass, and how often bills draw sponsors from across the aisle. A bill's party is its primary sponsor's party.</p></div>
-    <button class="btn primary" id="pt-dl">Download party comparison (CSV)</button></div>
+    <button class="btn primary dl" id="pt-dl">Download party comparison (CSV)</button></div>
   <div class="kpis">
     <div class="kpi"><span class="l">Seats</span><span class="v" style="font-size:19px;line-height:1.3;padding-block:2px"><span style="white-space:nowrap">House ${seat('Rep','Democratic')}–${seat('Rep','Republican')}</span><br><span style="white-space:nowrap">Senate ${seat('Sen','Democratic')}–${seat('Sen','Republican')}</span></span><span class="s">Democrats–Republicans, ${ga===LATEST?'current members':'legislators who sponsored bills'}</span></div>
     <div class="kpi"><span class="l">Bills introduced</span><span class="v">${pct(st.Democratic.n/Math.max(1,B.length),0)} D</span><span class="s">${fmt(st.Democratic.n)} by Democrats, ${fmt(st.Republican.n)} by Republicans</span></div>
@@ -2739,7 +2769,7 @@ function renderCommittees(){
   $('#view').innerHTML = `${legBar('committees')}
   <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Committees</h1>
     <p>Standing committees of the House and Senate: how many substantive bills each was assigned, how many it approved and how many became law. Read from each bill's ILGA action history. The House Rules Committee and Senate Assignments, which send bills to committees, are left out. Open a committee for its bills.</p></div>
-    <button class="btn primary" id="cm-dl">Download committee table (CSV)</button></div>
+    <button class="btn primary dl" id="cm-dl">Download committee table (CSV)</button></div>
   <div class="kpis">
     <div class="kpi"><span class="l">Committees</span><span class="v">${all.length}</span><span class="s">${all.filter(c=>c.ch==='House').length} House, ${all.filter(c=>c.ch==='Senate').length} Senate</span></div>
     <div class="kpi"><span class="l">Bills sent to a committee</span><span class="v">${fmt(assigned.size)}</span><span class="s">${pct(assigned.size/Math.max(1,B.length))} of ${fmt(B.length)} substantive bills</span></div>
@@ -2826,7 +2856,7 @@ SECTIONS.committee.push(
       el.innerHTML = `<div class="fbar" style="margin:0">
           <div class="seg" role="group" aria-label="Outcome">${[['all','All'],['ok','Approved'],['no','Not approved'],['law','Became law']].map(([k,l])=>`<button data-o="${k}" aria-pressed="${CMP.out===k}" ${n(k)?'':'disabled'}>${l} <span class="muted num">${fmt(n(k))}</span></button>`).join('')}</div>
           <select id="cg-m" aria-label="Topic">${majorOptions(CMP.major)}</select></div>
-        <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="cg-n"></span><button class="btn primary" id="cg-dl">Download these bills</button></div></div>
+        <div class="fbar" style="margin:0"><div class="count" style="margin-left:0"><span id="cg-n"></span><button class="btn primary dl" id="cg-dl">Download these bills</button></div></div>
         <div class="tscroll"><table class="dt" style="min-width:640px"><thead><tr><th>Bill</th><th>Description</th><th>Topic</th><th>In this committee</th><th>Furthest stage</th></tr></thead><tbody id="cg-tb"></tbody></table></div><div class="pager" id="cg-pg" style="margin-top:4px"></div>`;
       const draw = ()=>{ const list = c.bills.filter(b=>(CMP.out==='all'||(CMP.out==='ok'&&b.ok)||(CMP.out==='no'&&!b.ok)||(CMP.out==='law'&&b.r.x.stage>=5)) && (CMP.major==null||b.r.major===CMP.major));
         const rows = list.slice().sort((a,b)=>(b.r.x.last_date||'').localeCompare(a.r.x.last_date||''));
@@ -2834,7 +2864,7 @@ SECTIONS.committee.push(
         $('#cg-dl').onclick = ()=>save(`ipap-${c.ga}-${c.slug}-committee-bills.csv`, csvFor(rows.map(b=>b.r)));
         const PS=PHONE()?20:40, pages=Math.ceil(rows.length/PS); CMP.page=Math.min(CMP.page,Math.max(0,pages-1));
         $('#cg-tb').innerHTML = rows.slice(CMP.page*PS, CMP.page*PS+PS).map(({r,ok})=>{ const x=r.x, ch=chiefOf(r);
-          return `<tr class="row" data-h="${href(r)}"><td><a class="mono" href="${href(r)}" style="white-space:nowrap">${esc(x.bill)}</a><div class="muted num" style="font-size:12px">${x.intro||''}</div></td>
+          return `<tr class="row" data-h="${href(r)}"><td style="white-space:nowrap"><a class="mono" href="${href(r)}">${esc(x.bill)}</a><div class="muted num" style="font-size:12px">${fd(x.intro)}</div></td>
             <td><a class="rl" href="${href(r)}" style="font-weight:600">${esc(x.short)}</a><div class="muted" style="font-size:12.5px">${ch?spLink(ch):''}</div></td>
             <td style="font-size:12.5px">${subChip(r.sub)}</td><td>${ok?'<span class="chip">Approved</span>':'<span class="muted">Not approved</span>'}</td><td style="font-size:12.5px">${esc(STAGES[(x.stage||1)-1])}</td></tr>`; }).join('')
           || '<tr><td colspan="5" class="muted" style="padding:24px">No bills match.</td></tr>';
