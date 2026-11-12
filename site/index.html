@@ -166,13 +166,13 @@ table.dt tr.det td{background:var(--sel);padding-top:0;color:var(--ink-2)}
 /* speech reader */
 .strip{display:flex;height:26px;gap:1px;border-radius:4px;overflow:hidden;background:var(--line)}
 .strip i{flex:1;background:var(--sunk);cursor:pointer}
-.strip i.on{background:var(--s-sots)}
+.strip i.on{background:var(--mc, var(--s-sots))}
 .strip i.np{background:var(--bg)}
 .speech{font-family:var(--f-read);font-size:16px;line-height:1.8;max-width:75ch;color:var(--ink-2)}
 .speech p{margin:0 0 14px}
 .speech span{border-radius:3px;padding:1px 0;cursor:default}
 .speech span.np{color:var(--muted)}
-.speech span.on{background:var(--t-sots);color:var(--ink);box-shadow:0 0 0 2px var(--t-sots)}
+.speech span.on{--mt:color-mix(in srgb, var(--mc, var(--s-sots)) 24%, var(--surface));background:var(--mt);color:var(--ink);box-shadow:0 0 0 2px var(--mt)}
 .speech span.flash{outline:2px solid var(--s-sots)}
 .speech sup{font-family:var(--f-mono);font-size:10px;color:var(--ink-2);margin-left:2px}
 
@@ -466,7 +466,7 @@ ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;
 .addr .yr{font-family:var(--f-display);font-size:22px;font-weight:600;line-height:1}
 .addr .gv{font-size:13px;color:var(--ink-2)}
 .mstrip{display:flex;height:12px;gap:0;border-radius:2px;overflow:hidden;background:var(--sunk)}
-.mstrip i{flex:1} .mstrip i.on{background:var(--s-sots)}
+.mstrip i{flex:1} .mstrip i.on{background:var(--mc, var(--s-sots))}
 @media (max-width: 980px){ .rec-grid{grid-template-columns:minmax(0,1fr)} .rec-grid.sticky .rec-side{position:static;max-height:none} .rec-head h1{font-size:26px} }
 
 @media (max-width: 980px){
@@ -1413,7 +1413,7 @@ function renderSpeeches(){
       return `${esc(sp.g.split(' ').slice(-1)[0])}, ${p.source ? `<a href="${esc(p.source)}" target="_blank" rel="noopener">${esc(p.credit || 'source')}</a>` : esc(p.credit || '')}${lic ? ` (${lic})` : ''}`; }).join('; ')}.</p>` : ''}</div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs">The addresses</h2></div>
     <div class="fbar" style="margin:8px 0 12px;justify-content:flex-start"><label class="ink2" for="s-major" style="font-size:13px">Mark sentences on</label><select id="s-major"><option value="all" ${SP.major==='all'?'selected':''}>All topics</option>${majorOptions(spMajor(),'No topic').replace(/^<option value="">No topic<\/option>/,'')}</select></div>
-    <div class="addrs">${years.map(y=>{ const ss=all.filter(r=>r.year===y).sort((a,b)=>a.id-b.id); const M=spMajor(), n=M==null?ss.filter(isPol).length:ss.filter(r=>r.major===M).length;
+    <div class="addrs" style="${spMajor()!=null ? `--mc:${shade(spMajor(),0,1)}` : ''}">${years.map(y=>{ const ss=all.filter(r=>r.year===y).sort((a,b)=>a.id-b.id); const M=spMajor(), n=M==null?ss.filter(isPol).length:ss.filter(r=>r.major===M).length;
       return `<a class="addr" href="#speech-${y}"><span class="yr">${y}</span><span class="gv">${esc(govLabel(govOf(y), y))}</span>
         <span class="mstrip">${ss.map(r=>M==null ? (isPol(r)?`<i style="background:${shade(r.major,0,1)}"></i>`:'<i></i>') : `<i class="${r.major===M?'on':''}"></i>`).join('')}</span>
         <span class="muted num" style="font-size:12px">${fmt(ss.length)} sentences · ${M==null?`${fmt(n)} on policy`:`${fmt(n)} on ${esc(CB.majors[M].split(/,| and /)[0])}`}</span></a>`; }).join('')}</div></div>
@@ -2053,6 +2053,7 @@ SECTIONS.speech.push(
         <div class="speech" id="rd-text"></div>`;
       const draw = ()=>{ const hit = r => spMajor()!=null && r.major===spMajor(); const pol = s.sent.filter(isPol).length, n = s.sent.filter(hit).length;
         $('#rd-meta').innerHTML = `${fmt(s.sent.length)} sentences, ${fmt(pol)} with policy content.` + (spMajor()!=null ? ` <b style="color:var(--ink)">${fmt(n)}</b> on ${esc(CB.majors[spMajor()])} (${pct(n/Math.max(1,pol))} of policy sentences).` : '');
+        const mc = spMajor()!=null ? shade(spMajor(), 0, 1) : ''; ['#rd-text','#rd-strip'].forEach(q=>$(q).style.setProperty('--mc', mc || null));
         $('#rd-strip').innerHTML = s.sent.map(r=>`<i data-id="${r.id}" class="${hit(r)?'on':r.sub===NOPOL?'np':''}"></i>`).join('');
         let html='<p>'; s.sent.forEach((r,i)=>{ if (i && i%5===0) html+='</p><p>'; html += `<span id="sn-${r.id}" data-id="${r.id}" class="${hit(r)?'on':r.sub===NOPOL?'np':''} ${s.sid===r.id?'sel':''}">${esc(r.text)}${SP.codes||hit(r)?`<sup>${r.sub===NOPOL?'−555':r.sub}</sup>`:''}</span> `; }); $('#rd-text').innerHTML = html+'</p>';
         const byId = new Map(s.sent.map(r=>[r.id,r]));
