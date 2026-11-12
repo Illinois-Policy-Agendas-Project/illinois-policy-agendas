@@ -173,7 +173,7 @@ table.dt tr.det td{background:var(--sel);padding-top:0;color:var(--ink-2)}
 .speech span{border-radius:3px;padding:1px 0;cursor:default}
 .speech span.np{color:var(--muted)}
 .speech span.on{--mt:color-mix(in srgb, var(--mc, var(--s-sots)) 24%, var(--surface));background:var(--mt);color:var(--ink);box-shadow:0 0 0 2px var(--mt)}
-.speech span.flash{outline:2px solid var(--s-sots)}
+.speech span.flash{outline:2px solid var(--sc, var(--s-sots))}
 .speech sup{font-family:var(--f-mono);font-size:10px;color:var(--ink-2);margin-left:2px}
 
 /* topics */
@@ -301,7 +301,7 @@ details summary{cursor:pointer;color:var(--accent);font-size:13.5px}
 .quote-s{font-family:var(--f-read);font-size:15.5px;line-height:1.5;font-weight:600;border-left:3px solid var(--s-sots);padding-left:10px}
 .yrchips{display:flex;flex-wrap:wrap;gap:5px} .yrchips a{text-decoration:none}
 .speech span{cursor:pointer} .speech span:hover{background:var(--sunk)}
-.speech span.sel{outline:2px solid var(--s-sots);outline-offset:1px;background:var(--t-sots);color:var(--ink)}
+.speech span.sel{outline:2px solid var(--sc, var(--s-sots));outline-offset:1px;background:color-mix(in srgb, var(--sc, var(--s-sots)) 24%, var(--surface));color:var(--ink)}
 a.spn{color:inherit;text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:2px} a.spn:hover{color:var(--accent);text-decoration-color:currentColor}
 .splist{font-size:13.5px;line-height:1.6}
 .pr{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:4px 0;border-bottom:1px dashed var(--line)}
@@ -1368,7 +1368,7 @@ function billsUpdate(){
 function snippet(text, terms){ const t=String(text||''), i=terms.find ? terms.find(t) : t.toLowerCase().indexOf(terms[0]); if (i<0) return t.slice(0,140)+'…'; const a=Math.max(0,i-60); return (a?'…':'')+t.slice(a, i+100)+'…'; }
 
 /* =================== SPEECHES =================== */
-const SP = { major:'all', codes:false, focus:null, allTopics:true };   // topic highlighted on the tab and on speech pages ('all' colors every sentence by its topic on the tab)
+const SP = { major:3, codes:false, focus:null, allTopics:true };   // topic highlighted on the tab and on speech pages ('all' colors every sentence by its topic on the tab)
 const spMajor = () => typeof SP.major === 'number' ? SP.major : null;
 function speechData(){
   const all = byDs('sots'); const years = range(2005,2025); const pol = all.filter(isPol);
@@ -2055,7 +2055,7 @@ SECTIONS.speech.push(
         $('#rd-meta').innerHTML = `${fmt(s.sent.length)} sentences, ${fmt(pol)} with policy content.` + (spMajor()!=null ? ` <b style="color:var(--ink)">${fmt(n)}</b> on ${esc(CB.majors[spMajor()])} (${pct(n/Math.max(1,pol))} of policy sentences).` : '');
         const mc = spMajor()!=null ? shade(spMajor(), 0, 1) : ''; ['#rd-text','#rd-strip'].forEach(q=>$(q).style.setProperty('--mc', mc || null));
         $('#rd-strip').innerHTML = s.sent.map(r=>`<i data-id="${r.id}" class="${hit(r)?'on':r.sub===NOPOL?'np':''}"></i>`).join('');
-        let html='<p>'; s.sent.forEach((r,i)=>{ if (i && i%5===0) html+='</p><p>'; html += `<span id="sn-${r.id}" data-id="${r.id}" class="${hit(r)?'on':r.sub===NOPOL?'np':''} ${s.sid===r.id?'sel':''}">${esc(r.text)}${SP.codes||hit(r)?`<sup>${r.sub===NOPOL?'−555':r.sub}</sup>`:''}</span> `; }); $('#rd-text').innerHTML = html+'</p>';
+        let html='<p>'; s.sent.forEach((r,i)=>{ if (i && i%5===0) html+='</p><p>'; html += `<span id="sn-${r.id}" data-id="${r.id}"${isPol(r) ? ` style="--sc:${shade(r.major,0,1)}"` : ''} class="${hit(r)?'on':r.sub===NOPOL?'np':''} ${s.sid===r.id?'sel':''}">${esc(r.text)}${SP.codes||hit(r)?`<sup>${r.sub===NOPOL?'−555':r.sub}</sup>`:''}</span> `; }); $('#rd-text').innerHTML = html+'</p>';
         const byId = new Map(s.sent.map(r=>[r.id,r]));
         $$('#rd-text span, #rd-strip i').forEach(e=>{ const r=byId.get(+e.dataset.id); bindTip(e, ()=>`<div class="t">${subChip(r.sub)}</div><div class="muted">${esc(majorName(r.major))}</div>`); e.addEventListener('click', ()=>selectSentence(s, r.id, true)); }); };
       $('#rd-m').addEventListener('change', e=>{ SP.major = e.target.value===''?null:+e.target.value; draw(); drawProfile(s); });
