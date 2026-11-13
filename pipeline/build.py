@@ -1299,14 +1299,53 @@ def bill_slice(b):
 CM_LINE = re.compile(r'^(Arrived? in |(?:Re-)?[Aa]ssigned to |Do Pass|Recommends Be Adopted|Recommends Do (?:Adopt|Consent))')
 
 
+SITE_URL = 'https://www.illinoisagendas.org'
+
+
+def page_slug(name):
+    """The site's slug for a name (slug in site/index.html), with periods dropped first: J.B. Pritzker -> jb-pritzker."""
+    return re.sub(r'^-|-$', '', re.sub(r'[^a-z0-9]+', '-', name.replace('.', '').lower()))[:40]
+
+
+def write_entry_pages(out, sots, cfg=None):
+    """Pages that live after a # are one page to a search engine. For pages worth finding on their own (each governor's),
+    write an entry file next to index.html, e.g. governor-jb-pritzker.html, served at /governor-jb-pritzker: the same app
+    with the page's own title, description and canonical address, opening that page. List them in the sitemap."""
+    index = (out / 'index.html').read_text(encoding='utf-8')
+    years = defaultdict(set)
+    for _, gname, y, _, _ in sots:
+        years[gname].add(int(y))
+    pages = []
+    for name, ys in sorted(years.items(), key=lambda kv: -max(kv[1])):
+        slug, span = f'governor-{page_slug(name)}', (f'{min(ys)}–{max(ys)}' if len(ys) > 1 else str(min(ys)))
+        title = f'{name} · State of the State speeches · Illinois Policy Agendas Project'
+        desc = (f'Governor {name}\'s {len(ys)} State of the State address{"es" if len(ys) > 1 else ""} ({span}), coded sentence by sentence by '
+                f'policy topic: what the addresses paid attention to, compared with other Illinois governors.')
+        url = f'{SITE_URL}/{slug}'
+        h = index
+        h = re.sub(r'<title>[^<]*</title>', f'<title>{html.escape(title)}</title>', h, count=1)
+        h = re.sub(r'(<meta name="description" content=")[^"]*(")', lambda m: m.group(1) + html.escape(desc) + m.group(2), h, count=1)
+        h = re.sub(r'(<meta property="og:title" content=")[^"]*(")', lambda m: m.group(1) + html.escape(f'{name}: State of the State speeches') + m.group(2), h, count=1)
+        h = re.sub(r'(<meta property="og:description" content=")[^"]*(")', lambda m: m.group(1) + html.escape(desc) + m.group(2), h, count=1)
+        h = re.sub(r'(<meta property="og:url" content=")[^"]*(")', lambda m: m.group(1) + url + m.group(2), h, count=1)
+        h = h.replace('<title>', f'<link rel="canonical" href="{url}">\n<title>', 1)
+        (out / f'{slug}.html').write_text(h, encoding='utf-8')
+        pages.append(url)
+    sm = out / 'sitemap.xml'   # tell search engines when the data last changed, and where the entry pages are
+    if sm.exists():
+        today = dt.date.today().isoformat()
+        x = sm.read_text(encoding='utf-8').replace('<changefreq>', f'<lastmod>{today}</lastmod><changefreq>', 1)
+        extra = ''.join(f'  <url><loc>{u}</loc><lastmod>{today}</lastmod><changefreq>yearly</changefreq></url>\n' for u in pages)
+        sm.write_text(x.replace('</urlset>', extra + '</urlset>'), encoding='utf-8')
+    return pages
+
+
 def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=None, logo_copies=(), governors=(), home=None, legislators=None, govphotos=None):
     out = ROOT / cfg['build']['output'] / 'site'
     if out.exists():
         shutil.rmtree(out)
     shutil.copytree(ROOT / cfg['build']['site_template'], out)
-    sm = out / 'sitemap.xml'   # tell search engines when the data last changed
-    if sm.exists():
-        sm.write_text(sm.read_text(encoding='utf-8').replace('<changefreq>', f'<lastmod>{dt.date.today().isoformat()}</lastmod><changefreq>', 1), encoding='utf-8')
+    write_entry_pages(out, sots, cfg)
     d = out / 'data'
     files = {}
     files['codebook'] = dump(d / 'codebook.json', {'majors': codebook['majors'], 'subs': codebook['subs']})

@@ -64,6 +64,7 @@ def main():
     for f in (ROOT / 'site').iterdir():   # index.html, the favicon and the link-preview image
         if f.is_file():
             shutil.copyfile(f, docs / f.name)
+    B.write_entry_pages(docs, json.loads((d / 'sots.json').read_text(encoding='utf-8'))['rows'])   # governors' pages, listed in the sitemap
     (docs / '.nojekyll').write_text('')
     for level, ds, msg, _ in rep.items:
         print(f'  [{level}] {ds}: {msg}')

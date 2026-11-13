@@ -1702,7 +1702,7 @@ function srApply(qs){ if (qs === SR.applied) return; SR.applied = CB ? qs : unde
   Object.assign(SR, { q:p.get('q')||'', ds:new Set(ins.length || p.get('in') === '' ? ins : DSK),   /* "in=" with nothing after it: every source unchecked */ major: qMajor(m),
     ...(([y0, y1]) => ({y0, y1}))(qYears(p.get('from'), p.get('to'))), gas:p.get('ga')==='all' ? 'all' : 'latest', sort:p.get('sort')==='old' ? 'old' : 'new', page:0 }); }
 function srSync(){ if (ROUTE.view !== 'search') return; const t = srToken(); if (t === CUR) return;
-  CUR = t; ROUTE = parseRoute(t); SR.applied = ROUTE.params; try { history.replaceState(null, '', '#' + t); localStorage.setItem('ilpa2-view', t); } catch {} }
+  CUR = t; ROUTE = parseRoute(t); SR.applied = ROUTE.params; try { history.replaceState(null, '', hashUrl(t)); localStorage.setItem('ilpa2-view', t); } catch {} }
 function srFilter(){ const t=compileQuery(SR.q); if (!t.n) return [];
   return R.filter(r=>SR.ds.has(r.ds) && (r.ds!=='bills' || SR.gas==='all' || r.x.ga===LATEST) && (SR.major==null || r.major===SR.major) && (r.year==null || (r.year>=SR.y0 && r.year<=SR.y1)) && t.test(r.hay)); }
 /* "go straight to": legislators, committees, think tanks, topics and bill numbers whose names match what was typed */
@@ -2145,7 +2145,7 @@ function applyParams(rt){ const y = SYNC[rt.view]; if (!y || !R.length || rt.par
 /* after anything on the page changes, write its filters to the address (replacing, not adding to, the history) */
 function urlSync(){ const y = SYNC[ROUTE.view]; if (!y || !R.length || !CUR) return; const q = y.to().toString(), t = q ? ROUTE.view + '?' + q : ROUTE.view;
   if (t === CUR) return; const rt = parseRoute(t); if (!rt) return;
-  CUR = t; ROUTE = rt; APPLIED[rt.view] = rt.params; try { history.replaceState(null, '', '#' + t); localStorage.setItem('ilpa2-view', t); } catch {} }
+  CUR = t; ROUTE = rt; APPLIED[rt.view] = rt.params; try { history.replaceState(null, '', hashUrl(t)); localStorage.setItem('ilpa2-view', t); } catch {} }
 
 /* =================== ABOUT ===================
    #about, with #about-data, #about-team, #about-license and #about-cite opening at that section. Text from [about] in home.toml,
@@ -2419,7 +2419,7 @@ function selectSentence(s, id, scroll){
   const r = s.sent.find(x=>x.id===id); if (!r) return; s.sid = id;
   $$('.speech .sel').forEach(e=>e.classList.remove('sel')); const el = $('#sn-'+id); el?.classList.add('sel');
   if (scroll) el?.scrollIntoView({behavior:'smooth', block:'center'});
-  CUR = `speech-${s.year}-s${id}`; try { history.replaceState(null,'','#'+CUR); } catch {}
+  CUR = `speech-${s.year}-s${id}`; try { history.replaceState(null,'',hashUrl(CUR)); } catch {}
   const idx = s.sent.indexOf(r), others = isPol(r) ? byDs('sots').filter(o=>o.sub===r.sub && o.year!==s.year) : [];
   const yrs = [...count(others, o=>o.year)].sort((a,b)=>a[0]-b[0]);
   const box = $('#sec-sentence .sec-b');
@@ -3526,6 +3526,11 @@ function bindReplay(tl){
 
 const RENDER = {home:renderHome, find:renderFind, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, 'thinktanks-reports':renderTtReports, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch, contact:renderContact, about:renderAbout, trends:renderTrends};
 let CUR = null, ROUTE = {view:'bills'}; const STACK = [];
+/* the address of a page. Pages live after a # on the home address; an entry file such as /governor-jb-pritzker (written by
+   the build so search engines can list the page) opens its page, and the address returns to /#… once the app runs. */
+const entryOf = () => { const e = location.pathname.replace(/^\/+|\/+$/g, '').replace(/\.html$/, ''); return e && e !== 'index' && parseRoute(e) ? e : ''; };
+const ENTRY = location.pathname.replace(/^\/+|\/+$/g, '').replace(/\.html$/, '');
+const hashUrl = t => (ENTRY && ENTRY !== 'index' ? '/' : '') + '#' + t;
 function parseRoute(t){
   if (RENDER[t]) return {view:t};
   let m;
@@ -3614,8 +3619,8 @@ function drawNav(){ const n = $('nav.tabs'); n.innerHTML = navHTML(); bindNavSub
 /* nav(token): go to a tab or record page, remembering where we came from */
 function nav(token, {record=true, keep=false}={}){
   if (!parseRoute(token)) token = 'bills';
-  if (record && CUR && CUR !== token){ STACK.push({token:CUR, y:scrollY}); if (STACK.length > 60) STACK.shift(); try { history.pushState(null,'','#'+token); } catch {} }
-  else { try { history.replaceState(null,'','#'+token); } catch {} }
+  if (record && CUR && CUR !== token){ STACK.push({token:CUR, y:scrollY}); if (STACK.length > 60) STACK.shift(); try { history.pushState(null,'',hashUrl(token)); } catch {} }
+  else { try { history.replaceState(null,'',hashUrl(token)); } catch {} }
   CUR = token; ROUTE = parseRoute(token); if (ROUTE.view === 'search' && ROUTE.params != null) srApply(ROUTE.params); applyParams(ROUTE); drawNav(); hideTip(); try { localStorage.setItem('ilpa2-view', token); } catch {}
   if (!R.length) return;
   const want = needsFor(ROUTE), me = ++navSeq;
@@ -3630,7 +3635,7 @@ function nav(token, {record=true, keep=false}={}){
   if (!pending.length) return draw();
   withLoading(need(want)).then(draw);
 }
-let navSeq = 0; const SITE_TITLE = document.title;
+let navSeq = 0; const SITE_TITLE = document.querySelector('meta[property="og:site_name"]')?.content || document.title;   // not the entry page's own title
 /* page views with GoatCounter (no cookies, no personal data) when config.toml [analytics] goatcounter is set. Each
    view is counted as its own path (/bill-104-HB35, /speeches), since GoatCounter ignores the part after # by itself. */
 let GC_LAST = null, GC_WAIT = null;
@@ -3664,7 +3669,7 @@ function withLoading(p){
 }
 function back(){ const p = STACK.pop(); if (!p) return nav(tabOf(ROUTE), {record:false}); nav(p.token, {record:false}); scrollTo({top:p.y}); }
 document.addEventListener('click', e=>{ const a = e.target.closest('a[href^="#"]'); if (!a || e.metaKey || e.ctrlKey) return; const t = a.getAttribute('href').slice(1); if (!parseRoute(t)) return; e.preventDefault(); nav(t); });
-addEventListener('popstate', ()=>{ const t = location.hash.slice(1); if (parseRoute(t) && t !== CUR){ if (STACK.length && STACK[STACK.length-1].token === t) return back(); nav(t, {record:false}); } });
+addEventListener('popstate', ()=>{ const t = location.hash.slice(1) || entryOf(); if (parseRoute(t) && t !== CUR){ if (STACK.length && STACK[STACK.length-1].token === t) return back(); nav(t, {record:false}); } });
 addEventListener('hashchange', ()=>{ const t = location.hash.slice(1); if (parseRoute(t) && t !== CUR) nav(t); });
 let lastW = innerWidth, rz; addEventListener('resize', ()=>{ if (Math.abs(innerWidth-lastW)<40) return; lastW=innerWidth; clearTimeout(rz); rz=setTimeout(()=>{ if (R.length) nav(CUR, {record:false, keep:true}); },250); });
 /* give every cell of a data table its column's name, for the phone layout above */
@@ -3693,7 +3698,7 @@ function announceCount(){ clearTimeout(ANN.t); ANN.t = setTimeout(()=>{
   if (view !== ANN.view){ ANN = {view, text, t:0}; return; }
   if (text && text !== ANN.text){ ANN.text = text; const a = $('#announce'); a.textContent = ''; setTimeout(()=>{ a.textContent = text; }, 50); } }, 700); }
 document.getElementById('fyear').textContent = new Date().getFullYear();
-let start = location.hash.slice(1); if (!parseRoute(start||'')) start='home';
+let start = location.hash.slice(1) || entryOf(); if (!parseRoute(start||'')) start='home';
 nav(start, {record:false});
 load().then(()=>{ drawStrip(); nav(CUR, {record:false, keep:true}); }).catch(e=>{ $('#view').innerHTML = `<div class="loading">Could not load the data files (${esc(e.message)}). Reload the page to try again.</div>`; });
 </script>
