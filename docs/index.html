@@ -1167,7 +1167,8 @@ function billFilter(skipTopic){ const t=compileQuery(BL.q);
     && (BL.view!=='committee' || !BL.cmte || x.cmte===BL.cmte)
     && (!t.n || t.test(r.hay)); }); }
 function renderBills(){
-  BL.ga ??= LATEST; const all = billsOf(BL.ga), B = all.filter(isBillT); const y0 = parseInt(gaYears(BL.ga)) || 2025, preStart = `${y0-1}-12`;
+  BL.ga ??= LATEST; const all = billsOf(BL.ga), B = all.filter(isBillT);
+  if (BL.cmte && !all.some(r=>r.x.cmte===BL.cmte)) BL.cmte = ''; const y0 = parseInt(gaYears(BL.ga)) || 2025, preStart = `${y0-1}-12`;
   const V = BL.view, inTopic = r => (BL.major==null || r.major===BL.major) && (BL.sub==null || r.sub===BL.sub);
   const funnel = STAGES.map((_,i)=>B.filter(r=>inTopic(r) && r.x.stage>=i+1).length);
   const out = all.filter(r=>r.x.stage>=2), laws = B.filter(r=>r.x.stage>=5);
@@ -1608,10 +1609,10 @@ function srToken(){ const p = new URLSearchParams();
   if (SR.y0 !== 1991) p.set('from', SR.y0); if (SR.y1 !== 2026) p.set('to', SR.y1);
   if (SR.gas === 'all') p.set('ga', 'all'); if (SR.sort === 'old') p.set('sort', 'old');
   const q = p.toString(); return q ? 'search?' + q : 'search'; }
-function srApply(qs){ if (qs === SR.applied) return; SR.applied = qs; const p = new URLSearchParams(qs || '');
+function srApply(qs){ if (qs === SR.applied) return; SR.applied = CB ? qs : undefined;   /* read again once the data is in, to check the topic */ const p = new URLSearchParams(qs || '');
   const ins = (p.get('in')||'').split(',').filter(k=>DSK.includes(k)), m = p.get('topic');
-  Object.assign(SR, { q:p.get('q')||'', ds:new Set(ins.length || p.get('in') === '' ? ins : DSK),   /* "in=" with nothing after it: every source unchecked */ major: m!=null && m!=='' && !isNaN(+m) ? +m : null,
-    y0:yrClamp(p.get('from'), 1991), y1:yrClamp(p.get('to'), 2026), gas:p.get('ga')==='all' ? 'all' : 'latest', sort:p.get('sort')==='old' ? 'old' : 'new', page:0 }); }
+  Object.assign(SR, { q:p.get('q')||'', ds:new Set(ins.length || p.get('in') === '' ? ins : DSK),   /* "in=" with nothing after it: every source unchecked */ major: qMajor(m),
+    ...(([y0, y1]) => ({y0, y1}))(qYears(p.get('from'), p.get('to'))), gas:p.get('ga')==='all' ? 'all' : 'latest', sort:p.get('sort')==='old' ? 'old' : 'new', page:0 }); }
 function srSync(){ if (ROUTE.view !== 'search') return; const t = srToken(); if (t === CUR) return;
   CUR = t; ROUTE = parseRoute(t); SR.applied = ROUTE.params; try { history.replaceState(null, '', '#' + t); localStorage.setItem('ilpa2-view', t); } catch {} }
 function srFilter(){ const t=compileQuery(SR.q); if (!t.n) return [];
@@ -1785,22 +1786,30 @@ function renderTrends(){
    linked to and Back returns to it: #bills?topic=3&sub=325, #thinktanks-reports?org=Illinois+Policy&from=2020, #topics?m=3&s=325.
    Only what differs from the defaults is written. to() reads the page's state into params; from() sets the state from a link. */
 const qNum = v => v != null && v !== '' && !isNaN(+v) ? +v : null;
+/* values read from a link, kept only when the data has them: a major topic; a subtopic, with the topic it belongs to;
+   two years in order. A link someone edited by hand then shows what it filters on, and the address is corrected. */
+const qMajor = v => { const m = qNum(v); return m == null || !CB ? m : MAJORS().includes(m) ? m : null; };   // before the codebook loads: as written
+const qTopic = (mv, sv) => { let major = qMajor(mv), sub = qNum(sv);
+  if (sub == null || !CB.subs[sub]) return {major, sub:null};
+  const sm = Math.floor(sub / 100); if (major == null && MAJORS().includes(sm)) major = sm;
+  return {major, sub: sm === major ? sub : null}; };
+const qYears = (a, b) => { const y0 = yrClamp(a, 1991), y1 = yrClamp(b, 2026); return [Math.min(y0, y1), Math.max(y0, y1)]; };
 const billsSync = {
   to(){ const p = new URLSearchParams(); if (BL.ga && BL.ga !== LATEST) p.set('ga', BL.ga); if (BL.q.trim()) p.set('q', BL.q.trim()); if (BL.type) p.set('type', BL.type);
     if (BL.major != null) p.set('topic', BL.major); if (BL.sub != null) p.set('sub', BL.sub); if (BL.status) p.set('status', BL.status); if (BL.cmte && ROUTE.view === 'bills-committee') p.set('cmte', BL.cmte); return p; },
   from(p){ const ga = qNum(p.get('ga')); Object.assign(BL, { ga: ALL_SESSIONS.some(x=>x.ga===ga) ? ga : LATEST, q: p.get('q') || '', type: ['HB','SB'].includes(p.get('type')) ? p.get('type') : '',
-    major: qNum(p.get('topic')), sub: qNum(p.get('sub')), status: ['R','A'].includes(p.get('status')) ? p.get('status') : '', cmte: p.get('cmte') || '', page: 0 }); } };
+    ...qTopic(p.get('topic'), p.get('sub')), status: ['R','A'].includes(p.get('status')) ? p.get('status') : '', cmte: p.get('cmte') || '', page: 0 }); } };
 const SYNC = {
   bills: billsSync, 'bills-introduced': billsSync, 'bills-committee': billsSync, 'bills-law': billsSync,
   'bills-activity': {
     to(){ const p = new URLSearchParams(); if (BL.ga && BL.ga !== LATEST) p.set('ga', BL.ga); if (ACT.q.trim()) p.set('q', ACT.q.trim()); if (ACT.type) p.set('type', ACT.type);
       if (ACT.major != null) p.set('topic', ACT.major); if (ACT.kind) p.set('kind', ACT.kind); if (ACT.routine) p.set('routine', 1); return p; },
     from(p){ const ga = qNum(p.get('ga')); BL.ga = ALL_SESSIONS.some(x=>x.ga===ga) ? ga : LATEST;
-      Object.assign(ACT, { q: p.get('q') || '', type: ['HB','SB'].includes(p.get('type')) ? p.get('type') : '', major: qNum(p.get('topic')), kind: /^[a-z]+$/.test(p.get('kind') || '') ? p.get('kind') : '', routine: p.get('routine') === '1', shown: 120 }); } },
+      Object.assign(ACT, { q: p.get('q') || '', type: ['HB','SB'].includes(p.get('type')) ? p.get('type') : '', major: qMajor(p.get('topic')), kind: ACT_KINDS.some(([k])=>k===p.get('kind')) ? p.get('kind') : '', routine: p.get('routine') === '1', shown: 120 }); } },
   'thinktanks-reports': {
     to(){ const p = new URLSearchParams(); if (TT.q.trim()) p.set('q', TT.q.trim()); if (TT.org) p.set('org', TT.org); if (TT.major != null) p.set('topic', TT.major);
       if (TT.y0 !== 1991) p.set('from', TT.y0); if (TT.y1 !== 2026) p.set('to', TT.y1); return p; },
-    from(p){ const og = p.get('org') || ''; Object.assign(TT, { q: p.get('q') || '', org: orgs().some(o=>o.name===og) ? og : '', major: qNum(p.get('topic')), y0: yrClamp(p.get('from'), 1991), y1: yrClamp(p.get('to'), 2026), page: 0 }); } },
+    from(p){ const og = p.get('org') || ''; Object.assign(TT, { q: p.get('q') || '', org: orgs().some(o=>o.name===og) ? og : '', major: qMajor(p.get('topic')), ...(([y0, y1]) => ({y0, y1}))(qYears(p.get('from'), p.get('to'))), page: 0 }); } },
   topics: {
     to(){ const p = new URLSearchParams(); p.set('m', TP.major); if (TP.sub != null) p.set('s', TP.sub); if (TP.ds !== 'all') p.set('src', TP.ds); return p; },
     from(p){ const m = qNum(p.get('m')), sub = qNum(p.get('s')); Object.assign(TP, { major: MAJORS().includes(m) ? m : 5, sub: sub != null && CB.subs[sub] ? sub : null, ds: DSK.includes(p.get('src')) ? p.get('src') : 'all', page: 0 }); } },
