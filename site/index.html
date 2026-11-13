@@ -69,7 +69,7 @@ nav.tabs button{border:0;background:none;cursor:pointer;padding:10px 14px;font-s
 nav.tabs button:hover{color:var(--ink)}
 nav.tabs button[aria-current="page"]{color:var(--ink);font-weight:600;border-bottom-color:var(--accent)}
 nav.tabs .sep{width:1px;background:var(--line-2);margin:10px 6px}
-nav.tabs{flex-direction:column} .tabs-wide{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none} .tabs-wide [data-v="find"]{margin-left:auto}   /* the codebook sits at the far right */
+nav.tabs{flex-direction:column} .tabs-wide{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none} .tabs-wide [data-v="about"]{margin-left:auto}   /* the codebook sits at the far right */
 nav.tabs .menu-btn,nav.tabs .menu-panel{display:none}
 @media (max-width:560px){
   .tabs-wide{display:none} nav.tabs{margin-bottom:10px}
@@ -699,6 +699,14 @@ mark{background:#ffe2d6}
 .fd-leg i{width:14px;height:10px;border-radius:2px;display:inline-block} .fd-leg i.hi{background:none;border:2px solid var(--ink)}
 @media (max-width:900px){ .fd-layout{grid-template-columns:minmax(0,1fr)} .fd-map{position:static} }
 @media (forced-colors: active){ #fd-svg path{forced-color-adjust:none} }
+.fd-svgwrap{position:relative} #fd-svg{cursor:grab;outline-offset:2px} #fd-svg:active{cursor:grabbing} #fd-svg.zoomed{touch-action:none}
+#fd-svg:focus-visible{outline:2px solid var(--navy-2,#1f3a68)}
+.fd-zoom{position:absolute;bottom:8px;left:8px;display:flex;flex-direction:column;border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.fd-zoom button{width:36px;height:36px;border:0;background:var(--surface);color:var(--ink);font:600 20px/1 var(--f-ui);cursor:pointer} .fd-zoom button + button{border-top:1px solid var(--line)}
+.fd-zoom button:hover:not(:disabled){background:var(--sunk)} .fd-zoom button:disabled{color:var(--muted);cursor:default;opacity:.5} .fd-zoom button:focus-visible{outline:2px solid var(--navy-2,#1f3a68);outline-offset:-3px}
+.fd-zoom #fd-zreset{font-size:16px}
+.fd-zhint{font-size:12px;margin:6px 0 0}
+.fd-sel-l:empty{display:none} .fd-sel-l h2{margin-top:22px}
 </style>
 
 <a class="skip" href="#view" onclick="event.preventDefault();event.stopPropagation();const v=document.getElementById('view');v.setAttribute('tabindex','-1');v.focus();">Skip to content</a>
@@ -737,7 +745,7 @@ const DS = {
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
 /* top menu: [route, label, dot class, section]. Parties, Committees and Day by day are sub-tabs of Bills (LEGTABS), next to its stage views. */
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Legislators','nd-leg'],null,['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],['topics','Topics','nd-topics'],['search','Search','nd-search'],['find','Find my legislators'],['about','About'],['codebook','Codebook']];
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Legislators','nd-leg'],null,['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],['topics','Topics','nd-topics'],['search','Search','nd-search'],['about','About'],['find','Find my legislators']];
 const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
 // the Bills sub-menu. All bills is the Bills page; its stage views (Introduced, Out of committee, Became law) are reached
 // from the stage boxes on it, and keep All bills underlined
@@ -1805,7 +1813,7 @@ function fdCard(ch, district, share){
    for its member, click it to show their card; the menu below does the same by keyboard. A lookup zooms to the
    districts found, with a pin where the Census Bureau placed an address. Outlines from data/districtmap.json. */
 let DMAP = null;
-const FMAP = { layer:'house', found:null, pin:null, sel:null, view:null };
+const FMAP = { layer:'house', found:null, pin:null, sel:null, vb:null };
 const fdCh = () => FMAP.layer === 'house' ? 'Rep' : 'Sen';
 const fdProj = (lon, lat) => { const P = DMAP.proj; return [(lon - P.lon0) * P.cos * P.k, (P.lat0 - lat) * P.k]; };
 const fdFill = d => { const w = seatHolder(fdCh(), d); return w ? `color-mix(in srgb, var(${PCSS[w.party] || '--pi'}) 62%, var(--surface))` : 'var(--sunk)'; };
@@ -1828,33 +1836,90 @@ function fdMapDraw(){
   $('#fd-svg').setAttribute('aria-label', `Map of Illinois ${chamberName(ch)} districts, colored by the party of the current member${FMAP.found ? '. The districts found are outlined' : ''}${FMAP.pin ? ', and a pin marks the address' : ''}.`);
   $('#fd-pick').innerHTML = `<option value="">Choose a ${chamberName(ch)} district…</option>` + Object.keys(shapes).map(d=>{ const w = seatHolder(ch, d); return `<option value="${d}" ${FMAP.sel===+d?'selected':''}>District ${d}${w ? ' · ' + esc(withParty({name:w.name, party:w.party})) : ''}</option>`; }).join('');
   $$('#fd-layer button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.l === FMAP.layer));
-  fdZoom(FMAP.view);
+  if (FMAP.vb) fdSetView(FMAP.vb); else fdZoom(null);
 }
 /* zoom to a box in map units, or to all of Illinois */
 function fdZoom(box){
-  const svg = $('#fd-svg'); if (!svg) return; FMAP.view = box;
+  if (!$('#fd-svg') || !DMAP) return;
   let [x, y, w, h] = box || [0, 0, DMAP.w, DMAP.h];
-  if (box){ const pad = Math.max(w, h) * 0.35 + 6; x -= pad; y -= pad; w += 2*pad; h += 2*pad;
-    const want = DMAP.w / DMAP.h; if (w / h < want){ const nw = h * want; x -= (nw - w)/2; w = nw; } else { const nh = w / want; y -= (nh - h)/2; h = nh; } }
+  if (box){ const pad = Math.max(w, h) * 0.35 + 6; x -= pad; y -= pad; w += 2*pad; h += 2*pad; }
+  const want = DMAP.w / DMAP.h; if (w / h < want){ const nw = h * want; x -= (nw - w)/2; w = nw; } else { const nh = w / want; y -= (nh - h)/2; h = nh; }
+  fdSetView([x, y, w, h]);
+}
+function fdSetView([x, y, w, h]){
+  const svg = $('#fd-svg'); if (!svg) return;
+  const maxW = DMAP.w, minW = DMAP.w / 60, k = Math.min(maxW, Math.max(minW, w)) / w;   // no closer than about 1 km across, no further than the state
+  const cx = x + w/2, cy = y + h/2; w *= k; h *= k;
+  const fx = Math.min(Math.max(cx, 0), DMAP.w), fy = Math.min(Math.max(cy, 0), DMAP.h);       // the centre stays over Illinois
+  x = fx - w/2; y = fy - h/2; FMAP.vb = [x, y, w, h];
   svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
   const r = w * 0.016; svg.querySelectorAll('.fd-pin circle').forEach((c, i)=>c.setAttribute('r', i ? r * 0.55 : r));
+  svg.classList.toggle('zoomed', w < DMAP.w * 0.98);   // zoomed in: one-finger drags pan the map instead of scrolling the page
+  const zi = $('#fd-zin'), zo = $('#fd-zout'); if (zi) zi.disabled = w <= minW * 1.01; if (zo) zo.disabled = w >= maxW * 0.99;
 }
+/* zoom by a factor around a point in map units (the view's centre if none) */
+function fdZoomBy(f, px, py){
+  const [x, y, w, h] = FMAP.vb || [0, 0, DMAP.w, DMAP.h]; if (px == null){ px = x + w/2; py = y + h/2; }
+  fdSetView([px - (px - x) / f, py - (py - y) / f, w / f, h / f]);
+}
+const fdPan = (fx, fy) => { const [x, y, w, h] = FMAP.vb || [0, 0, DMAP.w, DMAP.h]; fdSetView([x + w*fx, y + h*fy, w, h]); };
+/* a point on screen, in map units */
+const fdAt = (svg, cx, cy) => { const r = svg.getBoundingClientRect(), [x, y, w, h] = FMAP.vb || [0, 0, DMAP.w, DMAP.h], s = Math.max(w / r.width, h / r.height);
+  return [x + w/2 + (cx - r.left - r.width/2) * s, y + h/2 + (cy - r.top - r.height/2) * s]; };
 const fdBox = ds => { const bs = ds.map(d=>$(`#fd-svg .fd-ds path[data-d="${d}"]`)?.getBBox()).filter(Boolean); if (!bs.length) return null;
   const x0 = Math.min(...bs.map(b=>b.x)), y0 = Math.min(...bs.map(b=>b.y)), x1 = Math.max(...bs.map(b=>b.x+b.width)), y1 = Math.max(...bs.map(b=>b.y+b.height)); return [x0, y0, x1-x0, y1-y0]; };
-function fdPick(d, fromMenu){
-  FMAP.sel = d; fdMapDraw(); if (d == null) return;
-  if (fromMenu) fdZoom(fdBox([d]));
-  const box = $('#fd-selcard'); box.innerHTML = `<div class="fd-grid" style="grid-template-columns:minmax(0,1fr)">${fdCard(fdCh(), d)}</div>`;
+function fdMarks(){
+  const svg = $('#fd-svg'); if (!svg) return; const found = new Set((FMAP.found?.[FMAP.layer]) || []), top = svg.querySelector('.fd-top'); top.innerHTML = '';
+  svg.querySelectorAll('.fd-ds path').forEach(p=>{ const d = +p.dataset.d; p.classList.toggle('hi', found.has(d)); p.classList.toggle('sel', FMAP.sel===d); if (found.has(d) || FMAP.sel===d) top.appendChild(p.cloneNode()); });
+  $('#fd-pick').value = FMAP.sel ?? '';
 }
+function fdPick(d, fromMenu){
+  FMAP.sel = d; fdMarks(); if (d == null){ fdSelClear(); return; }
+  if (fromMenu) fdZoom(fdBox([d]));
+  fdSelClear(); const wide = matchMedia('(min-width: 901px)').matches, box = $(wide ? '#fd-sel-l' : '#fd-selcard');
+  box.innerHTML = `<h2 class="hs">Chosen on the map</h2><div class="fd-grid"${wide ? '' : ' style="grid-template-columns:minmax(0,1fr)"'}>${fdCard(fdCh(), d)}</div>`;
+}
+const fdSelClear = () => { ['#fd-sel-l', '#fd-selcard'].forEach(q=>{ const e = $(q); if (e) e.innerHTML = ''; }); };
 function fdShowFound(found, pin){
-  FMAP.found = found; FMAP.pin = pin; FMAP.sel = null; if (!DMAP || !$('#fd-svg')) return; $('#fd-selcard').innerHTML = '';
+  FMAP.found = found; FMAP.pin = pin; FMAP.sel = null; if (!DMAP || !$('#fd-svg')) return; fdSelClear();
   fdMapDraw(); fdZoom(fdBox(found?.[FMAP.layer] || []));
+}
+
+/* zooming and panning: buttons, keyboard, Ctrl/⌘ + wheel (and trackpad pinch), double-click, drag, two-finger pinch */
+function fdMapGestures(){
+  const svg = $('#fd-svg');
+  $('#fd-zin').addEventListener('click', ()=>fdZoomBy(1.6)); $('#fd-zout').addEventListener('click', ()=>fdZoomBy(1/1.6)); $('#fd-zreset').addEventListener('click', ()=>fdZoom(null));
+  svg.addEventListener('keydown', e=>{
+    const act = {'+':()=>fdZoomBy(1.4), '=':()=>fdZoomBy(1.4), '-':()=>fdZoomBy(1/1.4), '_':()=>fdZoomBy(1/1.4), '0':()=>fdZoom(null),
+      ArrowLeft:()=>fdPan(-0.15, 0), ArrowRight:()=>fdPan(0.15, 0), ArrowUp:()=>fdPan(0, -0.15), ArrowDown:()=>fdPan(0, 0.15)}[e.key];
+    if (act){ e.preventDefault(); act(); } });
+  svg.addEventListener('wheel', e=>{ if (!e.ctrlKey && !e.metaKey) return;   // plain scrolling scrolls the page
+    e.preventDefault(); const [px, py] = fdAt(svg, e.clientX, e.clientY); fdZoomBy(Math.exp(-e.deltaY * 0.004), px, py); }, {passive:false});
+  svg.addEventListener('dblclick', e=>{ e.preventDefault(); const [px, py] = fdAt(svg, e.clientX, e.clientY); fdZoomBy(e.shiftKey ? 1/2 : 2, px, py); });
+  const pts = new Map(); let moved = 0, pinch = null;
+  svg.addEventListener('pointerdown', e=>{
+    if (e.pointerType === 'touch' && !svg.classList.contains('zoomed') && !pts.size) return;   // at full view a finger scrolls the page
+    pts.set(e.pointerId, [e.clientX, e.clientY]); moved = 0;
+    if (pts.size === 2){ const [a, b] = [...pts.values()]; pinch = {d: Math.hypot(a[0]-b[0], a[1]-b[1]), vb: FMAP.vb}; } });
+  svg.addEventListener('pointermove', e=>{ if (!pts.has(e.pointerId)) return; const [ox, oy] = pts.get(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pts.size === 2 && pinch){ const [a, b] = [...pts.values()], d = Math.hypot(a[0]-b[0], a[1]-b[1]); if (!pinch.d) return;
+      const [mx, my] = fdAt(svg, (a[0]+b[0])/2, (a[1]+b[1])/2); fdZoomBy(d / pinch.d, mx, my); pinch.d = d; moved = 99; return; }
+    const r = svg.getBoundingClientRect(), [x, y, w, h] = FMAP.vb || [0, 0, DMAP.w, DMAP.h], sc = Math.max(w / r.width, h / r.height);
+    moved += Math.abs(e.clientX - ox) + Math.abs(e.clientY - oy); if (moved < 4) return;
+    if (!svg.hasPointerCapture(e.pointerId)) try { svg.setPointerCapture(e.pointerId); } catch {}
+    hideTip(); fdSetView([x - (e.clientX - ox) * sc, y - (e.clientY - oy) * sc, w, h]); });
+  const end = e=>{ pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
+  svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+  // a drag is not a click on a district
+  svg.addEventListener('click', e=>{ if (moved >= 4){ e.stopPropagation(); e.preventDefault(); moved = 0; } }, true);
 }
 const fdMapHTML = () => `
   <section class="fd-map" id="fd-map" aria-labelledby="fd-mh" hidden>
     <div class="fd-mbar"><h2 class="hs" id="fd-mh">District map</h2>
       <div class="seg" id="fd-layer" role="group" aria-label="Districts shown"><button type="button" data-l="house">House</button><button type="button" data-l="senate">Senate</button></div></div>
-    <div class="fd-svgwrap"><svg id="fd-svg" role="img" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <div class="fd-svgwrap"><svg id="fd-svg" role="img" tabindex="0" preserveAspectRatio="xMidYMid meet" aria-describedby="fd-zhint"></svg>
+      <div class="fd-zoom" role="group" aria-label="Zoom"><button type="button" id="fd-zin" aria-label="Zoom in">+</button><button type="button" id="fd-zout" aria-label="Zoom out">−</button><button type="button" id="fd-zreset" aria-label="Show all of Illinois" title="Show all of Illinois">⤢</button></div></div>
+    <p class="muted fd-zhint" id="fd-zhint">Zoom with + and −, double-click, or Ctrl + scroll (pinch on a phone or trackpad); drag to move the map. With the map selected, arrow keys move it and + / − zoom.</p>
     <div class="fd-mctl"><button type="button" class="btn" id="fd-all">All of Illinois</button><button type="button" class="btn" id="fd-chi">Chicago area</button>
       <label class="fd-pickl"><span class="vh">District</span><select id="fd-pick"></select></label></div>
     <div class="fd-leg" aria-hidden="true"><span><i style="background:color-mix(in srgb, var(--pd) 62%, var(--surface))"></i>Democrat</span><span><i style="background:color-mix(in srgb, var(--pr) 62%, var(--surface))"></i>Republican</span><span><i class="hi"></i>District found</span></div>
@@ -1862,9 +1927,10 @@ const fdMapHTML = () => `
     <p class="muted fd-src">District lines: U.S. Census Bureau, 2024 cartographic boundaries (the districts drawn in 2021). Members: Illinois General Assembly.</p>
   </section>`;
 function fdMapBind(){
-  $$('#fd-layer button').forEach(b=>b.addEventListener('click', ()=>{ FMAP.layer = b.dataset.l; FMAP.sel = null; $('#fd-selcard').innerHTML = ''; fdMapDraw();
+  $$('#fd-layer button').forEach(b=>b.addEventListener('click', ()=>{ FMAP.layer = b.dataset.l; FMAP.sel = null; fdSelClear(); fdMapDraw();
     const ds = FMAP.found?.[FMAP.layer]; if (ds?.length) fdZoom(fdBox(ds)); }));
   $('#fd-all').addEventListener('click', ()=>fdZoom(null));
+  fdMapGestures();
   $('#fd-chi').addEventListener('click', ()=>{ const [x0, y0] = fdProj(-87.95, 42.07), [x1, y1] = fdProj(-87.52, 41.64); fdZoom([x0, y0, x1-x0, y1-y0]); });
   $('#fd-pick').addEventListener('change', e=>fdPick(e.target.value ? +e.target.value : null, true));
 }
@@ -1919,9 +1985,10 @@ function renderFind(){
     </form>
     <p class="find-priv" id="fd-priv"><b>Your privacy.</b> Nothing you enter is saved: not by this site, not in your browser, not in the page's address and not in our visitor counts. A ZIP code is looked up on your own computer. A street address is sent from your browser directly to the <a href="https://geocoding.geo.census.gov/" target="_blank" rel="noopener">U.S. Census Bureau's geocoder</a> to find its districts (<a href="https://www.census.gov/about/policies/privacy.html" target="_blank" rel="noopener">Census privacy policy</a>).</p>
     <p id="fd-st" class="fd-st" role="status"></p>
+    <div id="fd-sel-l" class="fd-sel-l"></div>
     <div id="fd-out"></div>
   </div>${fdMapHTML()}</div>`;
-  Object.assign(FMAP, {found:null, pin:null, sel:null, view:null});   // nothing from an earlier visit is kept
+  Object.assign(FMAP, {found:null, pin:null, sel:null, vb:null});   // nothing from an earlier visit is kept
   $('#fd-f').addEventListener('submit', e=>{ e.preventDefault(); fdLookup($('#fd-q').value.trim()); });
   fdMapBind(); fdMapInit();
 }
@@ -3392,7 +3459,7 @@ function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
   const groups = [], labels = ['', 'The General Assembly', 'More']; let g = 0; groups[0] = [];
   for (const t of TABS){ if (!t){ groups[++g] = []; continue; } groups[g].push(t); }
   return `<div class="tabs-wide">${TABS.map(t=> t ? btn(t) : '<span class="sep"></span>').join('')}</div>
-    <button class="menu-btn" aria-expanded="false" aria-controls="menu-panel"><span class="burger" aria-hidden="true"></span>${here?`${here[2]?`<i class="dot ${here[2]}"></i>`:''}${here[1]}`:'Menu'}<span class="muted" style="margin-left:auto;font-weight:400">Menu</span></button>
+    <button class="menu-btn" aria-expanded="false" aria-controls="menu-panel"><span class="burger" aria-hidden="true"></span>${here?`${here[2]?`<i class="dot ${here[2]}"></i>`:''}${here[1]}`:({codebook:'Codebook', contact:'Contact'})[cur] || ''}<span class="muted" style="margin-left:auto;font-weight:400">Menu</span></button>
     <div class="menu-panel" id="menu-panel" hidden>${groups.map((ts,i)=>`${labels[i]?`<div class="menu-lbl">${labels[i]}</div>`:''}${ts.map(btn).join('')}`).join('')}</div>`; }
 function drawNav(){ const n = $('nav.tabs'); n.innerHTML = navHTML(); $$('[data-v]', n).forEach(b=>b.addEventListener('click', ()=>nav(b.dataset.v)));
   const mb = $('.menu-btn', n), mp = $('#menu-panel'); mb.addEventListener('click', ()=>{ const open = mp.hidden; mp.hidden = !open; mb.setAttribute('aria-expanded', open); });
