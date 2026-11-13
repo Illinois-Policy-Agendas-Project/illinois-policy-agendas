@@ -11,3 +11,7 @@ photo file name, `manual`). Photos: Illinois General Assembly.
 `zip-districts.json` lists, for each Illinois ZIP code, the House and Senate districts it falls in and the share of its
 area in each. The "Find your legislators" page reads it in the visitor's browser. It is made from Census boundary files
 by `pipeline/zip_districts.py` (instructions at the top of that file) and only needs remaking after redistricting.
+
+`district-map.json` holds the House and Senate district outlines drawn on the same page's map. It is made by
+`pipeline/district_map.py` from the Census Bureau's cartographic boundary files and, like the ZIP table, only needs
+remaking after redistricting.

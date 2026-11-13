@@ -51,6 +51,9 @@ def main():
     else:
         man['v'].pop('legislators', None)
     zd = B.zip_districts(rep)
+    dm = B.district_map(rep)
+    if dm:
+        man['v']['districtmap'] = B.dump(d / 'districtmap.json', dm)
     if zd:
         man['v']['zipdist'] = B.dump(d / 'zipdist.json', zd)
     if govphotos:

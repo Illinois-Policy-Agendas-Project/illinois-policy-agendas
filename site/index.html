@@ -69,7 +69,7 @@ nav.tabs button{border:0;background:none;cursor:pointer;padding:10px 14px;font-s
 nav.tabs button:hover{color:var(--ink)}
 nav.tabs button[aria-current="page"]{color:var(--ink);font-weight:600;border-bottom-color:var(--accent)}
 nav.tabs .sep{width:1px;background:var(--line-2);margin:10px 6px}
-nav.tabs{flex-direction:column} .tabs-wide{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none} .tabs-wide [data-v="about"]{margin-left:auto}   /* the codebook sits at the far right */
+nav.tabs{flex-direction:column} .tabs-wide{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none} .tabs-wide [data-v="find"]{margin-left:auto}   /* the codebook sits at the far right */
 nav.tabs .menu-btn,nav.tabs .menu-panel{display:none}
 @media (max-width:560px){
   .tabs-wide{display:none} nav.tabs{margin-bottom:10px}
@@ -685,6 +685,20 @@ mark{background:#ffe2d6}
 .fd-links{display:flex;gap:4px 14px;flex-wrap:wrap;margin-top:6px;font-size:13.5px} .fd-share{font-size:12.5px;margin-top:6px}
 .fd-note{margin:8px 0 0;max-width:72ch} .fd-src{font-size:12px;margin-top:14px}
 @media (max-width:560px){ .find-row{flex-direction:column} .fd-grid{grid-template-columns:minmax(0,1fr)} }
+.fd-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,440px);gap:32px;align-items:start}
+.fd-layout .find-wrap{max-width:none}
+.fd-map{position:sticky;top:12px} .fd-mbar{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:2px solid var(--navy);padding-top:10px}
+.fd-mbar h2{margin:0}
+.fd-svgwrap{margin-top:10px;background:var(--surface)} #fd-svg{display:block;width:100%;height:auto;aspect-ratio:558/1000;max-height:72vh}
+#fd-svg path{stroke:var(--surface);stroke-width:.6;cursor:pointer} #fd-svg .fd-ds path:hover{stroke:var(--ink);stroke-width:1.4}
+#fd-svg .fd-top path{pointer-events:none;fill-opacity:1} #fd-svg .fd-top path.hi{stroke:var(--ink);stroke-width:2.4} #fd-svg .fd-top path.sel{stroke:var(--orange,#e8502a);stroke-width:3}
+#fd-svg .pin-o{fill:var(--orange,#e8502a);stroke:#fff;stroke-width:2;vector-effect:non-scaling-stroke} #fd-svg .pin-i{fill:#fff}
+.fd-mctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px} .fd-mctl select{max-width:100%;min-width:0;flex:1}
+.fd-pickl{flex:1 1 200px;display:flex;min-width:0}
+.fd-leg{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin-top:10px} .fd-leg span{display:inline-flex;align-items:center;gap:6px}
+.fd-leg i{width:14px;height:10px;border-radius:2px;display:inline-block} .fd-leg i.hi{background:none;border:2px solid var(--ink)}
+@media (max-width:900px){ .fd-layout{grid-template-columns:minmax(0,1fr)} .fd-map{position:static} }
+@media (forced-colors: active){ #fd-svg path{forced-color-adjust:none} }
 </style>
 
 <a class="skip" href="#view" onclick="event.preventDefault();event.stopPropagation();const v=document.getElementById('view');v.setAttribute('tabindex','-1');v.focus();">Skip to content</a>
@@ -723,7 +737,7 @@ const DS = {
 };
 const DSK = ['bills','sots','tt'], NOPOL = -555;
 /* top menu: [route, label, dot class, section]. Parties, Committees and Day by day are sub-tabs of Bills (LEGTABS), next to its stage views. */
-const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Legislators','nd-leg'],null,['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],['topics','Topics','nd-topics'],['search','Search','nd-search'],['about','About'],['codebook','Codebook']];
+const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Legislators','nd-leg'],null,['speeches','Speeches','ds-sots'],['thinktanks','Think tanks','ds-tt'],['topics','Topics','nd-topics'],['search','Search','nd-search'],['find','Find my legislators'],['about','About'],['codebook','Codebook']];
 const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
 // the Bills sub-menu. All bills is the Bills page; its stage views (Introduced, Out of committee, Became law) are reached
 // from the stage boxes on it, and keep All bills underlined
@@ -1786,10 +1800,78 @@ function fdCard(ch, district, share){
     <div style="min-width:0"><div class="fd-o">${office} · ${dist}</div><h3 class="fd-n">${name}</h3><div class="muted">${esc(who.party || '')}</div>
       <div class="fd-links">${who.sp ? `<a href="#sponsor-${who.sp.slug}">Bills and record →</a>` : ''}${who.url ? `<a href="${esc(who.url)}" target="_blank" rel="noopener">ilga.gov page ↗</a>` : ''}</div>${shareTxt}</div></div>`;
 }
+
+/* ---- the district map: House or Senate districts colored by the current member's party. Hover or tap a district
+   for its member, click it to show their card; the menu below does the same by keyboard. A lookup zooms to the
+   districts found, with a pin where the Census Bureau placed an address. Outlines from data/districtmap.json. */
+let DMAP = null;
+const FMAP = { layer:'house', found:null, pin:null, sel:null, view:null };
+const fdCh = () => FMAP.layer === 'house' ? 'Rep' : 'Sen';
+const fdProj = (lon, lat) => { const P = DMAP.proj; return [(lon - P.lon0) * P.cos * P.k, (P.lat0 - lat) * P.k]; };
+const fdFill = d => { const w = seatHolder(fdCh(), d); return w ? `color-mix(in srgb, var(${PCSS[w.party] || '--pi'}) 62%, var(--surface))` : 'var(--sunk)'; };
+async function fdMapInit(){
+  const el = $('#fd-map'); if (!el) return;
+  if (!DMAP) DMAP = MAN.v?.districtmap ? await get('districtmap').catch(()=>null) : null;
+  if (!DMAP || !$('#fd-map')){ el.hidden = true; return; }
+  el.hidden = false; fdMapDraw(); const ds = FMAP.found?.[FMAP.layer]; if (ds?.length) fdZoom(fdBox(ds));
+}
+function fdMapDraw(){
+  const svg = $('#fd-svg'); if (!svg || !DMAP) return;
+  const ch = fdCh(), shapes = DMAP[FMAP.layer], found = new Set((FMAP.found?.[FMAP.layer]) || []);
+  svg.innerHTML = `<g class="fd-ds">${Object.entries(shapes).map(([d, path])=>`<path d="${path}" data-d="${d}" class="${found.has(+d)?'hi':''} ${FMAP.sel===+d?'sel':''}" style="fill:${fdFill(+d)}" vector-effect="non-scaling-stroke"/>`).join('')}</g>
+    <g class="fd-top"></g>${FMAP.pin ? (()=>{ const [x, y] = fdProj(...FMAP.pin); return `<g class="fd-pin"><circle cx="${x}" cy="${y}" r="1" class="pin-o"/><circle cx="${x}" cy="${y}" r="1" class="pin-i"/></g>`; })() : ''}`;
+  // the found and selected districts are drawn last, so their outlines sit on top
+  const top = svg.querySelector('.fd-top'); svg.querySelectorAll('path.hi, path.sel').forEach(p=>top.appendChild(p.cloneNode()));
+  svg.querySelectorAll('.fd-ds path').forEach(p=>{ const d = +p.dataset.d;
+    bindTip(p, ()=>{ const w = seatHolder(ch, d); return `<div class="t">${chamberName(ch)} District ${d}</div>${w ? `<div>${esc(w.name)}</div><div class="muted">${esc(w.party||'')}</div>` : '<div class="muted">No current member listed</div>'}<div class="muted" style="margin-top:4px">Click to show the legislator</div>`; });
+    p.addEventListener('click', ()=>fdPick(d, false)); });
+  $('#fd-svg').setAttribute('aria-label', `Map of Illinois ${chamberName(ch)} districts, colored by the party of the current member${FMAP.found ? '. The districts found are outlined' : ''}${FMAP.pin ? ', and a pin marks the address' : ''}.`);
+  $('#fd-pick').innerHTML = `<option value="">Choose a ${chamberName(ch)} district…</option>` + Object.keys(shapes).map(d=>{ const w = seatHolder(ch, d); return `<option value="${d}" ${FMAP.sel===+d?'selected':''}>District ${d}${w ? ' · ' + esc(withParty({name:w.name, party:w.party})) : ''}</option>`; }).join('');
+  $$('#fd-layer button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.l === FMAP.layer));
+  fdZoom(FMAP.view);
+}
+/* zoom to a box in map units, or to all of Illinois */
+function fdZoom(box){
+  const svg = $('#fd-svg'); if (!svg) return; FMAP.view = box;
+  let [x, y, w, h] = box || [0, 0, DMAP.w, DMAP.h];
+  if (box){ const pad = Math.max(w, h) * 0.35 + 6; x -= pad; y -= pad; w += 2*pad; h += 2*pad;
+    const want = DMAP.w / DMAP.h; if (w / h < want){ const nw = h * want; x -= (nw - w)/2; w = nw; } else { const nh = w / want; y -= (nh - h)/2; h = nh; } }
+  svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+  const r = w * 0.016; svg.querySelectorAll('.fd-pin circle').forEach((c, i)=>c.setAttribute('r', i ? r * 0.55 : r));
+}
+const fdBox = ds => { const bs = ds.map(d=>$(`#fd-svg .fd-ds path[data-d="${d}"]`)?.getBBox()).filter(Boolean); if (!bs.length) return null;
+  const x0 = Math.min(...bs.map(b=>b.x)), y0 = Math.min(...bs.map(b=>b.y)), x1 = Math.max(...bs.map(b=>b.x+b.width)), y1 = Math.max(...bs.map(b=>b.y+b.height)); return [x0, y0, x1-x0, y1-y0]; };
+function fdPick(d, fromMenu){
+  FMAP.sel = d; fdMapDraw(); if (d == null) return;
+  if (fromMenu) fdZoom(fdBox([d]));
+  const box = $('#fd-selcard'); box.innerHTML = `<div class="fd-grid" style="grid-template-columns:minmax(0,1fr)">${fdCard(fdCh(), d)}</div>`;
+}
+function fdShowFound(found, pin){
+  FMAP.found = found; FMAP.pin = pin; FMAP.sel = null; if (!DMAP || !$('#fd-svg')) return; $('#fd-selcard').innerHTML = '';
+  fdMapDraw(); fdZoom(fdBox(found?.[FMAP.layer] || []));
+}
+const fdMapHTML = () => `
+  <section class="fd-map" id="fd-map" aria-labelledby="fd-mh" hidden>
+    <div class="fd-mbar"><h2 class="hs" id="fd-mh">District map</h2>
+      <div class="seg" id="fd-layer" role="group" aria-label="Districts shown"><button type="button" data-l="house">House</button><button type="button" data-l="senate">Senate</button></div></div>
+    <div class="fd-svgwrap"><svg id="fd-svg" role="img" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <div class="fd-mctl"><button type="button" class="btn" id="fd-all">All of Illinois</button><button type="button" class="btn" id="fd-chi">Chicago area</button>
+      <label class="fd-pickl"><span class="vh">District</span><select id="fd-pick"></select></label></div>
+    <div class="fd-leg" aria-hidden="true"><span><i style="background:color-mix(in srgb, var(--pd) 62%, var(--surface))"></i>Democrat</span><span><i style="background:color-mix(in srgb, var(--pr) 62%, var(--surface))"></i>Republican</span><span><i class="hi"></i>District found</span></div>
+    <div id="fd-selcard"></div>
+    <p class="muted fd-src">District lines: U.S. Census Bureau, 2024 cartographic boundaries (the districts drawn in 2021). Members: Illinois General Assembly.</p>
+  </section>`;
+function fdMapBind(){
+  $$('#fd-layer button').forEach(b=>b.addEventListener('click', ()=>{ FMAP.layer = b.dataset.l; FMAP.sel = null; $('#fd-selcard').innerHTML = ''; fdMapDraw();
+    const ds = FMAP.found?.[FMAP.layer]; if (ds?.length) fdZoom(fdBox(ds)); }));
+  $('#fd-all').addEventListener('click', ()=>fdZoom(null));
+  $('#fd-chi').addEventListener('click', ()=>{ const [x0, y0] = fdProj(-87.95, 42.07), [x1, y1] = fdProj(-87.52, 41.64); fdZoom([x0, y0, x1-x0, y1-y0]); });
+  $('#fd-pick').addEventListener('change', e=>fdPick(e.target.value ? +e.target.value : null, true));
+}
 function fdShow(html){ const o = $('#fd-out'); o.innerHTML = html; const h = o.querySelector('h2'); if (h){ h.tabIndex = -1; h.focus({preventScroll:false}); } }
 function fdStatus(t){ const st = $('#fd-st'); if (st) st.textContent = t; }
 async function fdLookup(q){
-  fdStatus(''); $('#fd-out').innerHTML = '';
+  fdStatus(''); $('#fd-out').innerHTML = ''; if (DMAP && $('#fd-svg')) fdShowFound(null, null);
   if (!q){ fdStatus('Enter a street address or a ZIP code.'); return; }
   const z = q.match(/^(\d{5})(?:-?\d{4})?$/);
   if (z){
@@ -1803,7 +1885,8 @@ async function fdLookup(q){
       ${row.il ? `<p class="fd-note">Part of this ZIP code is outside Illinois.</p>` : ''}
       <h3 class="fd-h">State House</h3><div class="fd-grid">${row.h.map(([d,sh])=>fdCard('Rep', d, split ? sh : null)).join('')}</div>
       <h3 class="fd-h">State Senate</h3><div class="fd-grid">${row.s.map(([d,sh])=>fdCard('Sen', d, split ? sh : null)).join('')}</div>
-      <p class="muted fd-src">Matched by area: the share of the ZIP code's land in each district, from Census Bureau boundaries.</p>`);
+      <p class="muted fd-src">Matched by area: the share of the ZIP code's land in each district, from Census Bureau boundaries. The map outlines these districts.</p>`);
+    fdShowFound({house: row.h.map(([d])=>d), senate: row.s.map(([d])=>d)}, null);
     return;
   }
   const address = /\b(IL|Ill|Illinois)\b|\b\d{5}\b/i.test(q) ? q : q + ', Illinois';
@@ -1819,15 +1902,16 @@ async function fdLookup(q){
   if (!h && !sn){ fdStatus("The Census Bureau found the address but returned no legislative districts. Try your ZIP code."); return; }
   fdStatus('');
   fdShow(`<h2 class="hs">Your legislators</h2>
-    <p class="fd-note">Matched address: <b>${esc(m.matchedAddress)}</b>. If that isn't your address, add the city or ZIP code and try again.</p>
+    <p class="fd-note">Matched address: <b>${esc(m.matchedAddress)}</b>. The pin on the map shows where the Census Bureau placed it. If that isn't your address, add the city or ZIP code and try again.</p>
     <div class="fd-grid">${h ? fdCard('Rep', h) : ''}${sn ? fdCard('Sen', sn) : ''}</div>
     <p class="muted fd-src">Districts from the U.S. Census Bureau's geocoder, using the current district lines.</p>`);
+  const c = m.coordinates; fdShowFound({house: h ? [h] : [], senate: sn ? [sn] : []}, c && isFinite(c.x) && isFinite(c.y) ? [+c.x, +c.y] : null);
 }
 function renderFind(){
   $('#view').innerHTML = `
-  <div class="phead"><div><div class="eyebrow">Legislators</div><h1>Find your legislators</h1>
+  <div class="phead"><div><div class="eyebrow">Illinois General Assembly</div><h1>Find your legislators</h1>
     <p>Everyone in Illinois has one State Representative and one State Senator. Enter your street address for an exact answer, or a ZIP code to see the districts it covers.</p></div></div>
-  <div class="find-wrap">
+  <div class="fd-layout"><div class="find-wrap">
     <form id="fd-f" class="find-form" autocomplete="off" novalidate>
       <label for="fd-q" class="fd-l">Street address or ZIP code</label>
       <div class="find-row"><input id="fd-q" type="text" name="fd-nosave" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="401 S Spring St, Springfield   or   62706" aria-describedby="fd-priv">
@@ -1836,8 +1920,10 @@ function renderFind(){
     <p class="find-priv" id="fd-priv"><b>Your privacy.</b> Nothing you enter is saved: not by this site, not in your browser, not in the page's address and not in our visitor counts. A ZIP code is looked up on your own computer. A street address is sent from your browser directly to the <a href="https://geocoding.geo.census.gov/" target="_blank" rel="noopener">U.S. Census Bureau's geocoder</a> to find its districts (<a href="https://www.census.gov/about/policies/privacy.html" target="_blank" rel="noopener">Census privacy policy</a>).</p>
     <p id="fd-st" class="fd-st" role="status"></p>
     <div id="fd-out"></div>
-  </div>`;
+  </div>${fdMapHTML()}</div>`;
+  Object.assign(FMAP, {found:null, pin:null, sel:null, view:null});   // nothing from an earlier visit is kept
   $('#fd-f').addEventListener('submit', e=>{ e.preventDefault(); fdLookup($('#fd-q').value.trim()); });
+  fdMapBind(); fdMapInit();
 }
 
 /* =================== TRENDS ===================
@@ -3297,7 +3383,7 @@ function parseRoute(t){
   if ((m = /^about-(data|team|license|cite)$/.exec(t))) return {view:'about', sec:m[1]};
   return null;
 }
-const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', 'thinktanks-reports':'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees', trends:'topics', find:'sponsors'})[rt.view] || rt.view;
+const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', 'thinktanks-reports':'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees', trends:'topics'})[rt.view] || rt.view;
 const sectionOf = rt => { const t = tabOf(rt); return LEGTABS.some(([k])=>k===t) ? 'bills' : t; };
 function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
   const btn = t => `<button data-v="${t[0]}" ${key(t)===cur?'aria-current="page"':''}>${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>`;

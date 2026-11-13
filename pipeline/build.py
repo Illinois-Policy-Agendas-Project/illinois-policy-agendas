@@ -1253,6 +1253,15 @@ def zip_districts(rep):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
+def district_map(rep):
+    """District outlines for the map on the "Find your legislators" page (made by pipeline/district_map.py)."""
+    path = ROOT / 'content' / 'legislators' / 'district-map.json'
+    if not path.exists():
+        rep.note('Legislators', 'No district map (content/legislators/district-map.json); the legislator finder shows no map.')
+        return None
+    return json.loads(path.read_text(encoding='utf-8'))
+
+
 def build_legislators(cfg, rep):
     """Party, district and photo for each legislator, from content/legislators/members.csv (made by fetch_legislators.py)."""
     ds = 'Legislators'
@@ -1345,6 +1354,9 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
     zd = zip_districts(rep)
     if zd:
         files['zipdist'] = dump(d / 'zipdist.json', zd)
+    dm = district_map(rep)
+    if dm:
+        files['districtmap'] = dump(d / 'districtmap.json', dm)
     files['governors'] = dump(d / 'governors.json', list(governors))
     if govphotos:
         files['govphotos'] = dump(d / 'govphotos.json', govphotos)
