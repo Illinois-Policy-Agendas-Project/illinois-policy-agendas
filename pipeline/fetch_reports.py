@@ -32,7 +32,7 @@ COLS = ['id', 'think_tank', 'title', 'date', 'year', 'abstract', 'url', 'pdf_url
 PAUSE = 0.4
 
 
-ROBOTS = {}
+ROBOTS, DELAY, LAST = {}, {}, {}   # robots.txt per site; seconds to wait between requests to a site; when we last asked it
 
 
 def allowed(url):
@@ -48,6 +48,7 @@ def allowed(url):
             code = getattr(e, 'code', None)
             rp.parse(['User-agent: *', 'Disallow: /'] if code in (401, 403) else [])
         ROBOTS[root] = rp
+        DELAY[u.netloc] = max(PAUSE, float(rp.crawl_delay(UA) or 0))   # a site's Crawl-delay is honoured
     return ROBOTS[root].can_fetch(UA, url)
 
 
@@ -61,15 +62,29 @@ def get(url):
     url = requote(url)
     if not allowed(url):
         raise PermissionError(f'robots.txt does not allow {url}')
-    for attempt in (1, 2):
+    host = urlparse(url).netloc
+    for attempt in (1, 2, 3):
+        wait = DELAY.get(host, PAUSE) - (time.time() - LAST.get(host, 0))
+        if wait > 0:
+            time.sleep(wait)
+        LAST[host] = time.time()
         try:
             body, ctype, final = webget.get(url, UA, timeout=40)
             break
-        except Exception as e:  # noqa: BLE001 - a dropped connection or a cut-off download gets one more try
-            if attempt == 2 or getattr(e, 'code', None) in (401, 403, 404, 410):
+        except Exception as e:  # noqa: BLE001
+            code = getattr(e, 'code', None)
+            if code == 429:   # too many requests: wait as long as the site asks (within reason) and go slower from now on
+                DELAY[host] = min(30.0, max(DELAY.get(host, PAUSE) * 3, 3.0))
+                try:
+                    retry = float((getattr(e, 'headers', None) or {}).get('Retry-After') or 0)
+                except (TypeError, ValueError):
+                    retry = 0
+                if attempt < 3:
+                    time.sleep(min(120.0, max(retry, 20.0)))
+                    continue
+            if attempt == 3 or code in (401, 403, 404, 410):
                 raise
-            time.sleep(3)
-    time.sleep(PAUSE)
+            time.sleep(3)   # a dropped connection or a cut-off download gets another try
     return body, ctype, final
 
 
@@ -174,30 +189,43 @@ def candidates(src, cutoff):
                     out.append((u, label, '', ''))
         return out
     if src['kind'] == 'rss':
-        body, _, _ = get(src['url'])
-        x = body.decode('utf-8', 'replace'); out = []
-        for item in re.findall(r'<(?:item|entry)\b.*?</(?:item|entry)>', x, re.S | re.I):
-            def tag(*names):
-                for n in names:
-                    m = re.search(rf'<{n}\b[^>]*>(.*?)</{n}>', item, re.S | re.I)
-                    if m:
-                        return html.unescape(re.sub(r'^<!\[CDATA\[|\]\]>$', '', m.group(1).strip()))
-                return ''
-            link = tag('link') or (re.search(r'<link[^>]+href=["\']([^"\']+)', item) or [None, ''])[1]
-            link = (re.search(r'href=["\']([^"\']+)', link) or [None, link])[1]   # some feeds wrap the link in markup
-            date = tag('pubDate', 'published', 'updated', 'dc:date')
+        out = []
+        for feed_url in listing_urls(src):
             try:
-                date = dt.datetime.strptime(re.sub(r'\s+\S+$', '', date), '%a, %d %b %Y %H:%M:%S').date().isoformat() if ',' in date[:5] else iso(date)
-            except ValueError:
-                date = iso(date)
-            if link:
-                out.append((urljoin(src['url'], link), text(tag('title')), date, text(tag('description', 'summary'))[:600]))
+                body, _, _ = get(feed_url)
+            except Exception:  # noqa: BLE001 - a later page of a paged feed may not exist; the first must
+                if feed_url == listing_urls(src)[0]:
+                    raise
+                continue
+            out += feed_items(src, body.decode('utf-8', 'replace'))
         return out
     raise ValueError(f'unknown kind {src["kind"]!r}')
 
 
+def feed_items(src, x):
+    """[(url, title, date, summary)] from an RSS or Atom feed."""
+    out = []
+    for item in re.findall(r'<(?:item|entry)\b.*?</(?:item|entry)>', x, re.S | re.I):
+        def tag(*names):
+            for n in names:
+                m = re.search(rf'<{n}\b[^>]*>(.*?)</{n}>', item, re.S | re.I)
+                if m:
+                    return html.unescape(re.sub(r'^<!\[CDATA\[|\]\]>$', '', m.group(1).strip()))
+            return ''
+        link = tag('link') or (re.search(r'<link[^>]+href=["\']([^"\']+)', item) or [None, ''])[1]
+        link = (re.search(r'href=["\']([^"\']+)', link) or [None, link])[1]   # some feeds wrap the link in markup
+        date = tag('pubDate', 'published', 'updated', 'dc:date')
+        try:
+            date = dt.datetime.strptime(re.sub(r'\s+\S+$', '', date), '%a, %d %b %Y %H:%M:%S').date().isoformat() if ',' in date[:5] else iso(date)
+        except ValueError:
+            date = iso(date)
+        if link:
+            out.append((urljoin(src['url'], link), text(tag('title')), date, text(tag('description', 'summary'))[:600]))
+    return out
+
+
 def listing_urls(src):
-    """The listing pages of a `links` source: `url`, a list `urls`, and `pages = [first, last]` filled into {n} in `url`."""
+    """The listing pages of a `links` or `rss` source: `url`, a list `urls`, or `pages = [first, last]` filled into {n} in `url`."""
     if src.get('urls'):
         return list(src['urls'])
     if src.get('pages'):
@@ -224,6 +252,7 @@ def main(argv=None):
         return 1
     found_path = new_path.with_name('found.json')
     found = json.loads(found_path.read_text()) if found_path.exists() else {}
+    found.setdefault('_retry', {})
 
     known = {}
     for df, cols in ((main_df, c), (new_df, {'org': 'think_tank', 'url': 'url', 'pdf': 'pdf_url', 'date': 'date'})):
@@ -247,16 +276,20 @@ def main(argv=None):
             continue
         k = known.get(org, {'keys': set(), 'last': '', 'pdfs': set()})
         cutoff = (dt.date.fromisoformat(k['last']) - dt.timedelta(days=a.days)).isoformat() if k['last'] else first_since
+        if org in tt.get('recheck', []):   # look back to the start again; reports on file or deleted by coders are still skipped
+            cutoff = first_since
         offered = set(found.get(org, []))
         print(f'{org}: looking for reports after {cutoff} …', flush=True)
+        retry = {tuple(x) for x in found.get('_retry', {}).get(org, [])}
         try:
-            cands = candidates(src, cutoff)
+            cands = [tuple(x) for x in retry] + candidates(src, cutoff)
         except Exception as e:  # noqa: BLE001 - reported, then the next organization
             problems.append(f'{org}: could not read the listing ({e})')
             print(f'  could not read the listing: {e}', flush=True)
             continue
-        n = 0
+        n, again = 0, []
         for url, title, date, abstract in cands:
+            was_retry = (url, title, date, abstract) in retry
             kk = key(url)
             if kk in k['keys'] or kk in offered:
                 continue
@@ -274,8 +307,10 @@ def main(argv=None):
                         pdf = ''
                 except Exception as e:  # noqa: BLE001
                     problems.append(f'{org}: {url} ({e})')
+                    if getattr(e, 'code', None) not in (401, 403, 404, 410) and not isinstance(e, PermissionError):
+                        again.append([url, title, date, abstract])   # a passing failure (too many requests, timeout): next run
                     continue
-            if date and date < cutoff:
+            if date and date < cutoff and not was_retry:
                 continue
             offered.add(kk)
             added.append({'id': next_id, 'think_tank': org, 'title': title, 'date': date or None, 'year': int(date[:4]) if date else None,
@@ -283,6 +318,9 @@ def main(argv=None):
             next_id += 1
             n += 1
         found[org] = sorted(offered)
+        found.setdefault('_retry', {})[org] = again
+        if not again:
+            found['_retry'].pop(org, None)
         print(f'  {n} new', flush=True)
 
     if a.dry_run:

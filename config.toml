@@ -110,6 +110,10 @@ columns = { id = "id", org = "think_tank", date = "date", year = "year", title =
 new = "inputs/thinktanks/new_reports.xlsx"
 # An organization with nothing on file yet is collected back to this date (the start of the data).
 first_since = "2006-01-01"
+# Organizations to look back through again, to pick up reports a run missed (reports on file, or deleted by coders,
+# are skipped). Cheap for WordPress sources; it can be emptied once the missing reports are in.
+# November 2026: the first collection of these two was slowed by the sites (429) and skipped 16 reports.
+recheck = ["Metropolitan Planning Council", "Health & Medicine Policy Research Group"]
 
 # Where to look for each organization's new reports. `org` must match the think_tank column.
 #   kind = "wp"     a WordPress site's listing (`type` is the post type: "posts", or e.g. "report")
@@ -127,9 +131,9 @@ type = "report"
 
 [[thinktanks.sources]]
 org = "Illinois Economic Policy Institute"
-kind = "wp"
-site = "https://www.illinoisepi.org"
-type = "posts"
+kind = "rss"   # its WordPress listing now refuses the collector (401); its feed is open, ten posts a page
+url = "https://www.illinoisepi.org/feed/?paged={n}"
+pages = [1, 5]
 
 [[thinktanks.sources]]
 org = "Center for Tax and Budget Accountability"
