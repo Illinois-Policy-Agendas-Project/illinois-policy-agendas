@@ -690,9 +690,12 @@ mark{background:#ffe2d6}
 .fd-map{position:sticky;top:12px} .fd-mbar{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:2px solid var(--navy);padding-top:10px}
 .fd-mbar h2{margin:0}
 .fd-svgwrap{margin-top:10px;background:var(--surface)} #fd-svg{display:block;width:100%;height:auto;aspect-ratio:558/1000;max-height:72vh}
-#fd-svg path{stroke:var(--surface);stroke-width:.6;cursor:pointer} #fd-svg .fd-ds path:hover{stroke:var(--ink);stroke-width:1.4}
-#fd-svg .fd-top path{pointer-events:none;fill-opacity:1} #fd-svg .fd-top path.hi{stroke:var(--ink);stroke-width:2.4} #fd-svg .fd-top path.sel{stroke:var(--orange,#e8502a);stroke-width:3}
-#fd-svg .pin-o{fill:var(--orange,#e8502a);stroke:#fff;stroke-width:2;vector-effect:non-scaling-stroke} #fd-svg .pin-i{fill:#fff}
+#fd-svg{--px:1;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+#fd-svg path{stroke:var(--surface);stroke-width:calc(var(--px) * .7px);stroke-linejoin:round;cursor:pointer}
+#fd-svg .fd-top path, #fd-svg .fd-hov{pointer-events:none}
+#fd-svg .fd-top path{fill:none!important} #fd-svg .fd-top path.hi{stroke:var(--ink);stroke-width:calc(var(--px) * 2.5px)} #fd-svg .fd-top path.sel{stroke:var(--orange,#e8502a);stroke-width:calc(var(--px) * 3px)}
+#fd-svg .fd-hov{fill:none;stroke:var(--ink);stroke-width:calc(var(--px) * 1.6px)} #fd-svg .fd-hov:not([d]){display:none}
+#fd-svg .pin-o{fill:var(--orange,#e8502a);stroke:#fff;stroke-width:calc(var(--px) * 2px)} #fd-svg .pin-i{fill:#fff;stroke:none}
 .fd-mctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px} .fd-mctl select{max-width:100%;min-width:0;flex:1}
 .fd-pickl{flex:1 1 200px;display:flex;min-width:0}
 .fd-leg{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin-top:10px} .fd-leg span{display:inline-flex;align-items:center;gap:6px}
@@ -700,13 +703,20 @@ mark{background:#ffe2d6}
 @media (max-width:900px){ .fd-layout{grid-template-columns:minmax(0,1fr)} .fd-map{position:static} }
 @media (forced-colors: active){ #fd-svg path{forced-color-adjust:none} }
 .fd-svgwrap{position:relative} #fd-svg{cursor:grab;outline-offset:2px} #fd-svg:active{cursor:grabbing} #fd-svg.zoomed{touch-action:none}
-#fd-svg:focus-visible{outline:2px solid var(--navy-2,#1f3a68)}
+#fd-svg, #fd-svg *{outline:none!important}   /* Chrome traces its focus ring around the zoomed shapes as a huge ring; the box shows focus instead */
+.fd-svgwrap:has(#fd-svg:focus-visible){box-shadow:0 0 0 2px var(--navy-2,#1f3a68)}
 .fd-zoom{position:absolute;bottom:8px;left:8px;display:flex;flex-direction:column;border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .fd-zoom button{width:36px;height:36px;border:0;background:var(--surface);color:var(--ink);font:600 20px/1 var(--f-ui);cursor:pointer} .fd-zoom button + button{border-top:1px solid var(--line)}
 .fd-zoom button:hover:not(:disabled){background:var(--sunk)} .fd-zoom button:disabled{color:var(--muted);cursor:default;opacity:.5} .fd-zoom button:focus-visible{outline:2px solid var(--navy-2,#1f3a68);outline-offset:-3px}
 .fd-zoom #fd-zreset{font-size:16px}
 .fd-zhint{font-size:12px;margin:6px 0 0}
 .fd-sel-l:empty{display:none} .fd-sel-l h2{margin-top:22px}
+.fd-tog{display:none} .fd-tomap{display:none}
+@media (max-width:900px){
+  .fd-tog{display:inline-flex;margin:0 0 16px} .fd-tog button{padding:8px 22px;font-size:14px}
+  .fd-layout[data-show="search"] .fd-map{display:none} .fd-layout[data-show="map"] .find-wrap{display:none}
+  .fd-tomap{display:block;margin-top:14px}
+}
 </style>
 
 <a class="skip" href="#view" onclick="event.preventDefault();event.stopPropagation();const v=document.getElementById('view');v.setAttribute('tabindex','-1');v.focus();">Skip to content</a>
@@ -1826,11 +1836,13 @@ async function fdMapInit(){
 function fdMapDraw(){
   const svg = $('#fd-svg'); if (!svg || !DMAP) return;
   const ch = fdCh(), shapes = DMAP[FMAP.layer], found = new Set((FMAP.found?.[FMAP.layer]) || []);
-  svg.innerHTML = `<g class="fd-ds">${Object.entries(shapes).map(([d, path])=>`<path d="${path}" data-d="${d}" class="${found.has(+d)?'hi':''} ${FMAP.sel===+d?'sel':''}" style="fill:${fdFill(+d)}" vector-effect="non-scaling-stroke"/>`).join('')}</g>
-    <g class="fd-top"></g>${FMAP.pin ? (()=>{ const [x, y] = fdProj(...FMAP.pin); return `<g class="fd-pin"><circle cx="${x}" cy="${y}" r="1" class="pin-o"/><circle cx="${x}" cy="${y}" r="1" class="pin-i"/></g>`; })() : ''}`;
+  svg.innerHTML = `<g class="fd-ds">${Object.entries(shapes).map(([d, path])=>`<path d="${path}" data-d="${d}" class="${found.has(+d)?'hi':''} ${FMAP.sel===+d?'sel':''}" style="fill:${fdFill(+d)}"/>`).join('')}</g>
+    <g class="fd-top"></g><path class="fd-hov"/>${FMAP.pin ? (()=>{ const [x, y] = fdProj(...FMAP.pin); return `<g class="fd-pin"><circle cx="${x}" cy="${y}" r="1" class="pin-o"/><circle cx="${x}" cy="${y}" r="1" class="pin-i"/></g>`; })() : ''}`;
   // the found and selected districts are drawn last, so their outlines sit on top
   const top = svg.querySelector('.fd-top'); svg.querySelectorAll('path.hi, path.sel').forEach(p=>top.appendChild(p.cloneNode()));
+  const hov = svg.querySelector('.fd-hov');
   svg.querySelectorAll('.fd-ds path').forEach(p=>{ const d = +p.dataset.d;
+    p.addEventListener('pointerenter', ()=>hov.setAttribute('d', p.getAttribute('d'))); p.addEventListener('pointerleave', ()=>hov.removeAttribute('d'));
     bindTip(p, ()=>{ const w = seatHolder(ch, d); return `<div class="t">${chamberName(ch)} District ${d}</div>${w ? `<div>${esc(w.name)}</div><div class="muted">${esc(w.party||'')}</div>` : '<div class="muted">No current member listed</div>'}<div class="muted" style="margin-top:4px">Click to show the legislator</div>`; });
     p.addEventListener('click', ()=>fdPick(d, false)); });
   $('#fd-svg').setAttribute('aria-label', `Map of Illinois ${chamberName(ch)} districts, colored by the party of the current member${FMAP.found ? '. The districts found are outlined' : ''}${FMAP.pin ? ', and a pin marks the address' : ''}.`);
@@ -1853,6 +1865,7 @@ function fdSetView([x, y, w, h]){
   const fx = Math.min(Math.max(cx, 0), DMAP.w), fy = Math.min(Math.max(cy, 0), DMAP.h);       // the centre stays over Illinois
   x = fx - w/2; y = fy - h/2; FMAP.vb = [x, y, w, h];
   svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+  const r0 = svg.getBoundingClientRect(); if (r0.width) svg.style.setProperty('--px', Math.max(w / r0.width, h / r0.height));
   const r = w * 0.016; svg.querySelectorAll('.fd-pin circle').forEach((c, i)=>c.setAttribute('r', i ? r * 0.55 : r));
   svg.classList.toggle('zoomed', w < DMAP.w * 0.98);   // zoomed in: one-finger drags pan the map instead of scrolling the page
   const zi = $('#fd-zin'), zo = $('#fd-zout'); if (zi) zi.disabled = w <= minW * 1.01; if (zo) zo.disabled = w >= maxW * 0.99;
@@ -1882,12 +1895,13 @@ function fdPick(d, fromMenu){
 const fdSelClear = () => { ['#fd-sel-l', '#fd-selcard'].forEach(q=>{ const e = $(q); if (e) e.innerHTML = ''; }); };
 function fdShowFound(found, pin){
   FMAP.found = found; FMAP.pin = pin; FMAP.sel = null; if (!DMAP || !$('#fd-svg')) return; fdSelClear();
-  fdMapDraw(); fdZoom(fdBox(found?.[FMAP.layer] || []));
+  fdMapDraw(); if (!$('#fd-svg').getBoundingClientRect().width){ FMAP.stale = true; return; } fdZoom(fdBox(found?.[FMAP.layer] || []));
 }
 
 /* zooming and panning: buttons, keyboard, Ctrl/⌘ + wheel (and trackpad pinch), double-click, drag, two-finger pinch */
 function fdMapGestures(){
   const svg = $('#fd-svg');
+  new ResizeObserver(()=>{ if (FMAP.vb && document.contains(svg)) fdSetView(FMAP.vb); }).observe(svg);
   $('#fd-zin').addEventListener('click', ()=>fdZoomBy(1.6)); $('#fd-zout').addEventListener('click', ()=>fdZoomBy(1/1.6)); $('#fd-zreset').addEventListener('click', ()=>fdZoom(null));
   svg.addEventListener('keydown', e=>{
     const act = {'+':()=>fdZoomBy(1.4), '=':()=>fdZoomBy(1.4), '-':()=>fdZoomBy(1/1.4), '_':()=>fdZoomBy(1/1.4), '0':()=>fdZoom(null),
@@ -1907,7 +1921,7 @@ function fdMapGestures(){
     const r = svg.getBoundingClientRect(), [x, y, w, h] = FMAP.vb || [0, 0, DMAP.w, DMAP.h], sc = Math.max(w / r.width, h / r.height);
     moved += Math.abs(e.clientX - ox) + Math.abs(e.clientY - oy); if (moved < 4) return;
     if (!svg.hasPointerCapture(e.pointerId)) try { svg.setPointerCapture(e.pointerId); } catch {}
-    hideTip(); fdSetView([x - (e.clientX - ox) * sc, y - (e.clientY - oy) * sc, w, h]); });
+    hideTip(); svg.querySelector('.fd-hov')?.removeAttribute('d'); fdSetView([x - (e.clientX - ox) * sc, y - (e.clientY - oy) * sc, w, h]); });
   const end = e=>{ pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
   svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
   // a drag is not a click on a district
@@ -1934,7 +1948,15 @@ function fdMapBind(){
   $('#fd-chi').addEventListener('click', ()=>{ const [x0, y0] = fdProj(-87.95, 42.07), [x1, y1] = fdProj(-87.52, 41.64); fdZoom([x0, y0, x1-x0, y1-y0]); });
   $('#fd-pick').addEventListener('change', e=>fdPick(e.target.value ? +e.target.value : null, true));
 }
-function fdShow(html){ const o = $('#fd-out'); o.innerHTML = html; const h = o.querySelector('h2'); if (h){ h.tabIndex = -1; h.focus({preventScroll:false}); } }
+
+/* phones: the page shows the search or the map, switched by the buttons under the heading */
+function fdShowPane(v){
+  const lay = $('#fd-layout'); if (!lay) return; lay.dataset.show = v;
+  $$('.fd-tog button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.v === v));
+  if (v === 'map' && FMAP.stale){ FMAP.stale = false; const ds = FMAP.found?.[FMAP.layer]; fdZoom(ds?.length ? fdBox(ds) : null); }
+}
+function fdShow(html){ const o = $('#fd-out'); o.innerHTML = html + (DMAP ? `<p class="fd-tomap"><button type="button" class="btn">See ${/ZIP code/.test(html) ? 'these districts' : 'your districts'} on the map</button></p>` : '');
+  o.querySelector('.fd-tomap button')?.addEventListener('click', ()=>{ fdShowPane('map'); $('#fd-map')?.scrollIntoView({block:'start'}); $('#fd-svg')?.focus({preventScroll:true}); }); const h = o.querySelector('h2'); if (h){ h.tabIndex = -1; h.focus({preventScroll:false}); } }
 function fdStatus(t){ const st = $('#fd-st'); if (st) st.textContent = t; }
 async function fdLookup(q){
   fdStatus(''); $('#fd-out').innerHTML = ''; if (DMAP && $('#fd-svg')) fdShowFound(null, null);
@@ -1977,7 +1999,8 @@ function renderFind(){
   $('#view').innerHTML = `
   <div class="phead"><div><div class="eyebrow">Illinois General Assembly</div><h1>Find your legislators</h1>
     <p>Everyone in Illinois has one State Representative and one State Senator. Enter your street address for an exact answer, or a ZIP code to see the districts it covers.</p></div></div>
-  <div class="fd-layout"><div class="find-wrap">
+  <div class="seg fd-tog" role="group" aria-label="Show"><button type="button" data-v="search" aria-pressed="true">Search</button><button type="button" data-v="map" aria-pressed="false">Map</button></div>
+  <div class="fd-layout" id="fd-layout" data-show="search"><div class="find-wrap">
     <form id="fd-f" class="find-form" autocomplete="off" novalidate>
       <label for="fd-q" class="fd-l">Street address or ZIP code</label>
       <div class="find-row"><input id="fd-q" type="text" name="fd-nosave" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="401 S Spring St, Springfield   or   62706" aria-describedby="fd-priv">
@@ -1991,6 +2014,7 @@ function renderFind(){
   Object.assign(FMAP, {found:null, pin:null, sel:null, vb:null});   // nothing from an earlier visit is kept
   $('#fd-f').addEventListener('submit', e=>{ e.preventDefault(); fdLookup($('#fd-q').value.trim()); });
   fdMapBind(); fdMapInit();
+  $$('.fd-tog button').forEach(b=>b.addEventListener('click', ()=>fdShowPane(b.dataset.v)));
 }
 
 /* =================== TRENDS ===================
