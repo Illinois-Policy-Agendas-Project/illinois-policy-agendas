@@ -92,3 +92,188 @@ logo = "delta-institute.png"
 reviewed = true
 bio = """A nonprofit, founded in 1998, that works with communities, businesses and governments across the Midwest and Great Lakes region on environmental, economic and climate challenges. Its work spans energy, ecosystems and waste. It has led Great Lakes Restoration Initiative projects and incubated social enterprises such as the Rebuilding Exchange, a building-materials reuse store."""
 sources = ["https://www.guidestar.org/profile/36-4210191", "https://delta-institute.org/wp-content/uploads/2024/02/Deltas-25th-Anniversary-Sponsorship-Opportunities.pdf"]
+
+# ---- Drafted November 2026 for the organizations added to the report collector, from each organization's own pages
+# (and, where those were silent on a date, the sources listed). Not yet reviewed. Logos were taken from each
+# organization's website; permission to use them still needs to be asked. Advance Illinois and the John Howard
+# Association show only white logos on their sites, and the Great Cities Institute and the Project for Middle Class
+# Renewal use their universities' branding, so those four show a monogram until a logo file is added.
+
+[[org]]
+name = "Civic Federation"
+official_name = "The Civic Federation"
+founded = 1894
+based = "Chicago"
+website = "https://www.civicfed.org"
+logo = "civic-federation.png"
+reviewed = false
+bio = """An independent, nonpartisan government research organization founded in 1894. It analyzes the finances of the State of Illinois, the City of Chicago, Cook County and other local governments, and makes recommendations on budgets, pensions, taxes and government transparency. Its Institute for Illinois' Fiscal Sustainability focuses on the state budget."""
+sources = ["https://www.civicfed.org/about-us"]
+
+[[org]]
+name = "Metropolitan Planning Council"
+official_name = "Metropolitan Planning Council (MPC)"
+founded = 1934
+based = "Chicago"
+website = "https://metroplanning.org"
+logo = "metropolitan-planning-council.svg"
+reviewed = false
+bio = """An independent planning and policy organization serving the Chicago region, founded in 1934. Through research, policy work and partnerships it addresses the built environment: housing, transportation and transit, water and the public systems behind them. It describes its approach as centered on racial and economic justice."""
+sources = ["https://metroplanning.org/about-us/"]
+
+[[org]]
+name = "Advance Illinois"
+official_name = "Advance Illinois"
+founded = 2008
+website = "https://www.advanceillinois.org"
+reviewed = false
+bio = """A bipartisan nonprofit policy and advocacy organization founded in 2008 by leaders of civic, philanthropic, business and education organizations, with support from the Bill & Melinda Gates Foundation and the Joyce Foundation. It works on education policy from early childhood through higher education, and publishes a periodic report on public education in Illinois, The State We're In."""
+sources = ["https://www.advanceillinois.org/about-us/mission-history"]
+
+[[org]]
+name = "Health & Medicine Policy Research Group"
+official_name = "Health & Medicine Policy Research Group (HMPRG)"
+founded = 1981
+based = "Chicago"
+website = "https://www.hmprg.org"
+logo = "health-medicine-policy-research-group.png"
+reviewed = false
+bio = """A health policy organization founded in 1981 by Dr. Quentin Young and fellow health justice advocates. It conducts research and policy analysis and convenes coalitions on health equity in Illinois, with recent work on public health capacity, the health workforce, aging and trauma-informed care."""
+sources = ["https://www.hmprg.org/announcing-health-medicine-policy-research-groups-2026-policy-priorities/", "https://hmprg.org/wp-content/uploads/2024/06/HMPRG-OurWins-Timeline-eBook.pdf", "https://pnhp.org/news/dr-quentin-young-selected-obituaries-stories/"]
+
+[[org]]
+name = "Latino Policy Forum"
+official_name = "Latino Policy Forum"
+founded = 1988
+based = "Chicago"
+website = "https://latinopolicyforum.org"
+logo = "latino-policy-forum.png"
+reviewed = false
+bio = """A Chicago organization that works to improve outcomes for Latino communities in Illinois through analysis, advocacy and leadership development. It began in 1988 as Latinos United and took its present name in 2008. Its work covers education, housing, immigration and community leadership, and it publishes data briefs on Latinos in Illinois."""
+sources = ["https://latinopolicyforum.org/about/", "https://www.macfound.org/grantee/latino-policy-forum-4765", "https://en.wikipedia.org/wiki/Latino_Policy_Forum"]
+
+[[org]]
+name = "Wirepoints"
+official_name = "Wirepoints"
+based = "Wilmette, Illinois"
+website = "https://wirepoints.org"
+logo = "wirepoints.png"
+reviewed = false
+bio = """A nonprofit founded by Mark Glennon that publishes research and commentary on Illinois' economy and government, with a particular focus on state and local fiscal problems such as pensions, taxes and budgets. It also publishes a daily roundup of Illinois news."""
+sources = ["https://www.guidestar.org/profile/83-2750180", "https://wirepoints.org"]
+
+[[org]]
+name = "UIC Great Cities Institute"
+official_name = "Great Cities Institute, University of Illinois Chicago"
+founded = 1995
+based = "Chicago"
+website = "https://greatcities.uic.edu"
+reviewed = false
+bio = """A research institute at the University of Illinois Chicago, created in 1995 as the university's main center for engaged urban research. Its work covers employment and economic development, local and regional governance, migration, energy and the environment, and community well-being, often in partnership with Chicago neighborhoods. It is home to the UIC Neighborhoods Initiative."""
+sources = ["https://greatcities.uic.edu/about/"]
+
+[[org]]
+name = "Loyola Center for Criminal Justice"
+official_name = "Center for Criminal Justice, Loyola University Chicago"
+founded = 2015
+based = "Chicago"
+website = "https://loyolaccj.org"
+logo = "loyola-center-for-criminal-justice.png"
+reviewed = false
+bio = """A research center at Loyola University Chicago that studies criminal justice policy and practice. Its research and evaluations cover sentencing, pretrial reform, prisons and reentry, and criminal justice trends in Illinois counties, and it works with practitioners on reform projects."""
+sources = ["https://loyolaccj.org/about", "https://loyolaccj.org/img/center-for-criminal-justice-decade-in-review-2025.pdf"]
+
+[[org]]
+name = "Project for Middle Class Renewal"
+official_name = "Project for Middle Class Renewal, University of Illinois Urbana-Champaign"
+based = "Urbana-Champaign"
+website = "https://lep.illinois.edu/project-for-middle-class-renewal/"
+reviewed = false
+bio = """A research project of the University of Illinois Labor Education Program that studies working conditions and labor policy. Its reports cover wages, unions, pensions, housing and the state economy, and many are written jointly with the Illinois Economic Policy Institute."""
+sources = ["https://lep.illinois.edu/project-for-middle-class-renewal/", "https://lep.illinois.edu/research-and-publications/policy-reports/"]
+
+[[org]]
+name = "John Howard Association"
+official_name = "John Howard Association of Illinois"
+founded = 1901
+based = "Chicago"
+website = "https://www.thejha.org"
+reviewed = false
+bio = """A prison reform organization founded in 1901 and named for an 18th-century English prison reformer. It monitors conditions in Illinois prisons, publishes monitoring reports and corrections data, and advocates independent oversight of the corrections system."""
+sources = ["https://www.thejha.org/who-we-are"]
+
+[[org]]
+name = "Restore Justice"
+official_name = "Restore Justice Foundation"
+founded = 2014
+based = "Chicago"
+website = "https://restorejustice.org"
+logo = "restore-justice.png"
+reviewed = false
+bio = """A policy-focused nonprofit, begun in 2014, that advocates for fairness in the Illinois criminal legal system, especially for people serving long sentences for crimes committed when they were young. It works on sentencing and parole policy with incarcerated people, their families and victims' families."""
+sources = ["https://restorejustice.org/about-us/"]
+
+[[org]]
+name = "Chicago Appleseed"
+official_name = "Chicago Appleseed Center for Fair Courts"
+founded = 1970
+based = "Chicago"
+website = "https://www.chicagoappleseed.org"
+logo = "chicago-appleseed.png"
+reviewed = false
+bio = """A research and advocacy organization focused on the courts and criminal legal system in Cook County and Illinois. It began in 1970 as the Fund for Justice, the research arm of the Chicago Council of Lawyers, and joined the national Appleseed network in 1997. Its work includes court-watching, research on pretrial practice and court access, and policy statements."""
+sources = ["https://www.chicagoappleseed.org/about-us/history/", "https://www.chicagoappleseed.org/about-us/"]
+
+[[org]]
+name = "Illinois Action for Children"
+official_name = "Illinois Action for Children (IAFC)"
+founded = 1969
+based = "Chicago"
+website = "https://www.actforchildren.org"
+logo = "illinois-action-for-children.png"
+reviewed = false
+bio = """A child care and early learning organization founded in 1969 by Sylvia Cotton as the Day Care Crisis Council of Metropolitan Chicago. It runs programs for families and child care providers, and carries out research and advocacy on child care policy through its Sylvia Cotton Center for Research and Policy Innovation."""
+sources = ["https://www.actforchildren.org/about/", "https://www.actforchildren.org/news-and-press/what-about-the-children-illinois-action-for-childrens-50-year-anniversary-of-transforming-the-lives-of-children-and-families/"]
+
+[[org]]
+name = "Illinois Environmental Council"
+official_name = "Illinois Environmental Council (IEC)"
+founded = 1975
+based = "Springfield"
+website = "https://ilenviro.org"
+logo = "illinois-environmental-council.png"
+reviewed = false
+bio = """A coalition created in 1975 to give Illinois' environmental community a collective voice in state policy. It represents more than 150 environmental organizations, lobbies in Springfield, and publishes legislative reports, analyses of the state budget and an environmental scorecard of legislators."""
+sources = ["https://ilenviro.org/about/", "https://ilenviro.org/wp-content/uploads/2026/06/IEC-Leg-Report-2026-compressed-6.19.pdf"]
+
+[[org]]
+name = "Illinois Public Health Institute"
+official_name = "Illinois Public Health Institute (IPHI)"
+based = "Chicago"
+website = "https://iphionline.org"
+logo = "illinois-public-health-institute.png"
+reviewed = false
+bio = """A nonprofit that works to advance health equity in Illinois through policy, systems and institutional change. It convenes statewide and regional initiatives such as the Alliance for Health Equity, supports data-sharing among health and social service organizations, and pursues a state policy agenda."""
+sources = ["https://iphionline.org/mission-vision-values/", "https://iphionline.org/our-approach/"]
+
+[[org]]
+name = "Housing Action Illinois"
+official_name = "Housing Action Illinois"
+founded = 1986
+based = "Chicago"
+website = "https://housingactionil.org"
+logo = "housing-action-illinois.png"
+reviewed = false
+bio = """A statewide coalition working since 1986 to expand and protect affordable housing and end homelessness in Illinois. It advocates on state and federal housing policy, supports housing counseling agencies, and publishes reports on housing needs, homelessness and tenant protections."""
+sources = ["https://housingactionil.org/history/", "https://housingactionil.org/what-we-do/publications/"]
+
+[[org]]
+name = "Reform for Illinois"
+official_name = "Reform for Illinois (formerly the Illinois Campaign for Political Reform)"
+founded = 1997
+based = "Chicago"
+website = "https://www.reformforillinois.org"
+logo = "reform-for-illinois.png"
+reviewed = false
+bio = """A nonpartisan research and advocacy organization founded in 1997 by former U.S. Sen. Paul Simon and then Lt. Gov. Bob Kustra as the Illinois Campaign for Political Reform. It works on campaign finance, government ethics and elections, and runs Illinois Sunshine, a searchable database of state campaign finance reports."""
+sources = ["https://www.reformforillinois.org/about/"]
