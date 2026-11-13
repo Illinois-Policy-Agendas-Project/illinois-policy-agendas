@@ -736,13 +736,9 @@ h1 a.h1-link{color:inherit;text-decoration:none} h1 a.h1-link:hover{text-decorat
 .cm-mix{display:flex;height:6px;border-radius:2px;overflow:hidden;margin-top:8px;background:var(--sunk)} .cm-mix i{display:block;min-width:1px}
 .cm-fun{position:relative;height:6px;margin-top:4px;border-radius:2px;overflow:hidden} .cm-fun i{position:absolute;left:0;top:0;bottom:0;display:block}
 .cm-fun .a{width:100%;background:var(--sunk);box-shadow:inset 0 0 0 1px var(--line)} .cm-fun .o{background:color-mix(in srgb, var(--s-bills) 55%, var(--surface))} .cm-fun .l{background:var(--navy)}
-#cm-sc svg{display:block;width:100%;height:auto} #cm-sc .grid{stroke:var(--line);stroke-width:1} #cm-sc .tick{font-size:11px;fill:var(--muted)} #cm-sc .axl{font-size:12px;fill:var(--ink-2)}
-#cm-sc .cm-avg{stroke:var(--ink-2);stroke-dasharray:4 4;stroke-width:1} #cm-sc .cm-pt{stroke:var(--surface);stroke-width:1.2;fill-opacity:.85;cursor:pointer} #cm-sc .cm-pt:hover{stroke:var(--ink);stroke-width:2;fill-opacity:1}
-#cm-sc .cm-lab{font-size:11.5px;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:3px;pointer-events:none}
-.cm-sc-leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-2);margin-top:8px} .cm-sc-leg span{display:inline-flex;align-items:center;gap:5px} .cm-sc-leg i{width:10px;height:10px;border-radius:50%;display:inline-block}
 details.cm-tbl{margin-top:4px} details.cm-tbl > summary{cursor:pointer;font-family:var(--f-display);font-weight:500;font-size:19px;padding:12px 0;border-top:2px solid var(--navy);list-style-position:inside}
 details.cm-tbl > summary .muted{font:13px var(--f-ui);margin-left:8px}
-@media (forced-colors: active){ .cm-mix i, .cm-sc-leg i, #cm-sc .cm-pt{forced-color-adjust:none} }
+@media (forced-colors: active){ .cm-mix i{forced-color-adjust:none} }
 </style>
 
 <a class="skip" href="#view" onclick="event.preventDefault();event.stopPropagation();const v=document.getElementById('view');v.setAttribute('tabindex','-1');v.focus();">Skip to content</a>
@@ -3193,7 +3189,7 @@ function sankey(el, nodes, links, {height=360, heads=[], unit='bills', onNode, p
    A bill counts for a committee when it was assigned (or re-assigned) to it, and as approved when the committee reported it
    out ("Do Pass…", "Recommends Be Adopted…"). The chamber is the bill's chamber of origin until it arrives in the other one.
    House Rules and Senate Assignments, which route bills to committees, are left out. Committee pages: #committee-104-house-executive */
-const CM = { ch:'both', tableOpen:false, q:'', major:null, sub:null, sort:'n', dir:-1 };
+const CM = { tableOpen:false, q:'', major:null, sub:null, sort:'n', dir:-1 };
 const CMP = { slug:null, out:'all', major:null, page:0 };
 const CMDATA = {}, CMKEY = new Map();
 const cmName = n => n.replace(/\s+Committee$/,'').replace(/\s*-\s*/g,' - ').replace(/\s+/g,' ').trim();
@@ -3249,10 +3245,6 @@ function renderCommittees(){
     <select id="cm-m" aria-label="Major topic">${majorOptions(CM.major,'Bills on any topic')}</select>
     ${CM.major!=null?`<select id="cm-s" aria-label="Subtopic">${subOptions(CM.major, CM.sub)}</select>`:''}
   </div>
-  <div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs" id="cm-sc-t">Workload and approval</h2>
-      <div class="seg" role="group" aria-label="Chamber">${[['both','Both chambers'],['House','House'],['Senate','Senate']].map(([k,l])=>`<button type="button" data-cmch="${k}" aria-pressed="${(CM.ch||'both')===k}">${l}</button>`).join('')}</div></div>
-    <p class="ink2" style="margin:2px 0 6px;font-size:13.5px">Each dot is a committee: how many bills it was sent (across) and the share it approved (up). Color is its main topic; size is how many of its bills became law. Hover for details, click to open the committee.</p>
-    <div id="cm-sc"></div><div class="cm-sc-leg" id="cm-sc-leg" aria-hidden="true"></div></div>
   <div class="grid2">
     <div class="panel"><div class="chead"><h2 class="hs" id="cm-ct-Senate"></h2><span class="muted" style="font-size:12px">Bills assigned · darker part approved</span></div><div id="cm-top-Senate"></div></div>
     <div class="panel"><div class="chead"><h2 class="hs" id="cm-ct-House"></h2><span class="muted" style="font-size:12px">Bills assigned · darker part approved</span></div><div id="cm-top-House"></div></div>
@@ -3268,7 +3260,6 @@ function renderCommittees(){
   <div class="tscroll"><table class="dt" id="cm-t" style="min-width:640px" data-mcap="20"><thead><tr>${[['name','Committee'],['ch','Chamber'],['n','Bills assigned'],['ok','Approved'],['rate','Approval rate'],['law','Became law'],['top','Main topic']].map(([k,l])=>`<th data-k="${k}" ${CM.sort===k?`aria-sort="${CM.dir<0?'descending':'ascending'}"`:''} style="${['n','ok','rate','law'].includes(k)?'text-align:right':''}"><button type="button" class="thsort">${l} <span class="muted" aria-hidden="true">${CM.sort===k?(CM.dir<0?'▼':'▲'):''}</span></button></th>`).join('')}</tr></thead><tbody></tbody></table></div></details>`;
   bindLegBar();
   $('#cm-tbl').addEventListener('toggle', e=>{ CM.tableOpen = e.target.open; });
-  $$('[data-cmch]').forEach(b=>b.addEventListener('click', ()=>{ CM.ch = b.dataset.cmch; $$('[data-cmch]').forEach(x=>x.setAttribute('aria-pressed', x===b)); cmScatter(); }));
   let deb; $('#cm-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ CM.q=e.target.value; cmUpdate(); },120); });
   $('#cm-m').addEventListener('change', e=>{ CM.major=e.target.value===''?null:+e.target.value; CM.sub=null; renderCommittees(); });
   $('#cm-s')?.addEventListener('change', e=>{ CM.sub=e.target.value===''?null:+e.target.value; cmUpdate(); });
@@ -3284,39 +3275,8 @@ function cmRows(){
   const key = ([c,s]) => CM.sort==='name' ? c.name : CM.sort==='ch' ? c.ch+c.name : CM.sort==='top' ? (s.top!=null?CB.majors[s.top]:'~') : s[CM.sort];
   return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (x>y?1:x<y?-1:0)*CM.dir || b[1].n-a[1].n || a[0].name.localeCompare(b[0].name); });
 }
-/* the committees as dots: bills assigned (log scale) against approval rate, sized by bills that became law */
-function cmScatter(){
-  const el = $('#cm-sc'); if (!el) return;
-  const ch = CM.ch || 'both';
-  const pts = CMDATA[legGA()].filter(c=>ch==='both' || c.ch===ch).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,st])=>st.n>0);
-  if (!pts.length){ el.innerHTML = '<p class="muted" style="margin:0">No bills on this topic went to these committees.</p>'; $('#cm-sc-leg').innerHTML = ''; return; }
-  const W = cw(el), H = W < 560 ? 300 : 380, m = {l:46, r:16, t:12, b:40}, iw = W-m.l-m.r, ih = H-m.t-m.b;
-  const nMax = Math.max(...pts.map(([,st])=>st.n)), lx0 = Math.log10(Math.max(1, Math.min(...pts.map(([,st])=>st.n))) / 1.3), lx1 = Math.log10(nMax * 1.15);
-  const X = n => m.l + (Math.log10(n) - lx0) / (lx1 - lx0) * iw, Y = r => m.t + (1 - r) * ih;
-  const lawMax = Math.max(1, ...pts.map(([,st])=>st.law)), R = law => (W < 560 ? 3.5 : 4.5) + (W < 560 ? 8 : 12) * Math.sqrt(law / lawMax);
-  const all = pts.reduce((a,[,st])=>({n:a.n+st.n, ok:a.ok+st.ok}), {n:0, ok:0}), avg = all.ok / Math.max(1, all.n);
-  const ticks = [1,2,5,10,20,50,100,200,500,1000,2000,5000].filter(t=>Math.log10(t)>=lx0 && Math.log10(t)<=lx1);
-  let g = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Scatter chart of ${pts.length} committees: bills assigned against approval rate. The table below lists every figure.">`;
-  for (const r of [0, .25, .5, .75, 1]) g += `<line class="grid" x1="${m.l}" x2="${W-m.r}" y1="${Y(r)}" y2="${Y(r)}"/><text x="${m.l-6}" y="${Y(r)+4}" text-anchor="end" class="tick">${Math.round(r*100)}%</text>`;
-  for (const t of ticks) g += `<line class="grid" x1="${X(t)}" x2="${X(t)}" y1="${m.t}" y2="${H-m.b}"/><text x="${X(t)}" y="${H-m.b+15}" text-anchor="middle" class="tick">${fmt(t)}</text>`;
-  g += `<line class="cm-avg" x1="${m.l}" x2="${W-m.r}" y1="${Y(avg)}" y2="${Y(avg)}"/><text x="${W-m.r}" y="${Y(avg)-5}" text-anchor="end" class="tick">all committees: ${pct(avg,0)} approved</text>`;
-  g += `<text x="${m.l + iw/2}" y="${H-6}" text-anchor="middle" class="axl">Bills assigned (log scale)</text><text transform="translate(12 ${m.t + ih/2}) rotate(-90)" text-anchor="middle" class="axl">Approved</text>`;
-  const order = pts.slice().sort((a,b)=>b[1].law-a[1].law);   // big dots first, small ones on top
-  g += order.map(([c,st],i)=>`<circle class="cm-pt" data-i="${pts.indexOf(order[i])}" cx="${X(st.n).toFixed(1)}" cy="${Y(st.rate).toFixed(1)}" r="${R(st.law).toFixed(1)}" style="fill:${st.top!=null?shade(st.top,0,1):'var(--muted)'}"/>`).join('');
-  // name the busiest few
-  const named = pts.slice().sort((a,b)=>b[1].n-a[1].n).slice(0, W < 560 ? 3 : 6);
-  g += named.map(([c,st])=>{ const x = X(st.n), right = x > m.l + iw*0.75; return `<text class="cm-lab" x="${(right ? x - R(st.law) - 4 : x + R(st.law) + 4).toFixed(1)}" y="${(Y(st.rate)+4).toFixed(1)}" text-anchor="${right?'end':'start'}">${esc(c.name.length>26?c.name.slice(0,25)+'…':c.name)}${ch==='both'?` (${c.ch[0]})`:''}</text>`; }).join('');
-  el.innerHTML = g + '</svg>';
-  $$('.cm-pt', el).forEach(dot=>{ const [c,st] = pts[+dot.dataset.i];
-    bindTip(dot, ()=>`<div class="t">${esc(c.name)}</div><div class="muted">${c.ch} committee${st.top!=null?` · mostly ${esc(CB.majors[st.top])}`:''}</div>
-      <div class="r"><span>Bills assigned</span><b class="num">${fmt(st.n)}</b></div><div class="r"><span>Approved</span><b class="num">${fmt(st.ok)} (${pct(st.rate,0)})</b></div><div class="r"><span>Became law</span><b class="num">${fmt(st.law)}</b></div><div class="muted">Click to open the committee</div>`);
-    dot.addEventListener('click', ()=>nav('committee-'+c.key)); });
-  const tops = [...count(pts.filter(([,st])=>st.top!=null), ([,st])=>st.top)].sort((a,b)=>b[1]-a[1]);
-  $('#cm-sc-leg').innerHTML = tops.map(([t,n])=>`<span><i style="background:${shade(t,0,1)}"></i>${esc(CB.majors[t])} <span class="muted">${n}</span></span>`).join('') + `<span class="muted">Larger dot: more bills became law</span>`;
-}
 function cmUpdate(){
   const rows = cmRows();
-  cmScatter();
   // one chart per chamber, side by side on a shared scale; they follow the topic filters but not the search
   const tops = Object.fromEntries(['Senate','House'].map(ch=>[ch, CMDATA[legGA()].filter(c=>c.ch===ch).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0).sort((a,b)=>b[1].n-a[1].n).slice(0,12)]));
   const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.n))));
