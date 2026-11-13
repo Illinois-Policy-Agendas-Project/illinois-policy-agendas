@@ -2164,7 +2164,7 @@ function renderAbout(){
     <p>${fillCounts(H.overview || '')}</p></div></div>
   <nav class="ab-toc" aria-label="On this page"><a href="#about-data">The data</a><a href="#about-team">Team and support</a><a href="#about-license">License</a><a href="#about-cite">How to cite</a><a href="#contact">Contact</a></nav>
   <div class="ab-wrap">
-    ${sec('data', 'The data', `<p class="prose">${fillCounts(H.methods || '')}</p>${A.sources?`<h3 class="ab-h">Sources</h3><p class="prose">${esc(A.sources)}</p>`:''}
+    ${sec('data', 'The data', `<p class="prose">${fillCounts(H.methods || '')}</p>${A.omnibus?`<h3 class="ab-h">Omnibus bills</h3><p class="prose">${esc(A.omnibus)}</p>`:''}${A.sources?`<h3 class="ab-h">Sources</h3><p class="prose">${esc(A.sources)}</p>`:''}
       <p class="prose">The full rules for every topic are in the <a href="#codebook">codebook</a>. Every page on the site has a button to download what it shows as a spreadsheet (CSV).</p>`)}
     ${sec('team', 'Team and support', `${team?`<ul class="ab-list">${team}</ul>`:''}${A.support?`<p class="prose">${esc(A.support)}</p>`:''}`)}
     ${sec('license', `License${A.license_name?` <span class="ab-badge">${esc(A.license_name)}</span>`:''}`, `<p class="prose">${esc(A.license || '')}</p>${A.license_note?`<p class="prose muted">${esc(A.license_note)}</p>`:''}${lic?`<p class="prose">Read the license: ${lic}</p>`:''}`)}
