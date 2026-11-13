@@ -675,7 +675,7 @@ mark{background:#ffe2d6}
 }
 .phead-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
 .find-wrap{max-width:860px} .fd-l{display:block;font-weight:600;margin-bottom:6px}
-.find-row{display:flex;gap:8px} .find-row input{flex:1;min-width:0;font-size:16px;padding:10px 12px}
+.find-row{display:flex;gap:8px;max-width:360px} .find-row input{flex:1;min-width:0;font-size:16px;padding:10px 12px}
 .find-priv{font-size:13px;color:var(--ink-2);line-height:1.55;margin:12px 0 0;max-width:72ch}
 .fd-st{margin:14px 0 0;font-weight:600} .fd-st:empty{display:none}
 #fd-out h2{margin-top:22px} .fd-h{font-family:var(--f-display);font-weight:500;font-size:16px;margin:18px 0 8px}
@@ -1751,24 +1751,10 @@ function drawStrip(){
 }
 
 /* =================== FIND YOUR LEGISLATORS ===================
-   #find: a street address or a ZIP code -> the visitor's State Representative and State Senator.
-   Privacy: what is typed stays in this page's memory. It is never written to the address bar, browser storage, the
-   page title or the visit counter (which sees only "/find"). A ZIP code is looked up in data/zipdist.json, on the
-   visitor's computer. A street address goes from the browser straight to the U.S. Census Bureau's geocoder, which
-   returns the districts (JSONP, since the geocoder sends no CORS headers; no referrer is sent). */
+   #find: a ZIP code -> the visitor's State Representative and State Senator, from data/zipdist.json.
+   Privacy: the ZIP code is looked up on the visitor's computer and sent nowhere. It stays in this page's memory and is
+   never written to the address bar, browser storage, the page title or the visit counter (which sees only "/find"). */
 let ZIPDIST = null;
-const CENSUS_GEO = 'https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress';
-function censusDistricts(address){
-  return new Promise((resolve, reject)=>{
-    const cb = 'ipapGeo' + Math.random().toString(36).slice(2), sc = document.createElement('script'); let timer;
-    const done = () => { clearTimeout(timer); window[cb] = () => {}; sc.remove(); };
-    window[cb] = d => { done(); resolve(d); };
-    sc.onerror = () => { done(); reject(new Error('network')); };
-    timer = setTimeout(()=>{ done(); reject(new Error('timeout')); }, 15000);
-    sc.referrerPolicy = 'no-referrer';
-    sc.src = CENSUS_GEO + '?' + new URLSearchParams({address, benchmark:'Public_AR_Current', vintage:'Current_Current', layers:'all', format:'jsonp', callback:cb});
-    document.head.appendChild(sc); });
-}
 /* the member now holding a seat, and their page on this site if they sponsored bills */
 function seatHolder(ch, district){
   const l = LEGSEAT().find(x=>x.ch===ch && String(x.district)===String(district));
@@ -1790,50 +1776,31 @@ function fdShow(html){ const o = $('#fd-out'); o.innerHTML = html; const h = o.q
 function fdStatus(t){ const st = $('#fd-st'); if (st) st.textContent = t; }
 async function fdLookup(q){
   fdStatus(''); $('#fd-out').innerHTML = '';
-  if (!q){ fdStatus('Enter a street address or a ZIP code.'); return; }
   const z = q.match(/^(\d{5})(?:-?\d{4})?$/);
-  if (z){
+  if (!z){ fdStatus('Enter a five-digit ZIP code, such as 62706.'); return; }
     if (!ZIPDIST) ZIPDIST = MAN.v?.zipdist ? await get('zipdist').catch(()=>null) : null;
-    if (!ZIPDIST){ fdStatus('ZIP code lookup is not available right now. Try your street address.'); return; }
+    if (!ZIPDIST){ fdStatus('ZIP code lookup is not available right now. Please try again later.'); return; }
     const row = ZIPDIST[z[1]];
-    if (!row){ fdStatus(`No Illinois districts were found for ZIP code ${z[1]}. It may be outside Illinois or a post-office-box ZIP code; try your street address.`); return; }
+    if (!row){ fdStatus(`No Illinois districts were found for ZIP code ${z[1]}. It may be outside Illinois, or a ZIP code used only for post office boxes; try the ZIP code where you live.`); return; }
     const split = row.h.length > 1 || row.s.length > 1;
     fdShow(`<h2 class="hs">Districts in ZIP code ${z[1]}</h2>
-      ${split ? `<p class="fd-note">This ZIP code crosses district lines, so it has more than one possible legislator. <b>Enter your street address for an exact answer.</b></p>` : ''}
+      ${split ? `<p class="fd-note">This ZIP code crosses district lines, so it has more than one possible legislator. The districts are listed by how much of the ZIP code they cover. Your county clerk or election authority can confirm which district your home is in.</p>` : ''}
       ${row.il ? `<p class="fd-note">Part of this ZIP code is outside Illinois.</p>` : ''}
       <h3 class="fd-h">State House</h3><div class="fd-grid">${row.h.map(([d,sh])=>fdCard('Rep', d, split ? sh : null)).join('')}</div>
       <h3 class="fd-h">State Senate</h3><div class="fd-grid">${row.s.map(([d,sh])=>fdCard('Sen', d, split ? sh : null)).join('')}</div>
       <p class="muted fd-src">Matched by area: the share of the ZIP code's land in each district, from Census Bureau boundaries.</p>`);
-    return;
-  }
-  const address = /\b(IL|Ill|Illinois)\b|\b\d{5}\b/i.test(q) ? q : q + ', Illinois';
-  fdStatus('Looking up the address with the U.S. Census Bureau…');
-  let d; try { d = await censusDistricts(address).catch(()=>new Promise(r=>setTimeout(r, 800)).then(()=>censusDistricts(address))); }   /* one retry: the geocoder sometimes drops a request */
-  catch { fdStatus("The Census Bureau's geocoder could not be reached. Check your connection and try again, or enter just your ZIP code."); return; }
-  if (!$('#fd-out')) return;   // left the page meanwhile
-  const m = d?.result?.addressMatches?.[0];
-  if (!m){ fdStatus("The Census Bureau's geocoder didn't find that address. Check the spelling and include the city or ZIP code, or enter just your ZIP code."); return; }
-  if ((m.addressComponents?.state || '').toUpperCase() !== 'IL'){ fdStatus(`That address matched ${m.matchedAddress}, which is outside Illinois.`); return; }
-  const g = m.geographies || {}, pick = re => { const k = Object.keys(g).find(k=>re.test(k)); const x = k && g[k][0]; return x ? +(x.BASENAME || x.SLDL || x.SLDU) : null; };
-  const h = pick(/State Legislative Districts - Lower/i), sn = pick(/State Legislative Districts - Upper/i);
-  if (!h && !sn){ fdStatus("The Census Bureau found the address but returned no legislative districts. Try your ZIP code."); return; }
-  fdStatus('');
-  fdShow(`<h2 class="hs">Your legislators</h2>
-    <p class="fd-note">Matched address: <b>${esc(m.matchedAddress)}</b>. If that isn't your address, add the city or ZIP code and try again.</p>
-    <div class="fd-grid">${h ? fdCard('Rep', h) : ''}${sn ? fdCard('Sen', sn) : ''}</div>
-    <p class="muted fd-src">Districts from the U.S. Census Bureau's geocoder, using the current district lines.</p>`);
 }
 function renderFind(){
   $('#view').innerHTML = `
   <div class="phead"><div><div class="eyebrow">Legislators</div><h1>Find your legislators</h1>
-    <p>Everyone in Illinois has one State Representative and one State Senator. Enter your street address for an exact answer, or a ZIP code to see the districts it covers.</p></div></div>
+    <p>Everyone in Illinois has one State Representative and one State Senator. Enter your ZIP code to see the districts it covers and who represents them.</p></div></div>
   <div class="find-wrap">
     <form id="fd-f" class="find-form" autocomplete="off" novalidate>
-      <label for="fd-q" class="fd-l">Street address or ZIP code</label>
-      <div class="find-row"><input id="fd-q" type="text" name="fd-nosave" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="401 S Spring St, Springfield   or   62706" aria-describedby="fd-priv">
+      <label for="fd-q" class="fd-l">ZIP code</label>
+      <div class="find-row"><input id="fd-q" type="text" inputmode="numeric" maxlength="10" name="fd-nosave" autocomplete="off" spellcheck="false" placeholder="62706" aria-describedby="fd-priv">
         <button class="btn primary" type="submit">Find</button></div>
     </form>
-    <p class="find-priv" id="fd-priv"><b>Your privacy.</b> Nothing you enter is saved: not by this site, not in your browser, not in the page's address and not in our visitor counts. A ZIP code is looked up on your own computer. A street address is sent from your browser directly to the <a href="https://geocoding.geo.census.gov/" target="_blank" rel="noopener">U.S. Census Bureau's geocoder</a> to find its districts (<a href="https://www.census.gov/about/policies/privacy.html" target="_blank" rel="noopener">Census privacy policy</a>).</p>
+    <p class="find-priv" id="fd-priv"><b>Your privacy.</b> Your ZIP code is looked up on your own computer. It isn't sent anywhere or saved: not by this site, not in your browser, not in the page's address and not in our visitor counts.</p>
     <p id="fd-st" class="fd-st" role="status"></p>
     <div id="fd-out"></div>
   </div>`;
