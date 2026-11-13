@@ -1610,7 +1610,7 @@ function srToken(){ const p = new URLSearchParams();
   const q = p.toString(); return q ? 'search?' + q : 'search'; }
 function srApply(qs){ if (qs === SR.applied) return; SR.applied = qs; const p = new URLSearchParams(qs || '');
   const ins = (p.get('in')||'').split(',').filter(k=>DSK.includes(k)), m = p.get('topic');
-  Object.assign(SR, { q:p.get('q')||'', ds:new Set(ins.length ? ins : DSK), major: m!=null && m!=='' && !isNaN(+m) ? +m : null,
+  Object.assign(SR, { q:p.get('q')||'', ds:new Set(ins.length || p.get('in') === '' ? ins : DSK),   /* "in=" with nothing after it: every source unchecked */ major: m!=null && m!=='' && !isNaN(+m) ? +m : null,
     y0:yrClamp(p.get('from'), 1991), y1:yrClamp(p.get('to'), 2026), gas:p.get('ga')==='all' ? 'all' : 'latest', sort:p.get('sort')==='old' ? 'old' : 'new', page:0 }); }
 function srSync(){ if (ROUTE.view !== 'search') return; const t = srToken(); if (t === CUR) return;
   CUR = t; ROUTE = parseRoute(t); SR.applied = ROUTE.params; try { history.replaceState(null, '', '#' + t); localStorage.setItem('ilpa2-view', t); } catch {} }
