@@ -306,10 +306,14 @@ def main(argv=None):
                     if pdf in k['pdfs']:   # already another report's: an organization-wide PDF linked from every page
                         pdf = ''
                 except Exception as e:  # noqa: BLE001
-                    problems.append(f'{org}: {url} ({e})')
-                    if getattr(e, 'code', None) not in (401, 403, 404, 410) and not isinstance(e, PermissionError):
-                        again.append([url, title, date, abstract])   # a passing failure (too many requests, timeout): next run
-                    continue
+                    refused = getattr(e, 'code', None) in (401, 402, 403) or isinstance(e, PermissionError)
+                    if refused and src['kind'] == 'rss' and title:
+                        pass   # the site won't show us the page, but its open feed gave the title, date and summary: use those
+                    else:
+                        problems.append(f'{org}: {url} ({e})')
+                        if not refused and getattr(e, 'code', None) not in (404, 410):
+                            again.append([url, title, date, abstract])   # a passing failure (too many requests, timeout): next run
+                        continue
             if date and date < cutoff and not was_retry:
                 continue
             offered.add(kk)

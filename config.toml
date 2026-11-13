@@ -112,8 +112,7 @@ new = "inputs/thinktanks/new_reports.xlsx"
 first_since = "2006-01-01"
 # Organizations to look back through again, to pick up reports a run missed (reports on file, or deleted by coders,
 # are skipped). Cheap for WordPress sources; it can be emptied once the missing reports are in.
-# November 2026: the first collection of these two was slowed by the sites (429) and skipped 16 reports.
-recheck = ["Metropolitan Planning Council", "Health & Medicine Policy Research Group"]
+recheck = []
 
 # Where to look for each organization's new reports. `org` must match the think_tank column.
 #   kind = "wp"     a WordPress site's listing (`type` is the post type: "posts", or e.g. "report")
