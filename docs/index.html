@@ -730,6 +730,7 @@ a.gov-n{color:var(--ink);text-decoration:none} a.gov-n:hover{text-decoration:und
 h1 a.h1-link{color:inherit;text-decoration:none} h1 a.h1-link:hover{text-decoration:underline;text-decoration-color:var(--orange,#e8502a)}
 .gv-subs{list-style:none;margin:0;padding:0} .gv-subs li{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px}
 .gv-subs li > div{min-width:0}
+.sk-omni{font-size:12px;margin:6px 0 0;line-height:1.5}
 </style>
 
 <a class="skip" href="#view" onclick="event.preventDefault();event.stopPropagation();const v=document.getElementById('view');v.setAttribute('tabindex','-1');v.focus();">Skip to content</a>
@@ -2636,7 +2637,7 @@ function renderSponsors(){
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs" id="sk-t">Where a legislator's bills went</h2>
       <select id="sk-p" aria-label="Legislator"></select></div>
     <div id="sk"></div>
-    <p class="muted" style="margin:6px 0 0;font-size:12px" id="sk-note"></p></div>
+    <p class="muted" style="margin:6px 0 0;font-size:12px" id="sk-note"></p>${OMNIBUS_NOTE}</div>
   <div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs" id="net-t">Co-sponsorship network</h2><span class="muted" style="font-size:12px" id="net-sub"></span></div>
     <div class="fbar" style="margin:4px 0 8px">
       <div class="seg" role="group" aria-label="Chamber">${[['Sen','Senate'],['Rep','House']].map(([k,l])=>`<button data-nc="${k}" aria-pressed="${NET.ch===k}">${l}</button>`).join('')}</div>
@@ -2709,6 +2710,8 @@ const STOP = 'hsl(215 14% 78%)';
 const isPlaceholder = r => /-TECH$/i.test((r.x.short0||'').trim()) && (r.x.stage||1) < 3;
 const keepBill = r => SK.shell || !isPlaceholder(r);   // legislator counts leave out placeholder bills unless asked
 const shellToggle = (id, n) => `<label class="check" style="font-size:13px" title="Technical shell bills (short titles ending in -TECH) that never passed a chamber"><input type="checkbox" id="${id}" ${SK.shell?'checked':''}>Include placeholder bills${n?` <span class="muted num">${fmt(n)}</span>`:''}</label>`;
+/* under the bill-flow charts: bills whose contents passed inside an omnibus bill still show as not becoming law */
+const OMNIBUS_NOTE = `<p class="muted sk-omni">Omnibus bills: when a bill's provisions become law as part of a larger omnibus bill, the original bill still shows here as not becoming law. Each omnibus bill is coded as one bill, under Government Operations. <a href="#about-data">More on how bills are coded</a>.</p>`;
 const shellNote = (n, id) => n ? `<label class="check" style="font-size:12.5px"><input type="checkbox" id="${id}" ${SK.shell?'checked':''}>Include ${pl(n, 'placeholder bill')}</label>` : '';
 function memberSankey(el, rows, {major=null, onNode, height}={}){
   const tp = topicNodes(rows, major, 0, 7), color = new Map(tp.nodes.map(n=>[n.id, n]));
@@ -2742,7 +2745,7 @@ function drawSponsorSankey(){
   const [p, mine] = who.find(([q])=>q.slug===SK.slug), shells = allOf(p).filter(isPlaceholder).length;
   $('#sk-t').innerHTML = `Where ${esc(p.title)}'s bills went${snTopic()?' · '+esc(snTopic()):''}`;
   memberSankey(el, mine, {major: SN.major, onNode: n=>{ if (n.major!=null){ SN.major=n.major; SN.sub=null; } else if (n.sub!=null) SN.sub=n.sub; else return; renderSponsors(); $('#sk').scrollIntoView({block:'center'}); }});
-  $('#sk-note').innerHTML = `The ${pl(mine.length, 'House or Senate bill')} ${esc(p.title)} filed as primary sponsor in the ${gaName(ga)}${snTopic()?' on this topic':''}, followed from topic to how far each got. Each strand is one bill: hover to see it, click to open it. ${shells && !SK.shell ? `Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber). ` : ''}Pick another legislator above (number of bills in brackets), or <a href="#sponsor-${p.slug}">open their page</a>.`;
+  $('#sk-note').innerHTML = `The ${pl(mine.length, 'House or Senate bill')} ${esc(p.title)} filed as primary sponsor in the ${gaName(ga)}${snTopic()?' on this topic':''}, followed from topic to how far each got. ${shells && !SK.shell ? `Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber). ` : ''}Pick another legislator above (number of bills in brackets), or <a href="#sponsor-${p.slug}">open their page</a>.`;
 }
 
 /* ---- sponsor page ---- */
@@ -2768,7 +2771,7 @@ SECTIONS.sponsor.push(
   { id:'flow', title:'Where their bills went', render(p, el){
       const all = p.bills.filter(b=>b.role==='C' && isBillHBSB(b.r)).map(b=>b.r), shells = all.filter(isPlaceholder).length, mine = all.filter(r=>SK.shell || !isPlaceholder(r));
       if (mine.length < 2){ el.innerHTML = `<p class="muted" style="margin:0">Too few bills as primary sponsor to chart.</p>${shellNote(shells, 'sg-sh')}`; $('#sg-sh')?.addEventListener('change', e=>{ SK.shell = e.target.checked; renderRecord(); }); return; }
-      el.innerHTML = `<p class="ink2" style="margin:0 0 8px;font-size:13.5px">The ${fmt(mine.length)} House and Senate bills they filed as primary sponsor, followed from topic through committee and the floor to the outcome. Each strand is one bill, in its topic's color: hover to see it, click to open it. Click a topic to list those bills below.${shells && !SK.shell ? ` Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber).` : ''}</p><div id="sg-sk"></div>${shellNote(shells, 'sg-sh')}`;
+      el.innerHTML = `<p class="ink2" style="margin:0 0 8px;font-size:13.5px">The ${fmt(mine.length)} House and Senate bills they filed as primary sponsor, followed from topic through committee and the floor to the outcome. Click a topic to list those bills below.${shells && !SK.shell ? ` Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber).` : ''}</p><div id="sg-sk"></div>${OMNIBUS_NOTE}${shellNote(shells, 'sg-sh')}`;
       $('#sg-sh')?.addEventListener('change', e=>{ SK.shell = e.target.checked; renderRecord(); });
       memberSankey($('#sg-sk'), mine, {height: Math.max(220, Math.min(360, 80 + mine.length*3)),
          onNode: n=>{ if (n.major==null) return; SPG.major = n.major; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }}); } },
