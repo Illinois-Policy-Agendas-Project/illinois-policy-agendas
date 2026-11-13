@@ -108,10 +108,16 @@ columns = { id = "id", org = "think_tank", date = "date", year = "year", title =
 # New reports found by "Update think tank reports" (pipeline/fetch_reports.py) go here for coders, not into `file`.
 # A row appears on the site once it has a subtopic; delete rows that aren't reports.
 new = "inputs/thinktanks/new_reports.xlsx"
+# An organization with nothing on file yet is collected back to this date (the start of the data).
+first_since = "2006-01-01"
 
 # Where to look for each organization's new reports. `org` must match the think_tank column.
 #   kind = "wp"     a WordPress site's listing (`type` is the post type: "posts", or e.g. "report")
 #   kind = "links"  links on a listing page whose address matches `match` (a regular expression)
+#   kind = "rss"    an RSS or Atom feed (`url`)
+# Options: for "wp", `query` adds filters to the WordPress listing (e.g. "categories=99" or "search=report");
+# for "links", `urls` lists several listing pages, or `pages = [first, last]` fills {n} in `url`, and `exclude` skips
+# matching addresses. The collector reads only what each site's robots.txt allows.
 # An organization with no entry here is collected by hand.
 [[thinktanks.sources]]
 org = "Illinois Policy"
@@ -154,6 +160,131 @@ org = "Chicago Urban League"
 kind = "links"
 url = "https://chiul.org/research/"
 match = "/wp-content/uploads/.+\\.pdf$"
+
+# ---- added November 2026: Illinois organizations that publish research on state policy (see the review of
+# missing think tanks). Each source points at the organization's reports, not its news, events or press releases.
+# Collected by hand: Paul Simon Public Policy Institute (its papers sit on a staging server), UIS Center for State
+# Policy and Leadership (no report links on its pages), DePaul Institute for Housing Studies (its site refuses the collector).
+[[thinktanks.sources]]
+org = "Civic Federation"
+kind = "links"   # the State of Illinois listing: reports and issue briefs, not blog posts or press statements
+url = "https://www.civicfed.org/governments/state-illinois?page={n}"
+pages = [0, 64]
+match = "^/(?:index%2Ephp/)?(?:(?:civic-federation|iifs)/publications/|iifs/)?[A-Za-z0-9_-]+$"   # newer reports sit at the root; older ones under /civic-federation/publications/ and /iifs/publications/
+exclude = "^/(?:index%2Ephp/)?(?:iifs/)?(?:library|membership|members|about-us|timeline|Financials|ournews|newsletters|commentary|pressroom|news|updates|localgovthub|glossary|events|join|donate|careers|user|search|iifs|blogs?|press|civicfederation)$"
+
+[[thinktanks.sources]]
+org = "Metropolitan Planning Council"
+kind = "wp"
+site = "https://metroplanning.org"
+type = "resource"
+query = "resource-category=34"   # Publication (not video, maps, audio or presentations)
+
+[[thinktanks.sources]]
+org = "Advance Illinois"
+kind = "links"
+urls = ["https://www.advanceillinois.org/research-hub-archives", "https://www.advanceillinois.org/research-hub/the-state-were-in",
+        "https://www.advanceillinois.org/research-hub/early-childhood-education-care", "https://www.advanceillinois.org/research-hub/higher-education",
+        "https://www.advanceillinois.org/research-hub/equitable-funding-resources", "https://www.advanceillinois.org/research-hub/strong-diverse-educator-pipeline",
+        "https://www.advanceillinois.org/research-hub/engaged-families-whole-student-supports", "https://www.advanceillinois.org/research-hub/data-assessments-accountability",
+        "https://www.advanceillinois.org/research-hub/learning-renewal-rebuilding", "https://www.advanceillinois.org/research-hub/standards-rigor-strong-transitions"]
+match = "\\.pdf$"
+
+[[thinktanks.sources]]
+org = "Health & Medicine Policy Research Group"
+kind = "wp"
+site = "https://www.hmprg.org"
+type = "posts"
+query = "categories=99"   # Resource Library
+
+[[thinktanks.sources]]
+org = "Latino Policy Forum"
+kind = "wp"
+site = "https://latinopolicyforum.org"
+type = "publication"
+
+[[thinktanks.sources]]
+org = "Wirepoints"
+kind = "wp"
+site = "https://wirepoints.org"
+type = "posts"
+query = "categories=229"   # Research (not its daily news and commentary)
+
+[[thinktanks.sources]]
+org = "UIC Great Cities Institute"
+kind = "links"
+url = "https://greatcities.uic.edu/research-2/browse-all-reports/page/{n}/"
+pages = [1, 10]
+match = "^/news-stories/[^/]+/?$"
+
+[[thinktanks.sources]]
+org = "Loyola Center for Criminal Justice"
+kind = "rss"
+url = "https://loyolaccj.org/feed.xml"
+
+[[thinktanks.sources]]
+org = "Project for Middle Class Renewal"   # University of Illinois; many reports are written with ILEPI, so check for duplicates
+kind = "links"
+url = "https://lep.illinois.edu/research-and-publications/policy-reports/"
+match = "/wp-content/uploads/.+\\.pdf$"
+
+[[thinktanks.sources]]
+org = "John Howard Association"
+kind = "links"
+urls = ["https://www.thejha.org/special-reports", "https://www.thejha.org/special-reports/tag/2009", "https://www.thejha.org/special-reports/tag/2010",
+        "https://www.thejha.org/special-reports/tag/2011", "https://www.thejha.org/special-reports/tag/2012", "https://www.thejha.org/special-reports/tag/2013",
+        "https://www.thejha.org/special-reports/tag/2014", "https://www.thejha.org/special-reports/tag/2015", "https://www.thejha.org/special-reports/tag/2016",
+        "https://www.thejha.org/special-reports/tag/2017", "https://www.thejha.org/special-reports/tag/2018", "https://www.thejha.org/special-reports/tag/2019",
+        "https://www.thejha.org/special-reports/tag/2020", "https://www.thejha.org/special-reports/tag/2021", "https://www.thejha.org/special-reports/tag/2022",
+        "https://www.thejha.org/special-reports/tag/2023", "https://www.thejha.org/special-reports/tag/2024", "https://www.thejha.org/special-reports/tag/2025",
+        "https://www.thejha.org/special-reports/tag/2026"]
+match = "^/special-reports/\\d+$"
+
+[[thinktanks.sources]]
+org = "Restore Justice"
+kind = "links"
+url = "https://restorejustice.org/our-work/reports-factsheets/"
+match = "(^/[a-z0-9-]*report[a-z0-9-]*/?$|/app/uploads/.+\\.pdf$)"
+exclude = "^/our-work/reports-factsheets/?$|One-Pager-About"
+
+[[thinktanks.sources]]
+org = "Chicago Appleseed"
+kind = "wp"
+site = "https://www.chicagoappleseed.org"
+type = "posts"
+query = "categories=1163"   # Research
+
+[[thinktanks.sources]]
+org = "Illinois Action for Children"
+kind = "links"
+url = "https://www.actforchildren.org/about/research-data/reports/"
+match = "/wp-content/uploads/.+\\.pdf$"
+
+[[thinktanks.sources]]
+org = "Illinois Environmental Council"
+kind = "wp"
+site = "https://ilenviro.org"
+type = "posts"
+query = "categories=166"   # Reports and Analysis
+
+[[thinktanks.sources]]
+org = "Illinois Public Health Institute"
+kind = "links"
+url = "https://iphionline.org/resources/"
+match = "/wp-content/uploads/.+\\.pdf$"
+
+[[thinktanks.sources]]
+org = "Housing Action Illinois"
+kind = "links"
+url = "https://housingactionil.org/what-we-do/publications/"
+match = "^/downloads/.+\\.pdf$"
+
+[[thinktanks.sources]]
+org = "Reform for Illinois"
+kind = "wp"
+site = "https://www.reformforillinois.org"
+type = "posts"
+query = "categories=483"   # Research
 
 # ---------------------------------------------------------------- home page
 [site]

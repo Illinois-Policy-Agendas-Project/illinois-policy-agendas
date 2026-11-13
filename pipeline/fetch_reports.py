@@ -3,6 +3,7 @@
 
     python pipeline/fetch_reports.py            check every organization listed under [[thinktanks.sources]] in config.toml
     python pipeline/fetch_reports.py --days 60  look back further than usual
+    python pipeline/fetch_reports.py --only "Civic Federation" --dry-run   count what one source would add, change nothing
 
 For each organization it reads the listing named in config.toml (a WordPress site's posts, or the links on a page),
 skips reports already in the reports file or in the new-reports file, and visits each new one for its title, date,
@@ -11,11 +12,14 @@ empty subtopic. Coders fill in `subtopic` and delete rows that aren't reports; a
 Reports already offered once are remembered in found.json next to that file, so deleted rows don't come back.
 
 It only looks at reports dated after the organization's latest report on file, less a few weeks (--days), so it
-won't offer old items the team chose not to collect.
+won't offer old items the team chose not to collect. An organization with nothing on file yet is collected from
+`[thinktanks] first_since` (default 2006-01-01, the start of the data), so a newly added source brings its back catalogue.
+
+It reads only what each site's robots.txt allows the collector, and skips a site that refuses it.
 """
-import argparse, datetime as dt, html, json, os, re, sys, time, tomllib
+import argparse, datetime as dt, html, json, os, re, sys, time, tomllib, urllib.robotparser
 from pathlib import Path
-from urllib.parse import urljoin, urlparse, unquote
+from urllib.parse import urljoin, urlparse, unquote, quote, urlsplit, urlunsplit
 
 import pandas as pd
 
@@ -28,8 +32,43 @@ COLS = ['id', 'think_tank', 'title', 'date', 'year', 'abstract', 'url', 'pdf_url
 PAUSE = 0.4
 
 
+ROBOTS = {}
+
+
+def allowed(url):
+    """Whether the site's robots.txt lets the collector read this address. A robots.txt we may not read (401/403)
+    counts as a refusal; a missing one (404 or similar) as permission, as crawlers do."""
+    u = urlparse(url); root = f'{u.scheme}://{u.netloc}'
+    if root not in ROBOTS:
+        rp = urllib.robotparser.RobotFileParser()
+        try:
+            body, _, _ = webget.get(root + '/robots.txt', UA, timeout=20)
+            rp.parse(body.decode('utf-8', 'replace').splitlines())
+        except Exception as e:  # noqa: BLE001
+            code = getattr(e, 'code', None)
+            rp.parse(['User-agent: *', 'Disallow: /'] if code in (401, 403) else [])
+        ROBOTS[root] = rp
+    return ROBOTS[root].can_fetch(UA, url)
+
+
+def requote(url):
+    """The address with any character a request can't carry percent-encoded (existing %xx escapes kept)."""
+    u = urlsplit(url)
+    return urlunsplit((u.scheme, u.netloc, quote(u.path, safe="/%:@!$&'()*+,;=-._~"), quote(u.query, safe="=&%+/:,;@!$'()*-._~"), u.fragment))
+
+
 def get(url):
-    body, ctype, final = webget.get(url, UA, timeout=40)
+    url = requote(url)
+    if not allowed(url):
+        raise PermissionError(f'robots.txt does not allow {url}')
+    for attempt in (1, 2):
+        try:
+            body, ctype, final = webget.get(url, UA, timeout=40)
+            break
+        except Exception as e:  # noqa: BLE001 - a dropped connection or a cut-off download gets one more try
+            if attempt == 2 or getattr(e, 'code', None) in (401, 403, 404, 410):
+                raise
+            time.sleep(3)
     time.sleep(PAUSE)
     return body, ctype, final
 
@@ -98,9 +137,9 @@ def iso(s):
 def candidates(src, cutoff):
     """[(url, title, date, abstract)] from one organization's listing; title etc. may be empty (filled from the page)."""
     if src['kind'] == 'wp':
-        out, page = [], 1
-        while page <= 10:
-            api = f"{src['site'].rstrip('/')}/wp-json/wp/v2/{src.get('type', 'posts')}?after={cutoff}T00:00:00&per_page=50&page={page}&_fields=date,link,title,excerpt"
+        out, page, extra = [], 1, ('&' + src['query'].lstrip('&?')) if src.get('query') else ''
+        while page <= 40:
+            api = f"{src['site'].rstrip('/')}/wp-json/wp/v2/{src.get('type', 'posts')}?after={cutoff}T00:00:00&per_page=50&page={page}&_fields=date,link,title,excerpt{extra}"
             body, _, _ = get(api)
             items = json.loads(body)
             if not isinstance(items, list) or not items:
@@ -111,21 +150,67 @@ def candidates(src, cutoff):
             page += 1
         return out
     if src['kind'] == 'links':
-        body, _, final = get(src['url'])
-        pat = re.compile(src['match'], re.I)
+        pat, skip = re.compile(src['match'], re.I), re.compile(src['exclude'], re.I) if src.get('exclude') else None
         seen, out = set(), []
-        for href in re.findall(r'href=["\']([^"\'#]+)', body.decode('utf-8', 'replace'), re.I):
-            u = urljoin(final, html.unescape(href)).split('?')[0]
-            if pat.search(urlparse(u).path) and u not in seen:
-                seen.add(u)
-                out.append((u, '', '', ''))
+        for page_url in listing_urls(src):
+            try:
+                body, _, final = get(page_url)
+            except Exception:  # noqa: BLE001 - a later page of a long listing may not exist; the first must
+                if page_url == listing_urls(src)[0]:
+                    raise
+                continue
+            site = '.'.join((urlparse(final).hostname or '').split('.')[-2:])
+            for href, inner in re.findall(r'<a\b[^>]*?href=["\']([^"\'#]+)["\'][^>]*>(.*?)</a>', body.decode('utf-8', 'replace'), re.I | re.S):
+                u = urljoin(final, html.unescape(href)).split('?')[0]
+                if not src.get('any_host') and not (urlparse(u).hostname or '').endswith(site):
+                    continue
+                if pat.search(urlparse(u).path) and not (skip and skip.search(urlparse(u).path)) and u not in seen:
+                    seen.add(u)
+                    label = text(re.sub(r'(?is)<(style|script|svg)\b.*?</\1>', ' ', inner))
+                    label = re.sub(r'(?i)[\s|·•-]*\b(view\s*/\s*download|download( pdf)?|view( pdf)?)\s*$', '', label).strip()
+                    # the link's words make a better title than a file name, unless they are just "View report" or "Read more"
+                    if len(label) < 8 or re.fullmatch(r'(?i)(view|download|read|open|see|get|click|learn|full|more|here|pdf)\b.{0,20}', label):
+                        label = ''
+                    out.append((u, label, '', ''))
+        return out
+    if src['kind'] == 'rss':
+        body, _, _ = get(src['url'])
+        x = body.decode('utf-8', 'replace'); out = []
+        for item in re.findall(r'<(?:item|entry)\b.*?</(?:item|entry)>', x, re.S | re.I):
+            def tag(*names):
+                for n in names:
+                    m = re.search(rf'<{n}\b[^>]*>(.*?)</{n}>', item, re.S | re.I)
+                    if m:
+                        return html.unescape(re.sub(r'^<!\[CDATA\[|\]\]>$', '', m.group(1).strip()))
+                return ''
+            link = tag('link') or (re.search(r'<link[^>]+href=["\']([^"\']+)', item) or [None, ''])[1]
+            link = (re.search(r'href=["\']([^"\']+)', link) or [None, link])[1]   # some feeds wrap the link in markup
+            date = tag('pubDate', 'published', 'updated', 'dc:date')
+            try:
+                date = dt.datetime.strptime(re.sub(r'\s+\S+$', '', date), '%a, %d %b %Y %H:%M:%S').date().isoformat() if ',' in date[:5] else iso(date)
+            except ValueError:
+                date = iso(date)
+            if link:
+                out.append((urljoin(src['url'], link), text(tag('title')), date, text(tag('description', 'summary'))[:600]))
         return out
     raise ValueError(f'unknown kind {src["kind"]!r}')
+
+
+def listing_urls(src):
+    """The listing pages of a `links` source: `url`, a list `urls`, and `pages = [first, last]` filled into {n} in `url`."""
+    if src.get('urls'):
+        return list(src['urls'])
+    if src.get('pages'):
+        a, b = src['pages']
+        return [src['url'].format(n=n) for n in range(a, b + 1)]
+    return [src['url']]
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--days', type=int, default=45, help='also look this many days before the latest report on file (default 45)')
+    ap.add_argument('--only', action='append', help='check only this organization (repeatable)')
+    ap.add_argument('--dry-run', action='store_true', help='list what would be added; write nothing')
     a = ap.parse_args(argv)
     cfg = tomllib.loads((ROOT / 'config.toml').read_text(encoding='utf-8'))
     tt = cfg['thinktanks']
@@ -155,11 +240,13 @@ def main(argv=None):
     next_id = int(max([0, *pd.to_numeric(main_df[c['id']], errors='coerce').dropna(), *pd.to_numeric(new_df['id'], errors='coerce').dropna()])) + 1
 
     added, problems, today = [], [], dt.date.today().isoformat()
+    first_since = iso(tt.get('first_since', '2006-01-01')) or '2006-01-01'
     for src in tt.get('sources', []):
         org = src['org']
+        if a.only and org not in a.only:
+            continue
         k = known.get(org, {'keys': set(), 'last': '', 'pdfs': set()})
-        last = k['last'] or (dt.date.today() - dt.timedelta(days=365)).isoformat()
-        cutoff = (dt.date.fromisoformat(last) - dt.timedelta(days=a.days)).isoformat()
+        cutoff = (dt.date.fromisoformat(k['last']) - dt.timedelta(days=a.days)).isoformat() if k['last'] else first_since
         offered = set(found.get(org, []))
         print(f'{org}: looking for reports after {cutoff} …', flush=True)
         try:
@@ -198,6 +285,19 @@ def main(argv=None):
         found[org] = sorted(offered)
         print(f'  {n} new', flush=True)
 
+    if a.dry_run:
+        by = {}
+        for r in added:
+            by.setdefault(r['think_tank'], []).append(r)
+        for org, rows in by.items():
+            ds = sorted(r['date'] for r in rows if r['date'])
+            print(f'\n{org}: {len(rows)} (dated {ds[0] if ds else "-"} to {ds[-1] if ds else "-"}; {sum(1 for r in rows if not r["date"])} undated)')
+            for r in rows[:6]:
+                print(f"   {r['date'] or '----------'}  {r['title'][:80]}  {r['url'][:90]}")
+        print(f'\nDry run: {len(added)} would be added. Nothing was written.')
+        if problems:
+            print(f'{len(problems)} problem(s):', *problems[:40], sep='\n  ')
+        return 0
     if added:
         out = pd.concat([new_df, pd.DataFrame(added)], ignore_index=True)[[x for x in COLS if x in set(new_df.columns) | set(COLS)]]
         out['date'] = pd.to_datetime(out['date'], errors='coerce').dt.date
