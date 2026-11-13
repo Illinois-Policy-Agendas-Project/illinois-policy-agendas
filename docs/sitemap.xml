@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- The site's pages live after a # in the address, which search engines treat as one page, so the sitemap lists the home page only. -->
+<!-- The site's pages live after a # in the address, which search engines treat as one page. The sitemap lists the home page,
+     and the build adds the entry pages it writes for pages worth finding on their own (each governor's, e.g. /governor-jb-pritzker). -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://www.illinoisagendas.org/</loc><lastmod>2026-11-13</lastmod><changefreq>weekly</changefreq></url>
+  <url><loc>https://www.illinoisagendas.org/governor-jb-pritzker</loc><lastmod>2026-11-13</lastmod><changefreq>yearly</changefreq></url>
+  <url><loc>https://www.illinoisagendas.org/governor-bruce-rauner</loc><lastmod>2026-11-13</lastmod><changefreq>yearly</changefreq></url>
+  <url><loc>https://www.illinoisagendas.org/governor-pat-quinn</loc><lastmod>2026-11-13</lastmod><changefreq>yearly</changefreq></url>
+  <url><loc>https://www.illinoisagendas.org/governor-rod-blagojevich</loc><lastmod>2026-11-13</lastmod><changefreq>yearly</changefreq></url>
 </urlset>
