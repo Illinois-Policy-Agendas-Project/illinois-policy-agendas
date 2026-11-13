@@ -50,6 +50,9 @@ def main():
         man['v']['legislators'] = B.dump(d / 'legislators.json', legislators)
     else:
         man['v'].pop('legislators', None)
+    zd = B.zip_districts(rep)
+    if zd:
+        man['v']['zipdist'] = B.dump(d / 'zipdist.json', zd)
     if govphotos:
         man['v']['govphotos'] = B.dump(d / 'govphotos.json', govphotos)
     else:

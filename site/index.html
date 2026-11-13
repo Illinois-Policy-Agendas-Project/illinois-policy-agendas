@@ -673,6 +673,18 @@ mark{background:#ffe2d6}
   .strip i.on, .mstrip i.on{background:Highlight!important}
   [aria-pressed="true"], [aria-current="page"], .titem.on, table.cmp tr.on td:first-child{outline:2px solid Highlight;outline-offset:1px}
 }
+.phead-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+.find-wrap{max-width:860px} .fd-l{display:block;font-weight:600;margin-bottom:6px}
+.find-row{display:flex;gap:8px} .find-row input{flex:1;min-width:0;font-size:16px;padding:10px 12px}
+.find-priv{font-size:13px;color:var(--ink-2);line-height:1.55;margin:12px 0 0;max-width:72ch}
+.fd-st{margin:14px 0 0;font-weight:600} .fd-st:empty{display:none}
+#fd-out h2{margin-top:22px} .fd-h{font-family:var(--f-display);font-weight:500;font-size:16px;margin:18px 0 8px}
+.fd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px 22px;margin-top:10px}
+.fd-card{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--line)}
+.fd-o{font-size:12.5px;color:var(--muted);font-weight:600} .fd-n{font-family:var(--f-display);font-weight:500;font-size:20px;margin:2px 0}
+.fd-links{display:flex;gap:4px 14px;flex-wrap:wrap;margin-top:6px;font-size:13.5px} .fd-share{font-size:12.5px;margin-top:6px}
+.fd-note{margin:8px 0 0;max-width:72ch} .fd-src{font-size:12px;margin-top:14px}
+@media (max-width:560px){ .find-row{flex-direction:column} .fd-grid{grid-template-columns:minmax(0,1fr)} }
 </style>
 
 <a class="skip" href="#view" onclick="event.preventDefault();event.stopPropagation();const v=document.getElementById('view');v.setAttribute('tabindex','-1');v.focus();">Skip to content</a>
@@ -689,7 +701,7 @@ mark{background:#ffe2d6}
     <div><b class="fname">Illinois Policy Agendas Project</b>
       <div>Supported by the <a href="https://igpa.uillinois.edu" target="_blank" rel="noopener">Institute of Government and Public Affairs</a>, University of Illinois System. Based in the Department of Political Science, University of Illinois Chicago.</div></div>
     <div><div class="fh">Data</div><ul><li><a href="#bills">Bills</a></li><li><a href="#sponsors">Legislators</a></li><li><a href="#speeches">State of the State speeches</a></li><li><a href="#thinktanks">Think tank reports</a></li></ul></div>
-    <div><div class="fh">Explore</div><ul><li><a href="#topics">Topics</a></li><li><a href="#search">Search</a></li><li><a href="#bills-activity">Recent activity</a></li><li><a href="#codebook">Codebook</a></li></ul></div>
+    <div><div class="fh">Explore</div><ul><li><a href="#topics">Topics</a></li><li><a href="#search">Search</a></li><li><a href="#bills-activity">Recent activity</a></li><li><a href="#find">Find your legislators</a></li><li><a href="#codebook">Codebook</a></li></ul></div>
     <div><div class="fh">Project</div><ul><li><a href="#about">About</a></li><li><a href="#about-cite">How to cite</a></li><li><a href="#about-license">License (CC BY 4.0)</a></li><li><a href="#contact">Contact</a></li></ul></div>
     <div class="flogos">
       <a href="https://igpa.uillinois.edu" target="_blank" rel="noopener" class="flogo" title="Institute of Government and Public Affairs, University of Illinois System"><img src="data:image/png;base64,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" alt="University of Illinois System, Institute of Government and Public Affairs" style="height:30px"></a>
@@ -1107,7 +1119,7 @@ function renderHome(){
     <div class="eyebrow">${esc(H.tagline || 'Illinois policy attention, coded by topic')}</div>
     <h1 class="home-title">${esc(H.title || 'Illinois Policy Agendas Project')}</h1>
     <p class="home-lede">${fillCounts(H.overview || '')}</p>
-    <div class="home-cta"><a class="btn primary" href="#topics">Explore by topic</a><a class="btn" href="#bills">Browse bills</a><a class="btn" href="#search">Search everything</a>${cbLink('btn')}</div>
+    <div class="home-cta"><a class="btn primary" href="#topics">Explore by topic</a><a class="btn" href="#bills">Browse bills</a><a class="btn" href="#search">Search everything</a><a class="btn" href="#find">Find your legislators</a>${cbLink('btn')}</div>
   </section>
   ${homeMembersBox()}
   <section class="home-cards" aria-label="What's on the site">${cards.map(([h,cls,t,n,d])=>`<a class="hcard ${cls}" href="#${h}"><span class="hc-t">${cls?'<i class="dot"></i>':''}${t}</span><span class="hc-n">${n}</span><span class="hc-d">${d}</span></a>`).join('')}</section>
@@ -1738,6 +1750,96 @@ function drawStrip(){
     i.addEventListener('click', ()=>{ Object.assign(TP, {major:m, sub:null, ds:'all', page:0}); if (ROUTE.view === 'topics') renderTopics(); else nav('topics'); }); });
 }
 
+/* =================== FIND YOUR LEGISLATORS ===================
+   #find: a street address or a ZIP code -> the visitor's State Representative and State Senator.
+   Privacy: what is typed stays in this page's memory. It is never written to the address bar, browser storage, the
+   page title or the visit counter (which sees only "/find"). A ZIP code is looked up in data/zipdist.json, on the
+   visitor's computer. A street address goes from the browser straight to the U.S. Census Bureau's geocoder, which
+   returns the districts (JSONP, since the geocoder sends no CORS headers; no referrer is sent). */
+let ZIPDIST = null;
+const CENSUS_GEO = 'https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress';
+function censusDistricts(address){
+  return new Promise((resolve, reject)=>{
+    const cb = 'ipapGeo' + Math.random().toString(36).slice(2), sc = document.createElement('script'); let timer;
+    const done = () => { clearTimeout(timer); window[cb] = () => {}; sc.remove(); };
+    window[cb] = d => { done(); resolve(d); };
+    sc.onerror = () => { done(); reject(new Error('network')); };
+    timer = setTimeout(()=>{ done(); reject(new Error('timeout')); }, 15000);
+    sc.referrerPolicy = 'no-referrer';
+    sc.src = CENSUS_GEO + '?' + new URLSearchParams({address, benchmark:'Public_AR_Current', vintage:'Current_Current', layers:'all', format:'jsonp', callback:cb});
+    document.head.appendChild(sc); });
+}
+/* the member now holding a seat, and their page on this site if they sponsored bills */
+function seatHolder(ch, district){
+  const l = LEGSEAT().find(x=>x.ch===ch && String(x.district)===String(district));
+  if (!l) return null;
+  const sp = SPON.find(p=>p.ilga && p.ilga===l.url) || null;
+  return {...l, sp};
+}
+function fdCard(ch, district, share){
+  const who = seatHolder(ch, district), office = ch==='Rep' ? 'State Representative' : 'State Senator', dist = `${chamberName(ch)} District ${district}`;
+  const shareTxt = share != null && share < 0.995 ? `<div class="muted fd-share">About ${Math.round(share*100)}% of this ZIP code's area</div>` : '';
+  if (!who) return `<div class="fd-card"><span class="leg-photo gov-photo"><span class="gov-ini" aria-hidden="true">?</span></span><div><div class="fd-o">${office} · ${dist}</div>
+    <p class="muted" style="margin:4px 0 0">No current member is listed for this district.</p>${shareTxt}</div></div>`;
+  const name = who.sp ? `<a href="#sponsor-${who.sp.slug}">${esc(who.name)}</a>` : esc(who.name);
+  return `<div class="fd-card"><span class="leg-photo">${who.photo ? `<img src="data/${esc(who.photo)}" alt="" loading="lazy">` : `<span class="gov-ini" aria-hidden="true">${esc(initials(who.name))}</span>`}</span>
+    <div style="min-width:0"><div class="fd-o">${office} · ${dist}</div><h3 class="fd-n">${name}</h3><div class="muted">${esc(who.party || '')}</div>
+      <div class="fd-links">${who.sp ? `<a href="#sponsor-${who.sp.slug}">Bills and record →</a>` : ''}${who.url ? `<a href="${esc(who.url)}" target="_blank" rel="noopener">ilga.gov page ↗</a>` : ''}</div>${shareTxt}</div></div>`;
+}
+function fdShow(html){ const o = $('#fd-out'); o.innerHTML = html; const h = o.querySelector('h2'); if (h){ h.tabIndex = -1; h.focus({preventScroll:false}); } }
+function fdStatus(t){ const st = $('#fd-st'); if (st) st.textContent = t; }
+async function fdLookup(q){
+  fdStatus(''); $('#fd-out').innerHTML = '';
+  if (!q){ fdStatus('Enter a street address or a ZIP code.'); return; }
+  const z = q.match(/^(\d{5})(?:-?\d{4})?$/);
+  if (z){
+    if (!ZIPDIST) ZIPDIST = MAN.v?.zipdist ? await get('zipdist').catch(()=>null) : null;
+    if (!ZIPDIST){ fdStatus('ZIP code lookup is not available right now. Try your street address.'); return; }
+    const row = ZIPDIST[z[1]];
+    if (!row){ fdStatus(`No Illinois districts were found for ZIP code ${z[1]}. It may be outside Illinois or a post-office-box ZIP code; try your street address.`); return; }
+    const split = row.h.length > 1 || row.s.length > 1;
+    fdShow(`<h2 class="hs">Districts in ZIP code ${z[1]}</h2>
+      ${split ? `<p class="fd-note">This ZIP code crosses district lines, so it has more than one possible legislator. <b>Enter your street address for an exact answer.</b></p>` : ''}
+      ${row.il ? `<p class="fd-note">Part of this ZIP code is outside Illinois.</p>` : ''}
+      <h3 class="fd-h">State House</h3><div class="fd-grid">${row.h.map(([d,sh])=>fdCard('Rep', d, split ? sh : null)).join('')}</div>
+      <h3 class="fd-h">State Senate</h3><div class="fd-grid">${row.s.map(([d,sh])=>fdCard('Sen', d, split ? sh : null)).join('')}</div>
+      <p class="muted fd-src">Matched by area: the share of the ZIP code's land in each district, from Census Bureau boundaries.</p>`);
+    return;
+  }
+  const address = /\b(IL|Ill|Illinois)\b|\b\d{5}\b/i.test(q) ? q : q + ', Illinois';
+  fdStatus('Looking up the address with the U.S. Census Bureau…');
+  let d; try { d = await censusDistricts(address).catch(()=>new Promise(r=>setTimeout(r, 800)).then(()=>censusDistricts(address))); }   /* one retry: the geocoder sometimes drops a request */
+  catch { fdStatus("The Census Bureau's geocoder could not be reached. Check your connection and try again, or enter just your ZIP code."); return; }
+  if (!$('#fd-out')) return;   // left the page meanwhile
+  const m = d?.result?.addressMatches?.[0];
+  if (!m){ fdStatus("The Census Bureau's geocoder didn't find that address. Check the spelling and include the city or ZIP code, or enter just your ZIP code."); return; }
+  if ((m.addressComponents?.state || '').toUpperCase() !== 'IL'){ fdStatus(`That address matched ${m.matchedAddress}, which is outside Illinois.`); return; }
+  const g = m.geographies || {}, pick = re => { const k = Object.keys(g).find(k=>re.test(k)); const x = k && g[k][0]; return x ? +(x.BASENAME || x.SLDL || x.SLDU) : null; };
+  const h = pick(/State Legislative Districts - Lower/i), sn = pick(/State Legislative Districts - Upper/i);
+  if (!h && !sn){ fdStatus("The Census Bureau found the address but returned no legislative districts. Try your ZIP code."); return; }
+  fdStatus('');
+  fdShow(`<h2 class="hs">Your legislators</h2>
+    <p class="fd-note">Matched address: <b>${esc(m.matchedAddress)}</b>. If that isn't your address, add the city or ZIP code and try again.</p>
+    <div class="fd-grid">${h ? fdCard('Rep', h) : ''}${sn ? fdCard('Sen', sn) : ''}</div>
+    <p class="muted fd-src">Districts from the U.S. Census Bureau's geocoder, using the current district lines.</p>`);
+}
+function renderFind(){
+  $('#view').innerHTML = `
+  <div class="phead"><div><div class="eyebrow">Legislators</div><h1>Find your legislators</h1>
+    <p>Everyone in Illinois has one State Representative and one State Senator. Enter your street address for an exact answer, or a ZIP code to see the districts it covers.</p></div></div>
+  <div class="find-wrap">
+    <form id="fd-f" class="find-form" autocomplete="off" novalidate>
+      <label for="fd-q" class="fd-l">Street address or ZIP code</label>
+      <div class="find-row"><input id="fd-q" type="text" name="fd-nosave" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="401 S Spring St, Springfield   or   62706" aria-describedby="fd-priv">
+        <button class="btn primary" type="submit">Find</button></div>
+    </form>
+    <p class="find-priv" id="fd-priv"><b>Your privacy.</b> Nothing you enter is saved: not by this site, not in your browser, not in the page's address and not in our visitor counts. A ZIP code is looked up on your own computer. A street address is sent from your browser directly to the <a href="https://geocoding.geo.census.gov/" target="_blank" rel="noopener">U.S. Census Bureau's geocoder</a> to find its districts (<a href="https://www.census.gov/about/policies/privacy.html" target="_blank" rel="noopener">Census privacy policy</a>).</p>
+    <p id="fd-st" class="fd-st" role="status"></p>
+    <div id="fd-out"></div>
+  </div>`;
+  $('#fd-f').addEventListener('submit', e=>{ e.preventDefault(); fdLookup($('#fd-q').value.trim()); });
+}
+
 /* =================== TRENDS ===================
    #trends: one small chart per major topic of its share of each source's agenda by year, with the change between the last five
    years and the five before, and a table of the bills of each General Assembly (a column per session as each one is coded). */
@@ -2306,7 +2408,7 @@ function renderSponsors(){
   $('#view').innerHTML = `${legBar('sponsors')}
   <div class="phead"><div><div class="eyebrow">${gaName(ga)} · built from the bills dataset</div><h1>Legislators</h1>
     <p>Every legislator named as a sponsor on a substantive bill in the bills dataset, with what they introduced, what they signed onto and what became law. Open a legislator for their full record.</p></div>
-    <button class="btn primary dl" id="sn-dl">Download sponsor table (CSV)</button></div>
+    <div class="phead-acts"><a class="btn" href="#find">Find your legislators</a><button class="btn primary dl" id="sn-dl">Download sponsor table (CSV)</button></div></div>
   <div class="kpis">
     <div class="kpi"><span class="l">Legislators</span><span class="v">${act.length}</span><span class="s">${reps.length} House, ${sens.length} Senate, including members who left or joined mid-term</span></div>
     <div class="kpi"><span class="l">Most bills as primary sponsor</span><span class="v" style="font-size:18px;padding-block:5px">${mc?spLink(mc):'—'}</span><span class="s">${fmt(mcn)} bills</span></div>
@@ -3175,7 +3277,7 @@ function bindReplay(tl){
   recolor(); setPlay(RP.playing); requestAnimationFrame(frame);
 }
 
-const RENDER = {home:renderHome, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, 'thinktanks-reports':renderTtReports, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch, contact:renderContact, about:renderAbout, trends:renderTrends};
+const RENDER = {home:renderHome, find:renderFind, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, 'thinktanks-reports':renderTtReports, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch, contact:renderContact, about:renderAbout, trends:renderTrends};
 let CUR = null, ROUTE = {view:'bills'}; const STACK = [];
 function parseRoute(t){
   if (RENDER[t]) return {view:t};
@@ -3195,7 +3297,7 @@ function parseRoute(t){
   if ((m = /^about-(data|team|license|cite)$/.exec(t))) return {view:'about', sec:m[1]};
   return null;
 }
-const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', 'thinktanks-reports':'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees', trends:'topics'})[rt.view] || rt.view;
+const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', 'thinktanks-reports':'thinktanks', speech:'speeches', sponsor:'sponsors', committee:'committees', trends:'topics', find:'sponsors'})[rt.view] || rt.view;
 const sectionOf = rt => { const t = tabOf(rt); return LEGTABS.some(([k])=>k===t) ? 'bills' : t; };
 function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
   const btn = t => `<button data-v="${t[0]}" ${key(t)===cur?'aria-current="page"':''}>${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>`;
