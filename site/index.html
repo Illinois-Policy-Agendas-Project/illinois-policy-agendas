@@ -2745,7 +2745,7 @@ function drawSponsorSankey(){
   const [p, mine] = who.find(([q])=>q.slug===SK.slug), shells = allOf(p).filter(isPlaceholder).length;
   $('#sk-t').innerHTML = `Where ${esc(p.title)}'s bills went${snTopic()?' · '+esc(snTopic()):''}`;
   memberSankey(el, mine, {major: SN.major, onNode: n=>{ if (n.major!=null){ SN.major=n.major; SN.sub=null; } else if (n.sub!=null) SN.sub=n.sub; else return; renderSponsors(); $('#sk').scrollIntoView({block:'center'}); }});
-  $('#sk-note').innerHTML = `The ${pl(mine.length, 'House or Senate bill')} ${esc(p.title)} filed as primary sponsor in the ${gaName(ga)}${snTopic()?' on this topic':''}, followed from topic to how far each got. Each strand is one bill: hover to see it, click to open it. ${shells && !SK.shell ? `Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber). ` : ''}Pick another legislator above (number of bills in brackets), or <a href="#sponsor-${p.slug}">open their page</a>.`;
+  $('#sk-note').innerHTML = `The ${pl(mine.length, 'House or Senate bill')} ${esc(p.title)} filed as primary sponsor in the ${gaName(ga)}${snTopic()?' on this topic':''}, followed from topic to how far each got. ${shells && !SK.shell ? `Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber). ` : ''}Pick another legislator above (number of bills in brackets), or <a href="#sponsor-${p.slug}">open their page</a>.`;
 }
 
 /* ---- sponsor page ---- */
@@ -2771,7 +2771,7 @@ SECTIONS.sponsor.push(
   { id:'flow', title:'Where their bills went', render(p, el){
       const all = p.bills.filter(b=>b.role==='C' && isBillHBSB(b.r)).map(b=>b.r), shells = all.filter(isPlaceholder).length, mine = all.filter(r=>SK.shell || !isPlaceholder(r));
       if (mine.length < 2){ el.innerHTML = `<p class="muted" style="margin:0">Too few bills as primary sponsor to chart.</p>${shellNote(shells, 'sg-sh')}`; $('#sg-sh')?.addEventListener('change', e=>{ SK.shell = e.target.checked; renderRecord(); }); return; }
-      el.innerHTML = `<p class="ink2" style="margin:0 0 8px;font-size:13.5px">The ${fmt(mine.length)} House and Senate bills they filed as primary sponsor, followed from topic through committee and the floor to the outcome. Each strand is one bill, in its topic's color: hover to see it, click to open it. Click a topic to list those bills below.${shells && !SK.shell ? ` Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber).` : ''}</p><div id="sg-sk"></div>${OMNIBUS_NOTE}${shellNote(shells, 'sg-sh')}`;
+      el.innerHTML = `<p class="ink2" style="margin:0 0 8px;font-size:13.5px">The ${fmt(mine.length)} House and Senate bills they filed as primary sponsor, followed from topic through committee and the floor to the outcome. Click a topic to list those bills below.${shells && !SK.shell ? ` Leaves out ${pl(shells, 'placeholder bill')} (technical shell bills, titled “-TECH”, that never passed a chamber).` : ''}</p><div id="sg-sk"></div>${OMNIBUS_NOTE}${shellNote(shells, 'sg-sh')}`;
       $('#sg-sh')?.addEventListener('change', e=>{ SK.shell = e.target.checked; renderRecord(); });
       memberSankey($('#sg-sk'), mine, {height: Math.max(220, Math.min(360, 80 + mine.length*3)),
          onNode: n=>{ if (n.major==null) return; SPG.major = n.major; SPG.role='C'; SPG.page=0; renderRecord(); $('#sec-bills').scrollIntoView({behavior:'smooth'}); }}); } },
