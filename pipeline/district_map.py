@@ -24,7 +24,7 @@ from shapely import transform as shp_transform
 
 DL, OUT = sys.argv[1], sys.argv[2]
 H = 1000.0          # map height in map units
-TOL = 0.12          # simplification, in map units (about 80 m)
+TOL = 0             # no simplification: the 1:500,000 files are already generalized, and neighbours share their border points exactly, so no gaps open between them
 
 
 def read(path, key):
