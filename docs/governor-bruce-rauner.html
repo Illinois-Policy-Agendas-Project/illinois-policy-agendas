@@ -3245,10 +3245,6 @@ function renderCommittees(){
     <select id="cm-m" aria-label="Major topic">${majorOptions(CM.major,'Bills on any topic')}</select>
     ${CM.major!=null?`<select id="cm-s" aria-label="Subtopic">${subOptions(CM.major, CM.sub)}</select>`:''}
   </div>
-  <div class="grid2">
-    <div class="panel"><div class="chead"><h2 class="hs" id="cm-ct-Senate"></h2><span class="muted" style="font-size:12px">Bills assigned · darker part approved</span></div><div id="cm-top-Senate"></div></div>
-    <div class="panel"><div class="chead"><h2 class="hs" id="cm-ct-House"></h2><span class="muted" style="font-size:12px">Bills assigned · darker part approved</span></div><div id="cm-top-House"></div></div>
-  </div>
   ${['Senate','House'].map(ch=>{ const cs = all.filter(c=>c.ch===ch).sort((a,b)=>a.name.localeCompare(b.name));
     return `<div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs">${ch} committees</h2><span class="muted" style="font-size:12px">${cs.length} committees · click one for its bills</span></div>
       <section class="orglist cmlist" aria-label="${ch} committees">${cs.map(c=>{ const st = cmStats(c), mix = [...count(c.bills.filter(b=>isPol(b.r)), b=>b.r.major)].sort((a,b)=>b[1]-a[1]);
@@ -3277,18 +3273,6 @@ function cmRows(){
 }
 function cmUpdate(){
   const rows = cmRows();
-  // one chart per chamber, side by side on a shared scale; they follow the topic filters but not the search
-  const tops = Object.fromEntries(['Senate','House'].map(ch=>[ch, CMDATA[legGA()].filter(c=>c.ch===ch).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0).sort((a,b)=>b[1].n-a[1].n).slice(0,12)]));
-  const shared = niceMax(Math.max(1, ...Object.values(tops).flatMap(t=>t.map(([,s])=>s.n))));
-  for (const ch of ['Senate','House']){
-    $('#cm-ct-'+ch).textContent = `${ch} committees${cmTopic()?' · '+cmTopic():''}`;
-    if (!tops[ch].length){ $('#cm-top-'+ch).innerHTML = '<p class="muted" style="margin:0">No bills on this topic went to these committees.</p>'; continue; }
-    hbars($('#cm-top-'+ch), tops[ch].map(([c,s])=>({label:c.name, value:s.n, color:'--s-bills',
-      segs:[{label:'Approved', value:s.ok, color:'--s-bills', tip:`<div class="r"><span>Approved</span><b class="num">${fmt(s.ok)} of ${fmt(s.n)} (${pct(s.rate,0)})</b></div>`},
-            {label:'Not approved', value:s.n-s.ok, color:'--h2', tip:`<div class="r"><span>Not approved</span><b class="num">${fmt(s.n-s.ok)}</b></div>`}].filter(g=>g.value>0),
-      tip:`<div class="r"><span>Bills assigned</span><b class="num">${fmt(s.n)}</b></div><div class="r"><span>Approved</span><b class="num">${fmt(s.ok)} (${pct(s.rate,0)})</b></div><div class="r"><span>Became law</span><b class="num">${fmt(s.law)}</b></div><div class="muted">Click for the committee's page</div>`,
-      onclick:()=>nav('committee-'+c.key)})), {labelW:210, rowH:23, max:shared});
-  }
   $('#cm-t tbody').innerHTML = rows.map(([c,s])=>`<tr class="row" data-h="#committee-${c.key}"><td>${cmLink(c)}</td><td>${c.ch}</td>
     <td class="num" style="text-align:right">${fmt(s.n)}</td><td class="num" style="text-align:right">${fmt(s.ok)}</td><td class="num" style="text-align:right">${pct(s.rate,0)}</td>
     <td class="num" style="text-align:right">${s.law?fmt(s.law):'<span class="muted">·</span>'}</td><td>${majChip(s.top)}</td></tr>`).join('')
