@@ -732,8 +732,8 @@ h1 a.h1-link{color:inherit;text-decoration:none} h1 a.h1-link:hover{text-decorat
 .gv-subs li > div{min-width:0}
 .sk-omni{font-size:12px;margin:6px 0 0;line-height:1.5}
 .orgcard.cmcard{border-left:4px solid var(--tc)}
-.cm-mix{display:flex;height:6px;border-radius:2px;overflow:hidden;margin-top:8px;background:var(--sunk)} .cm-mix i{display:block;min-width:1px}
-.cm-fun{position:relative;height:6px;margin-top:4px;border-radius:2px;overflow:hidden} .cm-fun i{position:absolute;left:0;top:0;bottom:0;display:block}
+.cm-mix{display:flex;height:9px;cursor:pointer;position:relative;z-index:1;border-radius:2px;overflow:hidden;margin-top:8px;background:var(--sunk)} .cm-mix i{display:block;min-width:1px}
+.cm-fun{position:relative;z-index:1;height:9px;cursor:pointer;margin-top:4px;border-radius:2px;overflow:hidden} .cm-fun i{position:absolute;left:0;top:0;bottom:0;display:block}
 .cm-fun .a{width:100%;background:var(--sunk);box-shadow:inset 0 0 0 1px var(--line)} .cm-fun .o{background:color-mix(in srgb, var(--s-bills) 55%, var(--surface))} .cm-fun .l{background:var(--navy)}
 details.cm-tbl{margin-top:4px} details.cm-tbl > summary{cursor:pointer;font-family:var(--f-display);font-weight:500;font-size:19px;padding:12px 0;border-top:2px solid var(--navy);list-style-position:inside}
 details.cm-tbl > summary .muted{font:13px var(--f-ui);margin-left:8px}
@@ -3246,14 +3246,23 @@ function renderCommittees(){
   </div>
   ${['Senate','House'].map(ch=>{ const cs = all.filter(c=>c.ch===ch).sort((a,b)=>a.name.localeCompare(b.name));
     return `<div class="panel" style="margin-bottom:16px"><div class="chead"><h2 class="hs">${ch} committees</h2><span class="muted" style="font-size:12px">${cs.length} committees · click one for its bills</span></div>
-      <section class="orglist cmlist" aria-label="${ch} committees">${cs.map(c=>{ const st = cmStats(c), mix = [...count(c.bills.filter(b=>isPol(b.r)), b=>b.r.major)].sort((a,b)=>b[1]-a[1]);
+      <section class="orglist cmlist" aria-label="${ch} committees">${cs.map(c=>{ const st = cmStats(c), mix = cmMix(c), pol = mix.reduce((a,x)=>a+x.n, 0);
         return `<div class="orgcard cmcard" style="--tc:${st.top!=null?shade(st.top,0,1):'var(--line-2)'}"><div style="min-width:0"><a class="oc-name" href="#committee-${c.key}">${esc(c.name)}</a>
           <div class="oc-meta num">${pl(st.n,'bill')} · ${pct(st.rate,0)} approved${st.law?` · ${fmt(st.law)} became law`:''}</div>
-          <div class="cm-mix" aria-hidden="true" title="Topics of its bills">${mix.map(([m,n])=>`<i style="flex:${n} 0 0;background:${shade(m,0,1)}"></i>`).join('')}</div>
-          <div class="cm-fun" aria-hidden="true" title="Assigned, approved, became law"><i class="a"></i><i class="o" style="width:${(st.rate*100).toFixed(1)}%"></i><i class="l" style="width:${(st.n?st.law/st.n*100:0).toFixed(1)}%"></i></div></div></div>`; }).join('')}</section></div>`; }).join('')}
+          <div class="cm-mix" aria-hidden="true">${mix.map(({m,s,n,j,k})=>`<i data-s="${s}" data-n="${n}" data-of="${pol}" style="flex:${n} 0 0;background:${shade(m,j,k)}"></i>`).join('')}</div>
+          <div class="cm-fun" aria-hidden="true" data-n="${st.n}" data-ok="${st.ok}" data-law="${st.law}"><i class="a"></i><i class="o" style="width:${(st.rate*100).toFixed(1)}%"></i><i class="l" style="width:${(st.n?st.law/st.n*100:0).toFixed(1)}%"></i></div></div></div>`; }).join('')}</section></div>`; }).join('')}
   <details class="cm-tbl" id="cm-tbl" ${CM.tableOpen?'open':''}><summary>All committees as a table <span class="muted">sortable, with every figure</span></summary>
   <div class="tscroll"><table class="dt" id="cm-t" style="min-width:640px" data-mcap="20"><thead><tr>${[['name','Committee'],['ch','Chamber'],['n','Bills assigned'],['ok','Approved'],['rate','Approval rate'],['law','Became law'],['top','Main topic']].map(([k,l])=>`<th data-k="${k}" ${CM.sort===k?`aria-sort="${CM.dir<0?'descending':'ascending'}"`:''} style="${['n','ok','rate','law'].includes(k)?'text-align:right':''}"><button type="button" class="thsort">${l} <span class="muted" aria-hidden="true">${CM.sort===k?(CM.dir<0?'▼':'▲'):''}</span></button></th>`).join('')}</tr></thead><tbody></tbody></table></div></details>`;
   bindLegBar();
+  /* hovering a card's bars: the subtopic and its number of bills, or the committee's assigned / approved / became-law counts */
+  $$('.cmlist').forEach(sec=>{ sec.addEventListener('pointermove', e=>{ const i = e.target.closest('.cm-mix i'), f = e.target.closest('.cm-fun');
+      if (i){ const sb = +i.dataset.s, n = +i.dataset.n, of = +i.dataset.of;
+        showTip(e, `<div class="t"><span class="mono">${sb}</span> ${esc(subName(sb))}</div><div class="muted">${esc(CB.majors[Math.floor(sb/100)]||'')}</div><div class="r"><span>Bills</span><b class="num">${fmt(n)} (${pct(n/Math.max(1,of),0)} of its coded bills)</b></div>`); }
+      else if (f){ const d = f.dataset;
+        showTip(e, `<div class="r"><span>Bills assigned</span><b class="num">${fmt(+d.n)}</b></div><div class="r"><span>Approved</span><b class="num">${fmt(+d.ok)} (${pct(+d.ok/Math.max(1,+d.n),0)})</b></div><div class="r"><span>Became law</span><b class="num">${fmt(+d.law)}</b></div>`); }
+      else hideTip(); });
+    sec.addEventListener('pointerleave', hideTip);
+    sec.addEventListener('click', e=>{ const bar = e.target.closest('.cm-mix, .cm-fun'); if (bar){ hideTip(); nav(bar.closest('.cmcard').querySelector('.oc-name').getAttribute('href').slice(1)); } }); });
   $('#cm-tbl').addEventListener('toggle', e=>{ CM.tableOpen = e.target.open; });
   let deb; $('#cm-q').addEventListener('input', e=>{ clearTimeout(deb); deb=setTimeout(()=>{ CM.q=e.target.value; cmUpdate(); },120); });
   $('#cm-m').addEventListener('change', e=>{ CM.major=e.target.value===''?null:+e.target.value; CM.sub=null; renderCommittees(); });
@@ -3269,6 +3278,12 @@ function cmRows(){
   const rows = CMDATA[legGA()].filter(c=>t.every(w=>c.name.toLowerCase().includes(w))).map(c=>[c, cmStats(c, CM.major, CM.sub)]).filter(([,s])=>s.n>0);
   const key = ([c,s]) => CM.sort==='name' ? c.name : CM.sort==='ch' ? c.ch+c.name : CM.sort==='top' ? (s.top!=null?CB.majors[s.top]:'~') : s[CM.sort];
   return rows.sort((a,b)=>{ const x=key(a), y=key(b); return (x>y?1:x<y?-1:0)*CM.dir || b[1].n-a[1].n || a[0].name.localeCompare(b[0].name); });
+}
+/* a committee's bills by subtopic, grouped by major topic (largest first), each shaded within its topic's color */
+function cmMix(c){
+  const bills = c.bills.filter(b=>isPol(b.r)), byM = [...count(bills, b=>b.r.major)].sort((a,b)=>b[1]-a[1]);
+  return byM.flatMap(([m])=>{ const ss = [...count(bills.filter(b=>b.r.major===m), b=>b.r.sub)].sort((a,b)=>b[1]-a[1]);
+    return ss.map(([s,n],j)=>({m, s, n, j, k:ss.length})); });
 }
 function cmUpdate(){
   const rows = cmRows();
