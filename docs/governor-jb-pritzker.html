@@ -3568,7 +3568,6 @@ function navSub(v){
   const sep = ['', ''];
   if (v === 'bills') return {items: BILLTABS.map(([k, l])=>['#' + k, l])};
   if (v === 'sponsors') return {items: [['#sponsors', 'All legislators'], ['#find', 'Find my legislators']]};
-  if (v === 'about') return {items: [['#about', 'About the project'], ['#about-data', 'The data'], ['#about-team', 'Team'], ['#about-license', 'License'], ['#about-cite', 'How to cite'], ['#contact', 'Contact']]};
   if (!R.length) return null;
   if (v === 'speeches'){
     return {items: [['#speeches', 'All addresses'], sep, ...governors().map(g=>[`#governor-${g.slug}`, `${g.name} · ${govYears(g)}`])]}; }
