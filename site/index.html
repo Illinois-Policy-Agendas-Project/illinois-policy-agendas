@@ -372,7 +372,7 @@ a.fstep:hover{border-color:var(--s-bills)} .fstep.on{border-color:var(--s-bills)
 .person{display:grid;grid-template-columns:56px minmax(0,1fr);gap:14px;align-items:start}
 .avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;display:grid;place-items:center}
 .avatar.mono{background:var(--sel);color:var(--navy,#13294b);font-weight:700;font-size:17px;font-family:var(--f-ui)}
-.pname{font-weight:600} .pname a{color:inherit} .ptitle{font-size:13px;color:var(--muted)} .pbio{margin:6px 0 0;font-size:14px;color:var(--ink-2);line-height:1.55}
+.pname{font-weight:600} .pname a{color:inherit} .ptitle{font-size:13px;color:var(--muted)} .purl{font-size:13px;display:inline-block;margin-top:2px} .pbio{margin:6px 0 0;font-size:14px;color:var(--ink-2);line-height:1.55}
 .home-sponsors{display:flex;gap:40px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:22px}
 .sponsor{display:flex;flex-direction:column;gap:8px}
 .sp-mark{display:inline-flex;align-items:center;min-height:48px;text-decoration:none;color:var(--ink)}
@@ -1185,7 +1185,7 @@ function renderHome(){
     <div><h2>Project team</h2><p class="ct-line"><a href="#contact">Contact us</a> · <a href="mailto:${esc(H.contact?.email || 'ejfagan@uic.edu')}">${esc(H.contact?.email || 'ejfagan@uic.edu')}</a></p><div class="people">${(H.people||[]).map(p=>`<div class="person">
       ${p.photo ? `<img class="avatar" src="data/${esc(p.photo)}" alt="">` : `<span class="avatar mono" aria-hidden="true">${esc(initials(p.name||''))}</span>`}
       <div style="min-width:0"><div class="pname">${p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}</div>
-      <div class="ptitle">${esc(p.title||p.role||'')}</div>${p.bio?`<p class="pbio">${esc(p.bio).replace(/\*([^*]+)\*/g,'<em>$1</em>')}</p>`:''}</div></div>`).join('')}</div></div>
+      <div class="ptitle">${esc(p.title||p.role||'')}</div>${p.url?`<a class="purl" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.url.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''))} ↗</a>`:''}${p.bio?`<p class="pbio">${esc(p.bio).replace(/\*([^*]+)\*/g,'<em>$1</em>')}</p>`:''}</div></div>`).join('')}</div></div>
   </section>
   ${(H.sponsors||[]).length ? `<section class="home-sponsors">${H.sponsors.map(sp=>`<div class="sponsor"><span class="eyebrow">${esc(sp.role||'')}</span>
       <a href="${esc(sp.url||'#')}" target="_blank" rel="noopener" class="sp-mark">${sp.logo ? `<img src="data/${esc(sp.logo)}" alt="${esc(sp.name)}">` : `<span class="sp-name">${esc(sp.name)}</span>`}</a></div>`).join('')}</section>` : ''}`;
