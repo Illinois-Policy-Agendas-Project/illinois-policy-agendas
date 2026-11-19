@@ -404,6 +404,8 @@ a.fstep:hover{border-color:var(--s-bills)} .fstep.on{border-color:var(--s-bills)
 ol.topsp{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 ol.topsp li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;align-items:center}
 .topsp .rk{font-weight:600;color:var(--muted);text-align:right}
+.tsbar.cm i{position:relative;background:color-mix(in srgb, var(--s-bills) 40%, var(--surface))} .tsbar.cm b{position:absolute;left:0;top:0;bottom:0;background:var(--s-bills);border-radius:3px}
+.tp-who{gap:16px;margin:0} .tp-who > .panel{margin:0}
 .tsbar{height:6px;background:var(--sunk);border-radius:3px;margin-top:5px;overflow:hidden} .tsbar i{display:block;height:100%;background:var(--s-bills);border-radius:3px}
 .tsn{display:flex;flex-direction:column;align-items:flex-end;font-size:13px;white-space:nowrap} .tsn .muted{font-size:12px}
 .btn.soon{opacity:.6;cursor:default;border-style:dashed}
@@ -1646,7 +1648,10 @@ function renderTopics(){
           <span class="v">${pct(inF[k].length/base[k].length)}</span><span class="s">${fmt(inF[k].length)} of ${fmt(base[k].length)} policy items${sub!=null && inM[k].length ? ` · ${pct(inF[k].length/inM[k].length,0)} of its ${esc(CB.majors[m].split(/,| and /)[0])} items` : ''}</span></div>`).join('')}</div></div>
       <div class="panel"><div class="chead"><h2 class="hs">Share of each source's agenda, by year</h2><div class="legend">${DSK.map(k=>`<span class="${DS[k].cls}"><i class="dot"></i>${DS[k].short}${k==='bills'?` (${SESSIONS.map(s=>s.years).join(', ')})`:''}</span>`).join('')}</div></div><div id="tp-ln"></div>
         <div class="muted" style="font-size:12px">Years with fewer than 20 speech sentences or 8 reports are left out.</div></div>
-      <div class="panel"><div class="chead"><h2 class="hs">Top 5 sponsors of ${esc(sub==null ? CB.majors[m] : CB.subs[sub])} bills</h2><span class="muted" style="font-size:12px">Primary sponsors, ${esc(SESSIONS.length>1?'all sessions':gaName(LATEST))}</span></div><div id="tp-sp"></div></div>
+      <div class="grid2 tp-who">
+        <div class="panel"><div class="chead"><h2 class="hs">Top 5 sponsors of ${esc(sub==null ? CB.majors[m] : CB.subs[sub])} bills</h2><span class="muted" style="font-size:12px">Primary sponsors, ${esc(SESSIONS.length>1?'all sessions':gaName(LATEST))}</span></div><div id="tp-sp"></div></div>
+        <div class="panel"><div class="chead"><h2 class="hs">Top 5 committees for ${esc(sub==null ? CB.majors[m] : CB.subs[sub])} bills</h2><span class="muted" style="font-size:12px">Bills assigned, ${esc(SESSIONS.length>1?'all sessions':gaName(LATEST))}</span></div><div id="tp-cm"><div class="loading" style="padding:12px 0">Reading committee assignments…</div></div></div>
+      </div>
       ${sub==null ? `<div class="panel"><div class="chead"><h2 class="hs">Subtopics</h2><span class="muted" style="font-size:12px">Records coded to each subtopic. Click a row to open it.</span></div>
         <div class="hscroll"><table class="subtab"><thead><tr><th>Code</th><th>Subtopic</th>${DSK.map(k=>`<th class="${DS[k].cls}"><i class="dot"></i> ${DS[k].short}</th>`).join('')}</tr></thead>
         <tbody>${subsOf(m).map(s=>`<tr data-s="${s}"><td><span class="code">${s}</span></td><td>${esc(CB.subs[s])}</td>${DSK.map(k=>`<td class="${subN[s][k]?'':'z'}">${fmt(subN[s][k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>` : ''}
@@ -1670,10 +1675,35 @@ function renderTopics(){
   fillRule($('#tp-rule'));
   $('#tp-dl').addEventListener('click', ()=>save(`ipap-topic-${sub??m}-${slug(sub==null?CB.majors[m]:CB.subs[sub])}.csv`, csvFor(DSK.flatMap(k=>inF[k]))));
   topSponsors(inF.bills);
+  topCommittees(inF.bills);
   topicList(inF);
 }
+/* the committees that took up the most bills on the topic: every session's committee assignments (read from the bill
+   histories the first time), a committee counted once per chamber and name across sessions, linked to its latest session */
+function topCommittees(bills){
+  const gas = SESSIONS.map(x=>x.ga), want = new Set(bills), me = CUR;
+  if (!gas.every(g=>CMDATA[g])){ Promise.all(gas.map(ensureCm)).then(()=>{ if (CUR===me && $('#tp-cm')) topCommittees(bills); }).catch(()=>{ const el = $('#tp-cm'); if (el) el.innerHTML = '<p class="muted" style="margin:0">Committee assignments could not be read.</p>'; }); return; }
+  const by = new Map();
+  for (const g of gas) for (const c of CMDATA[g]){ if (TOP_SKIP_CM.test(c.name)) continue; const bs = c.bills.filter(b=>want.has(b.r)); if (!bs.length) continue;
+    const id = c.ch + '|' + c.name, o = by.get(id) || {c, n:0, ok:0, law:0}; if (+g >= +o.c.ga) o.c = c;
+    o.n += bs.length; o.ok += bs.filter(b=>b.ok).length; o.law += bs.filter(b=>b.r.x.stage>=5).length; by.set(id, o); }
+  const top = [...by.values()].sort((a,b)=>b.n-a.n || b.ok-a.ok || a.c.name.localeCompare(b.c.name)).slice(0,5);
+  const el = $('#tp-cm'); if (!el) return;
+  if (!top.length){ el.innerHTML = '<p class="muted" style="margin:0">No bills in this topic were assigned to a committee.</p>'; return; }
+  const mx = top[0].n, assigned = new Set(gas.flatMap(g=>CMDATA[g].flatMap(c=>c.bills.filter(b=>want.has(b.r)).map(b=>b.r)))).size;
+  el.innerHTML = `<ol class="topsp">${top.map((o,i)=>`<li><span class="rk num">${i+1}</span>
+      <div style="min-width:0"><div><a class="spn" href="#committee-${o.c.key}">${esc(o.c.name)}</a> <span class="muted" style="font-size:12.5px">· ${o.c.ch}</span></div>
+      <div class="tsbar cm"><i style="width:${(o.n/mx*100).toFixed(1)}%"><b style="width:${(o.ok/o.n*100).toFixed(1)}%"></b></i></div></div>
+      <span class="num tsn"><b>${pl(o.n,'bill')}</b><span class="muted">${pct(o.ok/o.n,0)} approved</span></span></li>`).join('')}</ol>
+    <p class="muted" style="margin:0;font-size:12px">${fmt(assigned)} of ${pl(bills.length,'bill')} in this topic went to a committee. Leaves out the Executive committees, where leaders' placeholder bills wait. Darker part of each bar: approved. Click a name for the committee's page.</p>`;
+}
+/* The topic page's top sponsors and committees leave out the chambers' caucus leaders and the Executive committees: leaders
+   file placeholder ("shell") bills on nearly every topic, which wait in Rules or Executive until they are needed, so they
+   would top almost every list. Update the names when leadership changes. */
+const TOP_SKIP_LEADERS = new Set(['Emanuel "Chris" Welch', 'Don Harmon', 'Tony M. McCombie', 'John F. Curran']);
+const TOP_SKIP_CM = /^Executive$/;
 function topSponsors(bills){
-  const by = new Map(); for (const r of bills){ const c = chiefOf(r); if (!c) continue; const o = by.get(c.i) || {p:c, n:0, law:0}; o.n++; if (r.x.stage>=5) o.law++; by.set(c.i, o); }
+  const by = new Map(); for (const r of bills){ const c = chiefOf(r); if (!c || TOP_SKIP_LEADERS.has(c.name)) continue; const o = by.get(c.i) || {p:c, n:0, law:0}; o.n++; if (r.x.stage>=5) o.law++; by.set(c.i, o); }
   const top = [...by.values()].sort((a,b)=>b.n-a.n || b.law-a.law || a.p.name.localeCompare(b.p.name)).slice(0,5);
   const el = $('#tp-sp'); if (!el) return;
   if (!top.length){ el.innerHTML = '<p class="muted" style="margin:0">No bills in this topic list a sponsor.</p>'; return; }
@@ -1682,7 +1712,7 @@ function topSponsors(bills){
       <div style="min-width:0"><div>${spLink(o.p)} <span class="muted" style="font-size:12.5px">· ${chamberName(o.p.ch)}</span></div>
       <div class="tsbar"><i style="width:${(o.n/mx*100).toFixed(1)}%"></i></div></div>
       <span class="num tsn"><b>${pl(o.n,'bill')}</b><span class="muted">${o.law ? `${fmt(o.law)} became law` : 'none became law'}</span></span></li>`).join('')}</ol>
-    <p class="muted" style="margin:0;font-size:12px">Out of ${pl(bills.length,'bill')} in this topic. Click a name for the legislator's page.</p>`;
+    <p class="muted" style="margin:0;font-size:12px">Out of ${pl(bills.length,'bill')} in this topic. Leaves out the four caucus leaders, who file placeholder bills on nearly every topic. Click a name for the legislator's page.</p>`;
 }
 function topicList(inM){
   const rows = DSK.filter(k=>TP.ds==='all'||TP.ds===k).flatMap(k=>inM[k])
