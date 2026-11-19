@@ -1684,7 +1684,7 @@ function topCommittees(bills){
   const gas = SESSIONS.map(x=>x.ga), want = new Set(bills), me = CUR;
   if (!gas.every(g=>CMDATA[g])){ Promise.all(gas.map(ensureCm)).then(()=>{ if (CUR===me && $('#tp-cm')) topCommittees(bills); }).catch(()=>{ const el = $('#tp-cm'); if (el) el.innerHTML = '<p class="muted" style="margin:0">Committee assignments could not be read.</p>'; }); return; }
   const by = new Map();
-  for (const g of gas) for (const c of CMDATA[g]){ const bs = c.bills.filter(b=>want.has(b.r)); if (!bs.length) continue;
+  for (const g of gas) for (const c of CMDATA[g]){ if (TOP_SKIP_CM.test(c.name)) continue; const bs = c.bills.filter(b=>want.has(b.r)); if (!bs.length) continue;
     const id = c.ch + '|' + c.name, o = by.get(id) || {c, n:0, ok:0, law:0}; if (+g >= +o.c.ga) o.c = c;
     o.n += bs.length; o.ok += bs.filter(b=>b.ok).length; o.law += bs.filter(b=>b.r.x.stage>=5).length; by.set(id, o); }
   const top = [...by.values()].sort((a,b)=>b.n-a.n || b.ok-a.ok || a.c.name.localeCompare(b.c.name)).slice(0,5);
@@ -1695,10 +1695,15 @@ function topCommittees(bills){
       <div style="min-width:0"><div><a class="spn" href="#committee-${o.c.key}">${esc(o.c.name)}</a> <span class="muted" style="font-size:12.5px">· ${o.c.ch}</span></div>
       <div class="tsbar cm"><i style="width:${(o.n/mx*100).toFixed(1)}%"><b style="width:${(o.ok/o.n*100).toFixed(1)}%"></b></i></div></div>
       <span class="num tsn"><b>${pl(o.n,'bill')}</b><span class="muted">${pct(o.ok/o.n,0)} approved</span></span></li>`).join('')}</ol>
-    <p class="muted" style="margin:0;font-size:12px">${fmt(assigned)} of ${pl(bills.length,'bill')} in this topic went to a committee. Darker part of each bar: approved. Click a name for the committee's page.</p>`;
+    <p class="muted" style="margin:0;font-size:12px">${fmt(assigned)} of ${pl(bills.length,'bill')} in this topic went to a committee. Leaves out the Executive committees, where leaders' placeholder bills wait. Darker part of each bar: approved. Click a name for the committee's page.</p>`;
 }
+/* The topic page's top sponsors and committees leave out the chambers' caucus leaders and the Executive committees: leaders
+   file placeholder ("shell") bills on nearly every topic, which wait in Rules or Executive until they are needed, so they
+   would top almost every list. Update the names when leadership changes. */
+const TOP_SKIP_LEADERS = new Set(['Emanuel "Chris" Welch', 'Don Harmon', 'Tony M. McCombie', 'John F. Curran']);
+const TOP_SKIP_CM = /^Executive$/;
 function topSponsors(bills){
-  const by = new Map(); for (const r of bills){ const c = chiefOf(r); if (!c) continue; const o = by.get(c.i) || {p:c, n:0, law:0}; o.n++; if (r.x.stage>=5) o.law++; by.set(c.i, o); }
+  const by = new Map(); for (const r of bills){ const c = chiefOf(r); if (!c || TOP_SKIP_LEADERS.has(c.name)) continue; const o = by.get(c.i) || {p:c, n:0, law:0}; o.n++; if (r.x.stage>=5) o.law++; by.set(c.i, o); }
   const top = [...by.values()].sort((a,b)=>b.n-a.n || b.law-a.law || a.p.name.localeCompare(b.p.name)).slice(0,5);
   const el = $('#tp-sp'); if (!el) return;
   if (!top.length){ el.innerHTML = '<p class="muted" style="margin:0">No bills in this topic list a sponsor.</p>'; return; }
@@ -1707,7 +1712,7 @@ function topSponsors(bills){
       <div style="min-width:0"><div>${spLink(o.p)} <span class="muted" style="font-size:12.5px">· ${chamberName(o.p.ch)}</span></div>
       <div class="tsbar"><i style="width:${(o.n/mx*100).toFixed(1)}%"></i></div></div>
       <span class="num tsn"><b>${pl(o.n,'bill')}</b><span class="muted">${o.law ? `${fmt(o.law)} became law` : 'none became law'}</span></span></li>`).join('')}</ol>
-    <p class="muted" style="margin:0;font-size:12px">Out of ${pl(bills.length,'bill')} in this topic. Click a name for the legislator's page.</p>`;
+    <p class="muted" style="margin:0;font-size:12px">Out of ${pl(bills.length,'bill')} in this topic. Leaves out the four caucus leaders, who file placeholder bills on nearly every topic. Click a name for the legislator's page.</p>`;
 }
 function topicList(inM){
   const rows = DSK.filter(k=>TP.ds==='all'||TP.ds===k).flatMap(k=>inM[k])
