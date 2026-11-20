@@ -3430,11 +3430,11 @@ const DAYK = [   // [kind, heading, test, routine]; the first test that matches 
 ];
 const DAYK_OF = t => (DAYK.find(k=>k[2].test(t||'')) || DAYK[DAYK.length-1])[0];
 const DAYK_SHORT = {law:'became law', veto:'vetoed', gov:'sent to the governor', both:'passed both houses', passed:'passed a chamber', lost:'failed a floor vote', second:'had a second reading', cmvote:'had committee votes', assigned:'assigned to committees', intro:'introduced', arrive:'arrived in the other chamber', amend:'had amendment action', concur:'had concurrence action'};
-const DY = { ch:'', major:null, idx:null };
+const DY = { ch:'', major:null, idx:null, y:null };   // y: a stand-in for yesterday, for testing
 const DAYDATA = {};
 const isoDay = x => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
 const dayShift = (d, n) => { const x = new Date(d+'T12:00:00'); x.setDate(x.getDate()+n); return isoDay(x); };
-const dayYesterday = () => dayShift(new Date().toLocaleDateString('en-CA', {timeZone:'America/Chicago'}), -1);
+const dayYesterday = () => DY.y || dayShift(new Date().toLocaleDateString('en-CA', {timeZone:'America/Chicago'}), -1);
 const dayLong = d => new Date(d+'T12:00:00').toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
 /* the dates with actions in every session: {date: [ga, count]} */
 async function dayIndex(){
@@ -3503,7 +3503,10 @@ async function renderDay(){
   $$('[data-jump]').forEach(a=>a.addEventListener('click', e=>{ e.preventDefault(); const t = $('#'+a.dataset.jump); if (!t) return; if (t.tagName==='DETAILS') t.open = true; t.scrollIntoView({behavior:'smooth', block:'start'}); }));
 }
 
-/* the home page's box: yesterday, or the latest day before it with actions */
+/* the home page's box: yesterday, or the latest day before it with more than routine actions (calendar moves, deadline
+   re-referrals, sponsor changes). When the General Assembly is on a break it says so; when nothing more than routine
+   has happened for HOME_DAY_GAP days (a long recess), the box is left out until the legislature is back. */
+const HOME_DAY_GAP = 14;
 function homeDayBox(){
   if (!SESSIONS.some(x=>MAN.v?.['days-'+x.ga])) return '';
   return `<section class="home-day" id="home-day" aria-labelledby="hd-t" hidden></section>`;
@@ -3511,18 +3514,22 @@ function homeDayBox(){
 async function fillHomeDay(){
   const el = $('#home-day'); if (!el) return;
   try {
-    const idx = await dayIndex(), y = dayYesterday(), d = idx[y] ? y : Object.keys(idx).filter(x=>x<=y).sort().pop();
-    if (!d) return;
-    const acts = await dayActs(d); if (!el.isConnected || !acts.length) return;
-    const groups = dayGroups(acts), main = groups.filter(([k])=>!DAYK_INFO[k].routine);
+    const idx = await dayIndex(), y = dayYesterday(), from = dayShift(y, -HOME_DAY_GAP);
+    let d = null, acts = [], groups = [], main = [];
+    for (const x of Object.keys(idx).filter(x=>x<=y && x>from).sort().reverse()){   // newest first, usually one or two files
+      const a = await dayActs(x), g = dayGroups(a), m = g.filter(([k])=>!DAYK_INFO[k].routine);
+      if (m.length){ [d, acts, groups, main] = [x, a, g, m]; break; }
+    }
+    if (!d || !el.isConnected) return;
+    const gap = Math.round((new Date(y+'T12:00:00') - new Date(d+'T12:00:00')) / 864e5);
+    const short = x => new Date(x+'T12:00:00').toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
     // one bill from each kind of action in turn (the weightiest kinds first), so the four show the range of the day
     const lists = ['law','gov','both','passed','cmvote','second','intro','assigned'].map(k=>[k, (groups.find(([g])=>g===k)?.[1] || []).map(([r])=>r)]).filter(([,rs])=>rs.length);
     const seen = new Set(), top = [];
     for (let i = 0; top.length < 4 && lists.some(([,rs])=>i < rs.length); i++)
       for (const [k, rs] of lists) if (top.length < 4 && rs[i] && !seen.has(rs[i])){ seen.add(rs[i]); top.push([k, rs[i]]); }
-    el.innerHTML = `<div class="hd-head"><div><div class="eyebrow">${d===y ? 'Yesterday in the General Assembly' : 'The latest day with recorded actions'}</div>
+    el.innerHTML = `<div class="hd-head"><div><div class="eyebrow">${d===y ? 'Yesterday in the General Assembly' : gap <= 3 ? 'The latest day with action on bills' : `On break: no action on bills since ${short(d)}`}</div>
         <h2 id="hd-t">What happened on ${dayLong(d).replace(/, \d{4}$/, '')}?</h2></div><a class="btn primary" href="#day-${d}">See everything that happened</a></div>
-      ${main.length ? '' : `<p class="muted" style="margin:12px 0 0">${pl(acts.length,'routine action')} that day, such as sponsor changes and calendar moves.</p>`}
       <ul class="hd-counts">${main.slice(0, 6).map(([k, bs])=>`<li><b class="num">${fmt(bs.length)}</b><span>${DAYK_INFO[k].l}</span></li>`).join('')}</ul>
       ${top.length ? `<ul class="dk-list hd-list">${top.map(([k, r])=>`<li><div class="dk-h"><span class="hd-k">${DAYK_INFO[k].l}</span><a class="mono" href="#bill-${r.x.ga}-${r.x.bill.replace(/\s+/g,'')}">${esc(r.x.bill)}</a> <a class="dk-t" href="#bill-${r.x.ga}-${r.x.bill.replace(/\s+/g,'')}">${esc(r.x.short || '')}</a>${dayTopic(r)}</div></li>`).join('')}</ul>` : ''}`;
     el.hidden = false;
