@@ -95,9 +95,12 @@ downloads of Update and check on their own.
 
 The same update also runs on GitHub's servers (`.github/workflows/update.yml`), so no lab computer is needed.
 
-- **Every night** it updates bills from ILGA, looks for new think tank reports and checks the data. It saves the
-  downloads back to Dropbox but **never publishes**.
-- **To publish:** on GitHub, open the repository's **Actions** tab → **Update website** → **Run workflow**, tick
+- **Every night** (about 3–4 a.m. Chicago time) it updates bills from ILGA, looks for new think tank reports and checks
+  the data. It saves the downloads back to Dropbox and **publishes the site if the check finds no errors**, so the
+  "What happened" page and its home page box show the day before. Anything committed to the repository by then (site
+  changes, coding) goes live with it. To stop the nightly publish, set the repository variable `NIGHTLY_PUBLISH` to
+  `false` (Settings → Secrets and variables → Actions → Variables); delete it to turn the nightly publish back on.
+- **To publish by hand:** on GitHub, open the repository's **Actions** tab → **Update website** → **Run workflow**, tick
   **Publish the site if the check passes**, and click **Run workflow**. It publishes only if the check finds no errors.
   The same form can skip the downloads, or make a coding worksheet for a session (saved to `inputs/worksheets` in
   Dropbox).
@@ -209,8 +212,8 @@ Commit and push, and the site updates. Lab computers pick up the change the next
   The first run takes about 40 minutes; later runs download only bills that changed. Without these files the site
   builds from the scraped file alone and keeps the replay as last published.
   The same dated actions feed **What happened** (Bills → What happened, and the box on the home page): every action on
-  one day, opening on yesterday. The build writes them to `docs/data/bills/<session>/day/<date>.json`. The page is only
-  as current as the last publish, so "yesterday" is up to date only if the site is published daily.
+  one day, opening on yesterday. The build writes them to `docs/data/bills/<session>/day/<date>.json`; the nightly
+  publish keeps "yesterday" current.
 - **Design and features:** `site/index.html`.
 
 ## Common data changes (edit `config.toml`)

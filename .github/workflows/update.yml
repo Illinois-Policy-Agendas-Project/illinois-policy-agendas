@@ -1,7 +1,9 @@
 # Update the IPAP website on GitHub's servers instead of a lab computer.
 #
-# Every night it updates and checks the data and saves the downloads back to Dropbox, but never publishes.
-# To publish: Actions tab → "Update website" → "Run workflow", tick "Publish", Run. It publishes only if the check passes.
+# Every night it updates and checks the data, saves the downloads back to Dropbox, and publishes the site if the check
+# passes, so the "What happened" page and the home page box show yesterday. To stop the nightly publish, set the
+# repository variable NIGHTLY_PUBLISH to false (Settings → Secrets and variables → Actions → Variables).
+# To publish by hand: Actions tab → "Update website" → "Run workflow", tick "Publish", Run. It publishes only if the check passes.
 # Each run's page shows a summary; the full report is attached under Artifacts. Setup (Dropbox secrets) is in the README.
 name: Update website
 
@@ -126,7 +128,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Publish
-        if: inputs.publish && steps.check.outcome == 'success'
+        if: (inputs.publish || (github.event_name == 'schedule' && vars.NIGHTLY_PUBLISH != 'false')) && steps.check.outcome == 'success'
         run: |
           python pipeline/publish.py
           python pipeline/dropbox_sync.py push      # the publish log, so "what changed" works everywhere
