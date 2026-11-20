@@ -743,6 +743,22 @@ h1 a.h1-link{color:inherit;text-decoration:none} h1 a.h1-link:hover{text-decorat
 details.cm-tbl{margin-top:4px} details.cm-tbl > summary{cursor:pointer;font-family:var(--f-display);font-weight:500;font-size:19px;padding:12px 0;border-top:2px solid var(--navy);list-style-position:inside}
 details.cm-tbl > summary .muted{font:13px var(--f-ui);margin-left:8px}
 @media (forced-colors: active){ .cm-mix i{forced-color-adjust:none} }
+
+.dk-nav{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 16px} .dk-nav .btn[aria-disabled="true"]{opacity:.45;pointer-events:none}
+.dk-nav input[type=date]{width:auto} .dk-filt{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap} .dk-filt select{width:auto}
+.dk-sum{margin-bottom:16px} .dk-jump{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.dk-jump a{font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;text-decoration:none;color:var(--ink)} .dk-jump a:hover{border-color:var(--ink-2)} .dk-jump .num{color:var(--muted);margin-left:3px}
+.dk-sec{margin-bottom:16px;scroll-margin-top:12px} .dk-list{list-style:none;margin:0;padding:0} .dk-list li{padding:8px 0;border-top:1px solid var(--line)} .dk-list li:first-child{border-top:0}
+.dk-h{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline} .dk-h .mono{font-weight:600;white-space:nowrap} .dk-t{color:var(--ink)}
+.dk-top{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)} .dk-top i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dk-a{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+details.dk-routine{margin-bottom:16px;scroll-margin-top:12px} details.dk-routine > summary{cursor:pointer;font-family:var(--f-display);font-weight:500;font-size:19px;padding:12px 0;border-top:2px solid var(--navy)}
+details.dk-routine > summary .muted{font:13px var(--f-ui);margin-left:8px}
+.home-day{margin:28px 0;padding:20px 22px;border:1px solid var(--line);border-top:3px solid var(--s-bills);background:var(--surface)}
+.hd-head{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-end} .hd-head h2{margin:2px 0 0}
+.hd-counts{list-style:none;margin:14px 0 4px;padding:0;display:flex;flex-wrap:wrap;gap:8px 28px} .hd-counts li{display:flex;flex-direction:column} .hd-counts b{font-size:26px;line-height:1.1;color:var(--ink)} .hd-counts span{font-size:12.5px;color:var(--muted)}
+.hd-list{margin-top:8px} .hd-k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);min-width:9.5em}
+@media (forced-colors: active){ .dk-top i{forced-color-adjust:none} }
 </style>
 
 <a class="skip" href="#view" onclick="event.preventDefault();event.stopPropagation();const v=document.getElementById('view');v.setAttribute('tabindex','-1');v.focus();">Skip to content</a>
@@ -785,7 +801,7 @@ const TABS = [['home','Home'],null,['bills','Bills','ds-bills'],['sponsors','Leg
 const LEGTABS = [['parties','Parties'],['committees','Committees'],['replay','Day by day']];
 // the Bills sub-menu. All bills is the Bills page; its stage views (Introduced, Out of committee, Became law) are reached
 // from the stage boxes on it, and keep All bills underlined
-const BILLTABS = [['bills','All bills'], ['bills-activity','Recent activity'], ...LEGTABS];
+const BILLTABS = [['bills','All bills'], ['day','What happened'], ['bills-activity','Recent activity'], ...LEGTABS];
 const TABLABEL = {sponsors:'Legislators', parties:'Parties', committees:'Committees'};
 const BILLTYPE = {HB:'House bill',SB:'Senate bill',HR:'House resolution',SR:'Senate resolution',HJR:'House joint resolution',SJR:'Senate joint resolution',HJRCA:'House joint res. (const. amendment)',SJRCA:'Senate joint res. (const. amendment)',AM:'Appointment message',EO:'Executive order',JSR:'Joint session resolution'};
 const FLAGS = {L:'Became law / adopted',C:'Commemorative',A:'Appropriation',N:'Nomination',R:'Roll-call vote'};
@@ -916,7 +932,7 @@ const LOADED = {details:new Set(), links:new Set(), slices:new Set()};
 const billSlice = r => r.x.type + Math.floor(+r.x.bill.split(' ')[1] / 500);
 const SLICE_ACTS = {};
 const loadActsFor = r => SLICE_ACTS[`${r.x.ga}/${billSlice(r)}`] ||= get(`bills/${r.x.ga}/a/${billSlice(r)}`);
-const vkey = f => ({'bills/summary':'bills', thinktanks:'tt'})[f] || f.replace(/^bills\/(\d+)\/[ad]\/\w+$/,'slices-$1').replace(/^bills\/(\d+)\/(\w+)$/,'$2-$1');
+const vkey = f => ({'bills/summary':'bills', thinktanks:'tt'})[f] || f.replace(/^bills\/(\d+)\/[ad]\/\w+$/,'slices-$1').replace(/^bills\/(\d+)\/day\/[\d-]+$/,'days-$1').replace(/^bills\/(\d+)\/(\w+)$/,'$2-$1');
 const get = f => fetch('data/'+f+'.json?v='+(MAN?.v?.[vkey(f)] || '')).then(r=>{ if (!r.ok) throw new Error(f); return r.json(); });
 const gaName = ga => `${ga}th General Assembly`;
 const gaYears = ga => ALL_SESSIONS.find(s=>s.ga===ga)?.years || '';
@@ -1181,6 +1197,7 @@ function renderHome(){
     <p class="home-lede">${fillCounts(H.overview || '')}</p>
     <div class="home-cta"><a class="btn primary" href="#topics">Explore by topic</a><a class="btn" href="#bills">Browse bills</a><a class="btn" href="#search">Search everything</a><a class="btn" href="#find">Find your legislators</a>${cbLink('btn')}</div>
   </section>
+  ${homeDayBox()}
   ${homeMembersBox()}
   <section class="home-cards" aria-label="What's on the site">${cards.map(([h,cls,t,n,d])=>`<a class="hcard ${cls}" href="#${h}"><span class="hc-t">${cls?'<i class="dot"></i>':''}${t}</span><span class="hc-n">${n}</span><span class="hc-d">${d}</span></a>`).join('')}</section>
   <section class="home-two">
@@ -1192,7 +1209,7 @@ function renderHome(){
   </section>
   ${(H.sponsors||[]).length ? `<section class="home-sponsors">${H.sponsors.map(sp=>`<div class="sponsor"><span class="eyebrow">${esc(sp.role||'')}</span>
       <a href="${esc(sp.url||'#')}" target="_blank" rel="noopener" class="sp-mark">${sp.logo ? `<img src="data/${esc(sp.logo)}" alt="${esc(sp.name)}">` : `<span class="sp-name">${esc(sp.name)}</span>`}</a></div>`).join('')}</section>` : ''}`;
-  bindMembersBox();
+  bindMembersBox(); fillHomeDay();
 }
 
 /* two current legislators picked at random, one from each chamber, with their bills as primary sponsor by topic: on the
@@ -3386,6 +3403,140 @@ SECTIONS.committee.push(
 );
 
 /* =================== shell & routing =================== */
+
+/* =================== WHAT HAPPENED ON A DAY ===================
+   Every action ILGA recorded on one day, grouped by kind: what became law, passed, was voted on in committee, was
+   assigned, was introduced… Opens on yesterday (Chicago time). Data from the build (write_days in build.py, from the
+   dated actions "Update bills from ILGA" downloads): bills/<ga>/days.json {n:{date: actions}} and
+   bills/<ga>/day/<date>.json [[bill key, chamber, action], ...]. As current as the last publish. */
+const DAYK = [   // [kind, heading, test, routine]; the first test that matches an action decides its kind
+  ['law', 'Became law', /^Public Act|^Governor Approved|^Effective Date/i],
+  ['veto', 'Vetoed', /Veto/i],
+  ['gov', 'Sent to the governor', /^Sent to the Governor/i],
+  ['both', 'Passed both houses', /^Passed Both Houses/i],
+  ['passed', 'Passed a chamber', /^Third Reading.*Passed/i],
+  ['lost', 'Failed a floor vote', /^Third Reading.*(Lost|Failed)/i],
+  ['concur', 'Concurrence', /Concurs?\b|Concurrence|Non-Concur/i],
+  ['amend', 'Amendments', /Amendment No\./i],
+  ['second', 'Second reading', /^Second Reading|^Recalled to Second Reading/i],
+  ['cmvote', 'Committee votes', /^(Do Pass|Recommends|Approved for Consideration|Postponed|Reported Out|Reported Back|Held in |Tabled|Motion Do Pass)/i],
+  ['assigned', 'Assigned to a committee', /^(Re-)?[Aa]ssigned to |^To [A-Z]/],
+  ['intro', 'Introduced', /^(Filed with|Prefiled with)/i],   // and a first reading in the bill's own chamber (dayActs)
+  ['arrive', 'Arrived in the other chamber', /^Arrived? in/i],
+  ['calendar', 'Placed on a calendar', /^Placed on Calendar|^Held on Calendar|Deadline/i, true],
+  ['rules', 'Referred or sent back to Rules / Assignments', /^(Re-)?[Rr]eferred to (Rules|Assignments)|Re-referred|Pursuant to Senate Rule|Sine Die/i, true],
+  ['first', 'First reading', /^First Reading/i, true],
+  ['sponsor', 'Sponsor changes', /Sponsor/i, true],
+  ['other', 'Other actions', /./, true],
+];
+const DAYK_OF = t => (DAYK.find(k=>k[2].test(t||'')) || DAYK[DAYK.length-1])[0];
+const DAYK_SHORT = {law:'became law', veto:'vetoed', gov:'sent to the governor', both:'passed both houses', passed:'passed a chamber', lost:'failed a floor vote', second:'had a second reading', cmvote:'had committee votes', assigned:'assigned to committees', intro:'introduced', arrive:'arrived in the other chamber', amend:'had amendment action', concur:'had concurrence action'};
+const DY = { ch:'', major:null, idx:null, y:null };   // y: a stand-in for yesterday, for testing
+const DAYDATA = {};
+const isoDay = x => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+const dayShift = (d, n) => { const x = new Date(d+'T12:00:00'); x.setDate(x.getDate()+n); return isoDay(x); };
+const dayYesterday = () => DY.y || dayShift(new Date().toLocaleDateString('en-CA', {timeZone:'America/Chicago'}), -1);
+const dayLong = d => new Date(d+'T12:00:00').toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+/* the dates with actions in every session: {date: [ga, count]} */
+async function dayIndex(){
+  if (DY.idx) return DY.idx;
+  const gas = SESSIONS.map(x=>x.ga).filter(g=>MAN.v?.['days-'+g]), idx = {};
+  for (const [g, j] of await Promise.all(gas.map(g=>get(`bills/${g}/days`).then(j=>[g, j]))))
+    for (const [d, n] of Object.entries(j.n || {})) idx[d] = [g, (idx[d]?.[1] || 0) + n];
+  return DY.idx = idx;
+}
+/* one day's actions, each with its bill record and kind */
+async function dayActs(d){
+  if (DAYDATA[d]) return DAYDATA[d];
+  const idx = await dayIndex(); if (!idx[d]) return DAYDATA[d] = [];
+  const raw = await get(`bills/${idx[d][0]}/day/${d}`), by = new Map(billsOf(idx[d][0]).map(r=>[r.x.key, r]));
+  const kindOf = (r, ch, t) => { const k = DAYK_OF(t); return k==='first' && ch===(r.x.type==='SB'?'Senate':'House') ? 'intro' : k; };
+  return DAYDATA[d] = raw.filter(([k])=>by.has(k)).map(([k, ch, t])=>{ const r = by.get(k); return {r, ch, t, kind:kindOf(r, ch, t)}; });
+}
+/* the actions grouped by kind, then by bill: [[kind, [[record, [action, ...]], ...]], ...] in DAYK order */
+function dayGroups(acts){
+  const g = new Map(DAYK.map(([k])=>[k, new Map()]));
+  for (const a of acts){ const m = g.get(a.kind); if (!m.has(a.r)) m.set(a.r, []); m.get(a.r).push(a); }
+  return [...g].filter(([,m])=>m.size).map(([k,m])=>[k, [...m]]);
+}
+const DAYK_INFO = Object.fromEntries(DAYK.map(([k,l,,routine])=>[k, {l, routine:!!routine}]));
+const dayTopic = r => isPol(r) ? `<span class="dk-top"><i style="background:${shade(r.major,0,1)}"></i>${esc(CB.majors[r.major])}</span>` : '';
+const dayBill = (r, acts) => `<li><div class="dk-h"><a class="mono" href="#bill-${r.x.ga}-${r.x.bill.replace(/\s+/g,'')}">${esc(r.x.bill)}</a> <a class="dk-t" href="#bill-${r.x.ga}-${r.x.bill.replace(/\s+/g,'')}">${esc(r.x.short || '')}</a>${dayTopic(r)}</div>
+  ${acts ? `<div class="dk-a">${[...new Set(acts.map(a=>`${a.ch} · ${a.t}`))].map(esc).join('<br>')}</div>` : ''}</li>`;
+const daySummary = groups => groups.filter(([k])=>DAYK_SHORT[k]).map(([k, bs])=>`<b class="num">${fmt(bs.length)}</b> ${DAYK_SHORT[k]}`).join(' · ');
+
+async function renderDay(){
+  const me = CUR;
+  $('#view').innerHTML = `<nav class="vtabs" aria-label="Bills">${BILLTABS.map(([k,l])=>`<a href="#${k}" class="vtab" aria-current="${k==='day'?'page':'false'}">${l}</a>`).join('')}</nav><div class="loading">Reading the day's actions…</div>`;
+  let idx; try { idx = await dayIndex(); } catch { idx = {}; }
+  if (CUR !== me) return;
+  const dates = Object.keys(idx).sort(), last = dates[dates.length-1];
+  if (!dates.length){ $('#view').innerHTML = `<div class="phead"><div><h1>What happened in the General Assembly?</h1><p>This page appears once the dated bill actions have been downloaded (<b>Update bills from ILGA</b>) and the site is published.</p></div></div>`; return; }
+  const d = ROUTE.date || dayYesterday();
+  let acts; try { acts = await dayActs(d); } catch { acts = []; }
+  if (CUR !== me) return;
+  const prev = dates.filter(x=>x<d).pop(), next = dates.find(x=>x>d);
+  const sel = acts.filter(a=>(!DY.ch || a.ch===DY.ch) && (DY.major==null || a.r.major===DY.major));
+  const groups = dayGroups(sel), main = groups.filter(([k])=>!DAYK_INFO[k].routine), routine = groups.filter(([k])=>DAYK_INFO[k].routine);
+  const nBills = new Set(sel.map(a=>a.r)).size, isY = d === dayYesterday();
+  const sec = ([k, bs]) => `<section class="panel dk-sec" id="dk-${k}"><div class="chead"><h2 class="hs">${DAYK_INFO[k].l}</h2><span class="muted" style="font-size:12px">${pl(bs.length,'bill')}</span></div>
+    <ul class="dk-list">${bs.map(([r, as])=>dayBill(r, as)).join('')}</ul></section>`;
+  $('#view').innerHTML = `<nav class="vtabs" aria-label="Bills">${BILLTABS.map(([k,l])=>`<a href="#${k}" class="vtab" aria-current="${k==='day'?'page':'false'}">${l}</a>`).join('')}</nav>
+  <div class="phead"><div><div class="eyebrow">${isY ? 'Yesterday in the General Assembly' : 'A day in the General Assembly'}</div><h1>What happened on ${dayLong(d)}?</h1>
+    <p>Every action the General Assembly recorded on House and Senate bills that day, from ILGA's bill histories. The data runs through ${fd(last)} and is as current as the last data update.</p></div></div>
+  <div class="dk-nav">
+    <a class="btn" ${prev?`href="#day-${prev}"`:'aria-disabled="true"'} title="${prev?fd(prev):''}">← Previous day${prev?` <span class="muted">${new Date(prev+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>`:''}</a>
+    <input type="date" id="dk-date" value="${d}" min="${dates[0]}" max="${dayYesterday() > last ? dayYesterday() : last}" aria-label="Pick a day">
+    <a class="btn" ${next?`href="#day-${next}"`:'aria-disabled="true"'} title="${next?fd(next):''}">Next day${next?` <span class="muted">${new Date(next+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>`:''} →</a>
+    ${isY ? '' : `<a class="btn" href="#day">Yesterday</a>`}
+    <span class="dk-filt"><select id="dk-ch" aria-label="Chamber"><option value="">House and Senate</option><option value="House" ${DY.ch==='House'?'selected':''}>House</option><option value="Senate" ${DY.ch==='Senate'?'selected':''}>Senate</option></select>
+    <select id="dk-m" aria-label="Topic">${majorOptions(DY.major)}</select></span>
+  </div>
+  ${!acts.length ? `<div class="panel"><p style="margin:0">Nothing was recorded on ${dayLong(d)}. ${d > last ? `The data runs through ${fd(last)}, so actions from this day may not be in it yet.` : 'The General Assembly took no recorded action on bills that day.'}${prev ? ` <a href="#day-${prev}">See ${fd(prev)}</a>, the last day before it with actions.` : ''}</p></div>`
+  : !sel.length ? `<div class="panel"><p style="margin:0">None of the day's ${pl(acts.length,'action')} match these filters.</p></div>`
+  : `<div class="panel dk-sum"><p style="margin:0"><b class="num">${fmt(sel.length)}</b> actions on <b class="num">${fmt(nBills)}</b> bills${main.length?`: ${daySummary(main)}`:''}.</p>
+      <div class="dk-jump">${main.map(([k, bs])=>`<a href="#dk-${k}" data-jump="dk-${k}">${DAYK_INFO[k].l} <span class="num">${fmt(bs.length)}</span></a>`).join('')}${routine.length?`<a href="#dk-routine" data-jump="dk-routine">Routine actions <span class="num">${fmt(routine.reduce((a,[,bs])=>a+bs.length,0))}</span></a>`:''}</div></div>
+    ${main.map(sec).join('')}
+    ${routine.length ? `<details class="dk-routine" id="dk-routine"><summary>Routine actions <span class="muted">${routine.map(([k, bs])=>`${DAYK_INFO[k].l.toLowerCase()} (${fmt(bs.length)})`).join(', ')}</span></summary>${routine.map(sec).join('')}</details>` : ''}`}`;
+  $('#dk-date').addEventListener('change', e=>{ if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) nav('day-' + e.target.value); });
+  $('#dk-ch').addEventListener('change', e=>{ DY.ch = e.target.value; renderDay(); });
+  $('#dk-m').addEventListener('change', e=>{ DY.major = e.target.value===''?null:+e.target.value; renderDay(); });
+  $$('[data-jump]').forEach(a=>a.addEventListener('click', e=>{ e.preventDefault(); const t = $('#'+a.dataset.jump); if (!t) return; if (t.tagName==='DETAILS') t.open = true; t.scrollIntoView({behavior:'smooth', block:'start'}); }));
+}
+
+/* the home page's box: yesterday, or the latest day before it with more than routine actions (calendar moves, deadline
+   re-referrals, sponsor changes). When the General Assembly is on a break it says so; when nothing more than routine
+   has happened for HOME_DAY_GAP days (a long recess), the box is left out until the legislature is back. */
+const HOME_DAY_GAP = 14;
+function homeDayBox(){
+  if (!SESSIONS.some(x=>MAN.v?.['days-'+x.ga])) return '';
+  return `<section class="home-day" id="home-day" aria-labelledby="hd-t" hidden></section>`;
+}
+async function fillHomeDay(){
+  const el = $('#home-day'); if (!el) return;
+  try {
+    const idx = await dayIndex(), y = dayYesterday(), from = dayShift(y, -HOME_DAY_GAP);
+    let d = null, acts = [], groups = [], main = [];
+    for (const x of Object.keys(idx).filter(x=>x<=y && x>from).sort().reverse()){   // newest first, usually one or two files
+      const a = await dayActs(x), g = dayGroups(a), m = g.filter(([k])=>!DAYK_INFO[k].routine);
+      if (m.length){ [d, acts, groups, main] = [x, a, g, m]; break; }
+    }
+    if (!d || !el.isConnected) return;
+    const gap = Math.round((new Date(y+'T12:00:00') - new Date(d+'T12:00:00')) / 864e5);
+    const short = x => new Date(x+'T12:00:00').toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+    // one bill from each kind of action in turn (the weightiest kinds first), so the four show the range of the day
+    const lists = ['law','gov','both','passed','cmvote','second','intro','assigned'].map(k=>[k, (groups.find(([g])=>g===k)?.[1] || []).map(([r])=>r)]).filter(([,rs])=>rs.length);
+    const seen = new Set(), top = [];
+    for (let i = 0; top.length < 4 && lists.some(([,rs])=>i < rs.length); i++)
+      for (const [k, rs] of lists) if (top.length < 4 && rs[i] && !seen.has(rs[i])){ seen.add(rs[i]); top.push([k, rs[i]]); }
+    el.innerHTML = `<div class="hd-head"><div><div class="eyebrow">${d===y ? 'Yesterday in the General Assembly' : gap <= 3 ? 'The latest day with action on bills' : `On break: no action on bills since ${short(d)}`}</div>
+        <h2 id="hd-t">What happened on ${dayLong(d).replace(/, \d{4}$/, '')}?</h2></div><a class="btn primary" href="#day-${d}">See everything that happened</a></div>
+      <ul class="hd-counts">${main.slice(0, 6).map(([k, bs])=>`<li><b class="num">${fmt(bs.length)}</b><span>${DAYK_INFO[k].l}</span></li>`).join('')}</ul>
+      ${top.length ? `<ul class="dk-list hd-list">${top.map(([k, r])=>`<li><div class="dk-h"><span class="hd-k">${DAYK_INFO[k].l}</span><a class="mono" href="#bill-${r.x.ga}-${r.x.bill.replace(/\s+/g,'')}">${esc(r.x.bill)}</a> <a class="dk-t" href="#bill-${r.x.ga}-${r.x.bill.replace(/\s+/g,'')}">${esc(r.x.short || '')}</a>${dayTopic(r)}</div></li>`).join('')}</ul>` : ''}`;
+    el.hidden = false;
+  } catch { /* the box is optional */ }
+}
+
 /* =================== SESSION REPLAY ===================
    Every House and Senate bill is a dot that moves, on the day ILGA recorded each step, between the readings and
    committees of each chamber and then to the governor. Data: bills/<ga>/timeline.json from the build (timeline() in
@@ -3572,7 +3723,7 @@ function bindReplay(tl){
   recolor(); setPlay(RP.playing); requestAnimationFrame(frame);
 }
 
-const RENDER = {home:renderHome, find:renderFind, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, speeches:renderSpeeches, thinktanks:renderThinkTanks, 'thinktanks-reports':renderTtReports, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch, contact:renderContact, about:renderAbout, trends:renderTrends};
+const RENDER = {home:renderHome, find:renderFind, bills:()=>{ BL.view='law'; renderBills(); }, 'bills-introduced':()=>{ BL.view='intro'; renderBills(); }, 'bills-committee':()=>{ BL.view='committee'; renderBills(); }, 'bills-law':()=>{ BL.view='law'; renderBills(); }, 'bills-activity':()=>{ BL.view='activity'; renderBills(); }, day:renderDay, speeches:renderSpeeches, thinktanks:renderThinkTanks, 'thinktanks-reports':renderTtReports, topics:renderTopics, sponsors:renderSponsors, replay:renderReplay, codebook:renderCodebook, parties:renderParties, committees:renderCommittees, search:renderSearch, contact:renderContact, about:renderAbout, trends:renderTrends};
 let CUR = null, ROUTE = {view:'bills'}; const STACK = [];
 /* the address of a page. Pages live after a # on the home address; an entry file such as /governor-jb-pritzker (written by
    the build so search engines can list the page) opens its page, and the address returns to /#… once the app runs. */
@@ -3585,6 +3736,7 @@ function parseRoute(t){
   if ((m = /^bill-(\d+)-([A-Z]+\d+)$/.exec(t))) return {view:'bill', ga:+m[1], key:m[2]};
   if ((m = /^bill-([A-Z]+\d+)$/.exec(t))) return {view:'bill', ga:null, key:m[1]};  // older links: newest session with that number
   if ((m = /^report-(\d+)$/.exec(t))) return {view:'report', key:+m[1]};
+  if ((m = /^day-(\d{4}-\d{2}-\d{2})$/.exec(t))) return {view:'day', date:m[1]};
   if ((m = /^sponsor-([a-z0-9-]+)$/.exec(t))) return {view:'sponsor', key:m[1]};
   if ((m = /^org-([a-z0-9-]+)$/.exec(t))) return {view:'org', key:m[1]};
   if ((m = /^governor-([a-z0-9-]+)$/.exec(t))) return {view:'governor', key:m[1]};
@@ -3598,7 +3750,7 @@ function parseRoute(t){
   if ((m = /^about-(data|team|license|cite)$/.exec(t))) return {view:'about', sec:m[1]};
   return null;
 }
-const tabOf = rt => ({'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', 'thinktanks-reports':'thinktanks', speech:'speeches', governor:'speeches', sponsor:'sponsors', committee:'committees', trends:'topics'})[rt.view] || rt.view;
+const tabOf = rt => ({day:'bills', 'bills-introduced':'bills', 'bills-committee':'bills', 'bills-law':'bills', 'bills-activity':'bills', bill:'bills', report:'thinktanks', org:'thinktanks', 'thinktanks-reports':'thinktanks', speech:'speeches', governor:'speeches', sponsor:'sponsors', committee:'committees', trends:'topics'})[rt.view] || rt.view;
 const sectionOf = rt => { const t = tabOf(rt); return LEGTABS.some(([k])=>k===t) ? 'bills' : t; };
 function navHTML(){ const cur = sectionOf(ROUTE), key = t => t[3] || t[0];
   const btn = t => `<button data-v="${t[0]}" ${key(t)===cur?'aria-current="page"':''}>${t[2]?`<i class="dot ${t[2]}"></i>`:''}${t[1]}</button>`;
