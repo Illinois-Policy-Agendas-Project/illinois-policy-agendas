@@ -199,7 +199,7 @@ Commit and push, and the site updates. Lab computers pick up the change the next
   not offered again (`found.json` remembers them). It only looks back to a few weeks before each organization's latest
   report on file. Sites that block automated requests (CTBA and ILEPI did from a cloud server) and organizations
   without a source are collected by hand into the main reports file as before.
-- **Keeping bills current (and the day-by-day replay):** click **Update bills from ILGA** in the control panel (or run
+- **Keeping bills current (the day-by-day replay and the "What happened" page):** click **Update bills from ILGA** in the control panel (or run
   `python pipeline/fetch_actions.py`) before **Check data**. It downloads every House and Senate bill's Bill Status file
   from the General Assembly's public file repository (ftp.ilga.gov, which ILGA asks automated tools to use instead of
   ilga.gov) into `IAP/Website/inputs/actions/<session>/`: every dated action (`bill_actions.csv`) and each bill's short
@@ -208,6 +208,9 @@ Commit and push, and the site updates. Lab computers pick up the change the next
   (listed in the report so they can be coded). The scraped file itself is not changed, and coders' codes still apply.
   The first run takes about 40 minutes; later runs download only bills that changed. Without these files the site
   builds from the scraped file alone and keeps the replay as last published.
+  The same dated actions feed **What happened** (Bills → What happened, and the box on the home page): every action on
+  one day, opening on yesterday. The build writes them to `docs/data/bills/<session>/day/<date>.json`. The page is only
+  as current as the last publish, so "yesterday" is up to date only if the site is published daily.
 - **Design and features:** `site/index.html`.
 
 ## Common data changes (edit `config.toml`)

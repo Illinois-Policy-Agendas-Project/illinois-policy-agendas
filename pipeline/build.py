@@ -815,6 +815,19 @@ TO_THIRD = re.compile(r'^(Second Reading|Placed on Calendar (Order of )?3rd Read
 PASSED = re.compile(r'^Third Reading.*Passed')
 
 
+def write_days(folder, dated):
+    """Every dated action, by day, for the "What happened on …" page: day/<YYYY-MM-DD>.json holds [[bill key, chamber,
+    action], ...] (ILGA's order within a bill), and days.json lists each date with its number of actions.
+    Returns one hash for them all."""
+    by_day = defaultdict(list)
+    for key, acts in dated.items():
+        for d, chamber, text in acts:
+            by_day[d].append([key, chamber, text])
+    hashes = [dump(folder / 'day' / f'{d}.json', acts) for d, acts in sorted(by_day.items())]
+    hashes.append(dump(folder / 'days.json', {'n': {d: len(v) for d, v in sorted(by_day.items())}}))
+    return hashlib.sha1(''.join(hashes).encode()).hexdigest()[:10]
+
+
 def timeline(dated):
     """Where each bill was, day by day, for the session replay.
     start: the first day; n: actions taken on each day; cm: [[chamber, committee name], ...];
@@ -1377,11 +1390,17 @@ def write_site(cfg, codebook, sessions, people, links, sots, tt, rep, profiles=N
         files[f'sponsors-{ga}'] = dump(d / 'bills' / str(ga) / 'sponsors.json', {k: links.get(k, []) for k in s['bills']})
         if s.get('dated'):
             files[f'timeline-{ga}'] = dump(d / 'bills' / str(ga) / 'timeline.json', timeline(s['dated']))
+            files[f'days-{ga}'] = write_days(d / 'bills' / str(ga), s['dated'])
         elif (ROOT / 'docs' / 'data' / 'bills' / str(ga) / 'timeline.json').exists():
             # no dated actions on this computer yet: keep the replay that is already published rather than dropping it
             old = (ROOT / 'docs' / 'data' / 'bills' / str(ga) / 'timeline.json').read_text(encoding='utf-8')
             files[f'timeline-{ga}'] = dump(d / 'bills' / str(ga) / 'timeline.json', json.loads(old))
             rep.note(f'Bills, {ga}th GA', 'Kept the published day-by-day replay as it was. Click "Update bills from ILGA" to bring it up to date.')
+            old_days = ROOT / 'docs' / 'data' / 'bills' / str(ga)
+            if (old_days / 'days.json').exists():   # the same for the "What happened on …" days
+                shutil.copytree(old_days / 'day', d / 'bills' / str(ga) / 'day', dirs_exist_ok=True)
+                shutil.copyfile(old_days / 'days.json', d / 'bills' / str(ga) / 'days.json')
+                files[f'days-{ga}'] = hashlib.sha1((old_days / 'days.json').read_bytes()).hexdigest()[:10]
     files['people'] = dump(d / 'people.json', {'people': people})
     files['sots'] = dump(d / 'sots.json', {'cols': ['id', 'governor', 'year', 'text', 'sub'], 'rows': sots})
     for src, dest in logo_copies:
